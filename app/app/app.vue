@@ -16,21 +16,43 @@ useSeoMeta({
   twitterCard: 'summary_large_image',
 })
 
-// Inner transition for navigation inside the user panel: content blurs out
-// and slides up in. Skipped while the page curtain is covering the screen.
+// Inner transition for navigation inside the user panel: content fades and
+// lifts out, then rises in. Opacity + transform only (GPU-composited); the
+// scroll reset happens while the old page is invisible so it never jumps.
+const root = () => document.documentElement
+function done2(el: Element, done: () => void) {
+  gsap.set(el, { clearProps: 'opacity,visibility,transform,willChange' })
+  done()
+}
 const pageTransition = {
   name: 'page',
   mode: 'out-in' as const,
   css: false,
+  onBeforeLeave() {
+    if (!curtain.value.active) root().dataset.transitioning = '1'
+  },
   onLeave(el: Element, done: () => void) {
     if (curtain.value.active || prefersReducedMotion()) return done()
-    gsap.to(el, { autoAlpha: 0, y: -12, filter: 'blur(6px)', duration: 0.22, ease: 'power2.in', onComplete: done })
+    gsap.to(el, {
+      autoAlpha: 0, y: -10, duration: 0.18, ease: 'power2.in', willChange: 'transform, opacity', overwrite: true,
+      onComplete: () => { window.scrollTo({ top: 0, behavior: 'instant' }); done() },
+    })
   },
   onEnter(el: Element, done: () => void) {
-    if (curtain.value.active || prefersReducedMotion()) return done()
-    window.scrollTo({ top: 0 })
-    gsap.fromTo(el, { autoAlpha: 0, y: 22, filter: 'blur(8px)' }, { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, ease: 'power3.out', clearProps: 'filter,transform,opacity,visibility', onComplete: done })
+    if (curtain.value.active || prefersReducedMotion()) {
+      if (!curtain.value.active) window.scrollTo({ top: 0, behavior: 'instant' })
+      return done2(el, done)
+    }
+    gsap.fromTo(el, { autoAlpha: 0, y: 18 }, {
+      autoAlpha: 1, y: 0, duration: 0.42, ease: 'power3.out', willChange: 'transform, opacity', overwrite: true,
+      onComplete: () => done2(el, done),
+    })
   },
+  onAfterEnter() {
+    if (!curtain.value.active) delete root().dataset.transitioning
+  },
+  onEnterCancelled: (el: Element) => gsap.set(el, { clearProps: 'all' }),
+  onLeaveCancelled: (el: Element) => gsap.set(el, { clearProps: 'all' }),
 }
 </script>
 

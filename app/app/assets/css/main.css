@@ -71,6 +71,10 @@
   html {
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: auto;
+    /* Reserve the scrollbar so locking scroll for a panel doesn't shift the page. */
+    scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-bg text-fg font-sans antialiased;
@@ -86,6 +90,13 @@
     @apply outline-2 outline-offset-2 outline-brand-500;
   }
   [hidden] { display: none !important; }
+
+  /* Grid items default to min-width:auto, so one long nowrap/truncated title
+     widens a single-column grid past the phone screen. Zero specificity, so
+     any explicit min-w-* still wins. */
+  :where(.grid, .inline-grid) > * { min-width: 0; }
+
+  button, a, [role="button"], label { touch-action: manipulation; }
 }
 
 /* Entrance animation guard: elements marked by v-anim start hidden only when
@@ -136,7 +147,8 @@
   .card-pad { @apply p-5 sm:p-6; }
 
   .input {
-    @apply w-full rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-fg placeholder:text-muted/70
+    /* 16px on phones: iOS Safari zooms the page when a smaller input is focused. */
+    @apply w-full rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-base sm:text-sm text-fg placeholder:text-muted/70
       transition focus:border-brand-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-500/15;
   }
   .input-error { @apply border-danger focus:border-danger focus:ring-danger/15; }
@@ -168,6 +180,9 @@
     @apply animate-pulse rounded-2xl bg-surface-2;
   }
 
+  /* Bottom padding that clears the iPhone home indicator. */
+  .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
   .scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 }
 
@@ -181,6 +196,12 @@
 @utility bg-dots {
   background-image: radial-gradient(color-mix(in oklab, var(--fg) 12%, transparent) 1px, transparent 1px);
   background-size: 22px 22px;
+}
+
+/* Touch screens: comfortable 40px minimum tap targets for the small controls. */
+@media (pointer: coarse) {
+  .btn-sm, .chip-toggle { min-height: 2.5rem; }
+  .btn-icon { min-width: 2.5rem; min-height: 2.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

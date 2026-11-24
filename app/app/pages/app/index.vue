@@ -43,11 +43,11 @@ const brandOf = (id: string) => brands.byId(id)
 
     <template v-else>
       <UiErrorState v-if="q.error.value && !q.data.value" :error="q.error.value" @retry="q.refresh()" />
-      <div v-else-if="!q.data.value" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div v-else-if="!q.data.value" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <div v-for="i in 4" :key="i" class="skeleton h-32" />
       </div>
       <template v-else>
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <UiStatCard v-anim="0" :label="t('credits.available')" :value="q.data.value.wallet.available" :icon="Coins" tint="#FFB23F" :hint="q.data.value.wallet.reserved ? t('credits.reservedShort', { n: q.data.value.wallet.reserved }) : t('credits.noExpiry')" />
           <UiStatCard v-anim="1" :label="t('dashboard.thisMonth')" :value="q.data.value.monthCount" :icon="CalendarClock" tint="#6C4CF5" />
           <UiStatCard v-anim="2" :label="t('dashboard.inProgress')" :value="(q.data.value.statusCounts.draft + q.data.value.statusCounts.in_review)" :icon="FilePen" tint="#FF6FAE" :hint="`${t('status.draft')} ${q.data.value.statusCounts.draft} · ${t('status.in_review')} ${q.data.value.statusCounts.in_review}`" />

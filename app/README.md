@@ -89,6 +89,17 @@ scripts/extract-logo.py      Regenerates public/brand from brand-source/
 - **Page transitions:**
   - Between public pages, and when entering or leaving `/app`: a four-colour curtain.
   - Inside `/app`: a blur and slide of the content area.
+- **Mobile:**
+  - Below `lg`, the user panel uses a bottom tab bar (Home, Library, Create, Calendar, More) instead of the sidebar. It hides while the on-screen keyboard is open and publishes its height as `--tabbar-h`, so sticky bars can sit above it.
+  - Panels close with a swipe to the right, and notices dismiss the same way.
+  - Inputs are 16px on phones so iOS doesn't zoom on focus, and small controls get 40px tap targets on touch screens.
+  - Safe-area insets are respected for the notch and the home indicator.
+  - Grid children default to `min-width: 0`, so long titles truncate instead of widening the page.
+- **Smooth motion rules:**
+  - Animate only `transform` and `opacity`. The page curtain, inner page transition, panels and notices all follow this (no `filter`, `clip-path` or `height` tweens on large elements).
+  - `v-anim` uses one shared IntersectionObserver, so entrances still play after content above them changes size.
+  - ScrollTrigger re-measures (debounced) whenever the page height changes.
+  - Add `overwrite: true` to any tween a user can retrigger quickly.
 - **Theme:** light, dark, or system. Stored in a cookie and applied before first paint. Toggling uses a circular View Transition where the browser supports it.
 - **Language:** TH (default) or EN, stored in a cookie. Generated content follows each brand's language setting, not the UI language.
 - **Every data screen** has loading, empty, error-with-retry, and success states (`useQuery` + `Ui*State` components).

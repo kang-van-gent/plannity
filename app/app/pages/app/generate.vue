@@ -103,7 +103,7 @@ async function go(to: number) {
   step.value = to
   await nextTick()
   window.scrollTo({ top: 0, behavior: 'smooth' })
-  if (stepEl.value && !prefersReducedMotion()) gsap.fromTo(stepEl.value, { x: 70 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: 'power3.out' })
+  if (stepEl.value && !prefersReducedMotion()) gsap.fromTo(stepEl.value, { x: 70 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
 }
 
 async function submit() {

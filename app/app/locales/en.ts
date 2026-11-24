@@ -13,6 +13,7 @@ const en: Messages = {
   },
 
   nav: {
+    more: 'More', tabHome: 'Home', tabLibrary: 'Library', tabCreate: 'Create', theme: 'Theme',
     main: 'Main menu', menu: 'Menu', howItWorks: 'How it works', pricing: 'Pricing', faq: 'FAQ', login: 'Log in',
     tryFree: 'Try free', openApp: 'Open app', dashboard: 'Dashboard', brands: 'Brands', generate: 'Generate with AI',
     library: 'Content library', calendar: 'Calendar', promote: 'Promote', credits: 'Credits', settings: 'Settings', profile: 'Profile',

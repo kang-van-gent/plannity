@@ -54,9 +54,48 @@ function onLeave(el: Element, done: () => void) {
   timers.get(Number(node.dataset.id))?.kill()
   timers.delete(Number(node.dataset.id))
   if (prefersReducedMotion()) return done()
-  gsap.timeline({ onComplete: done })
-    .to(node, { x: '115%', opacity: 0, duration: 0.32, ease: 'power2.in' })
-    .to(node, { height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, duration: 0.22, ease: 'power2.inOut' })
+  gsap.to(node, {
+    x: '115%', opacity: 0, duration: 0.3, ease: 'power2.in',
+    onComplete: () => {
+      // Take it out of the flow and let the cards below glide up (FLIP, transforms only).
+      const below = Array.from(node.parentElement?.children ?? []).filter((c) => c !== node && (c.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING)) as HTMLElement[]
+      const before = below.map((b) => b.getBoundingClientRect().top)
+      node.style.display = 'none'
+      below.forEach((b, i) => {
+        const dy = before[i]! - b.getBoundingClientRect().top
+        if (dy) gsap.fromTo(b, { y: dy }, { y: 0, duration: 0.35, ease: 'power3.out', clearProps: 'transform' })
+      })
+      done()
+    },
+  })
+}
+
+// Touch: swipe a notice to the right to dismiss it.
+let swipe: { id: number; x0: number; y0: number; dx: number; lock: boolean; el: HTMLElement } | null = null
+function swipeStart(e: PointerEvent, n: Notice) {
+  if (e.pointerType === 'mouse' || (e.target as Element).closest('button')) return
+  swipe = { id: n.id, x0: e.clientX, y0: e.clientY, dx: 0, lock: false, el: e.currentTarget as HTMLElement }
+  pause(n)
+}
+function swipeMove(e: PointerEvent) {
+  if (!swipe) return
+  const dx = e.clientX - swipe.x0, dy = e.clientY - swipe.y0
+  if (!swipe.lock) {
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return }
+    if (Math.abs(dx) < 8) return
+    swipe.lock = true
+    swipe.el.setPointerCapture(e.pointerId)
+  }
+  swipe.dx = Math.max(-20, dx)
+  gsap.set(swipe.el, { x: swipe.dx, opacity: 1 - Math.max(0, swipe.dx) / 260 })
+}
+function swipeEnd(n: Notice) {
+  const s = swipe
+  swipe = null
+  if (!s) return resume(n)
+  if (s.dx > 90) return dismiss(n.id)
+  gsap.to(s.el, { x: 0, opacity: 1, duration: 0.3, ease: 'power3.out' })
+  resume(n)
 }
 
 const pause = (n: Notice) => timers.get(n.id)?.pause()
@@ -76,12 +115,14 @@ const answer = (ok: boolean) => confirmReq.value?.resolve(ok)
 </script>
 
 <template>
-  <div class="pointer-events-none fixed right-3 top-3 z-[160] w-[min(390px,calc(100vw-1.5rem))] transition-[right] duration-500 ease-[var(--ease-spring)] sm:right-5 sm:top-5"
+  <div class="pointer-events-none fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[160] w-[min(390px,calc(100vw-1.5rem))] transition-[right] duration-500 ease-[var(--ease-spring)] sm:right-5 sm:top-5"
     :style="offset ? { right: `${offset}px` } : undefined" aria-live="polite">
     <TransitionGroup :css="false" @enter="onEnter" @leave="onLeave">
       <div v-for="n in notices" :key="n.id" :data-id="n.id" :role="n.type === 'error' ? 'alert' : 'status'"
         class="pointer-events-auto relative mb-3 overflow-hidden rounded-3xl border border-line bg-surface p-4 pl-5 shadow-panel"
-        @mouseenter="pause(n)" @mouseleave="resume(n)" @focusin="pause(n)" @focusout="resume(n)">
+        style="touch-action: pan-y"
+        @mouseenter="pause(n)" @mouseleave="resume(n)" @focusin="pause(n)" @focusout="resume(n)"
+        @pointerdown="swipeStart($event, n)" @pointermove="swipeMove" @pointerup="swipeEnd(n)" @pointercancel="swipeEnd(n)">
         <span data-glow class="pointer-events-none absolute inset-0 bg-gradient-to-r to-transparent opacity-60" :class="GLOW[n.type]" />
         <span class="absolute inset-y-0 left-0 w-1.5" :class="ACCENT[n.type]" />
         <div class="relative flex items-start gap-3">

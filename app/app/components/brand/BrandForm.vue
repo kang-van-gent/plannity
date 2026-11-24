@@ -48,7 +48,7 @@ async function go(dir: 1 | -1) {
   if (dir === 1 && step.value === 0 && !validate('basics')) return
   step.value = Math.max(0, Math.min(STEPS.length - 1, step.value + dir))
   await nextTick()
-  if (stepEl.value && !prefersReducedMotion()) gsap.fromTo(stepEl.value, { x: 60 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: 'power3.out' })
+  if (stepEl.value && !prefersReducedMotion()) gsap.fromTo(stepEl.value, { x: 60 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
 }
 
 function submit() {

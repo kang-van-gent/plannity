@@ -10,7 +10,7 @@ onMounted(() => { mounted.value = true })
 
 function onClick(e: MouseEvent) {
   toggle({ x: e.clientX, y: e.clientY })
-  if (icon.value && !prefersReducedMotion()) gsap.fromTo(icon.value, { rotate: -90, scale: 0.4 }, { rotate: 0, scale: 1, duration: 0.6, ease: 'back.out(2.5)' })
+  if (icon.value && !prefersReducedMotion()) gsap.fromTo(icon.value, { rotate: -90, scale: 0.4 }, { rotate: 0, scale: 1, duration: 0.6, ease: 'back.out(2.5)', overwrite: true })
 }
 </script>
 

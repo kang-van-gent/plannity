@@ -11,7 +11,7 @@ const { t } = useLocale()
       <div class="absolute left-1/3 top-1/2 size-72 rounded-full bg-sun/60 blur-3xl" />
       <div class="relative flex h-full flex-col justify-between p-12 text-white">
         <NuxtLink to="/" class="inline-flex w-fit items-center gap-2 rounded-2xl bg-white/90 px-4 py-2.5 shadow-xl">
-          <AppLogo variant="lockup" class="h-9" eager />
+          <AppLogo variant="lockup" surface="light" class="h-9" eager />
         </NuxtLink>
         <div>
           <Doodle variant="spark" class="size-12 text-sun" />
@@ -22,11 +22,11 @@ const { t } = useLocale()
       </div>
     </aside>
     <div class="flex min-h-dvh flex-col">
-      <div class="flex items-center justify-between gap-2 p-4 sm:p-6">
-        <NuxtLink to="/" class="btn-ghost"><ArrowLeft class="size-4" />{{ t('auth.backHome') }}</NuxtLink>
+      <div class="flex items-center justify-between gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:p-6">
+        <NuxtLink to="/" class="btn-ghost -ml-2 sm:ml-0"><ArrowLeft class="size-4" /><span class="hidden min-[380px]:inline">{{ t('auth.backHome') }}</span></NuxtLink>
         <div class="flex items-center gap-2"><LocaleSwitch /><ThemeToggle /></div>
       </div>
-      <main class="flex flex-1 items-center justify-center px-5 pb-12">
+      <main class="flex flex-1 items-center justify-center px-5 pb-[max(3rem,env(safe-area-inset-bottom))]">
         <div class="w-full max-w-md"><slot /></div>
       </main>
     </div>

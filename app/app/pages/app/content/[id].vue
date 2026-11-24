@@ -128,7 +128,7 @@ async function regenerate() {
   })
   if (!ok) return
   regenerating.value = true
-  if (cardEl.value && !prefersReducedMotion()) gsap.to(cardEl.value, { opacity: 0.4, filter: 'blur(3px)', duration: 0.3 })
+  if (cardEl.value && !prefersReducedMotion()) gsap.to(cardEl.value, { opacity: 0.45, scale: 0.985, duration: 0.3, ease: 'power2.out', overwrite: true })
   try {
     const c = await api.contents.regenerate(content.value.id, regenKey.key.value)
     regenKey.renew()
@@ -139,7 +139,7 @@ async function regenerate() {
     notify.fromError(e)
   } finally {
     regenerating.value = false
-    if (cardEl.value) gsap.to(cardEl.value, { opacity: 1, filter: 'blur(0px)', duration: 0.5, clearProps: 'filter' })
+    if (cardEl.value) gsap.to(cardEl.value, { opacity: 1, scale: 1, duration: 0.5, ease: 'power3.out', overwrite: true, clearProps: 'transform,opacity' })
   }
 }
 
@@ -248,7 +248,7 @@ onBeforeRouteLeave(async () => {
 
       <!-- Sticky save bar appears when there are unsaved edits -->
       <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="translate-y-full opacity-0" leave-active-class="transition duration-200 ease-in" leave-to-class="translate-y-full opacity-0">
-        <div v-if="dirty" class="sticky bottom-4 z-30 mt-6 flex items-center gap-3 rounded-3xl border border-brand-300 bg-surface/95 p-3 pl-5 shadow-panel backdrop-blur">
+        <div v-if="dirty" class="sticky bottom-[calc(var(--tabbar-h,0px)+0.75rem)] z-30 mt-6 flex items-center gap-3 rounded-3xl border border-brand-300 bg-surface/95 p-3 pl-5 shadow-panel backdrop-blur">
           <span class="size-2.5 animate-pulse rounded-full bg-warning" />
           <p class="flex-1 text-sm font-semibold">{{ t('content.unsaved') }}</p>
           <button type="button" class="btn-ghost btn-sm" @click="setContent(content)">{{ t('content.discard') }}</button>

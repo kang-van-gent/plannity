@@ -11,6 +11,7 @@ const th = {
   },
 
   nav: {
+    more: 'เพิ่มเติม', tabHome: 'หน้าหลัก', tabLibrary: 'คลัง', tabCreate: 'สร้าง', theme: 'ธีม',
     main: 'เมนูหลัก', menu: 'เมนู', howItWorks: 'วิธีใช้งาน', pricing: 'ราคา', faq: 'คำถามที่พบบ่อย', login: 'เข้าสู่ระบบ',
     tryFree: 'ทดลองฟรี', openApp: 'เข้าสู่แอป', dashboard: 'แดชบอร์ด', brands: 'แบรนด์', generate: 'สร้างด้วย AI',
     library: 'คลังคอนเทนต์', calendar: 'ปฏิทิน', promote: 'โปรโมต', credits: 'เครดิต', settings: 'ตั้งค่า', profile: 'โปรไฟล์',

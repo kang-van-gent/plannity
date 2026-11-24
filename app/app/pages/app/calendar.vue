@@ -65,13 +65,13 @@ const grid = ref<HTMLElement | null>(null)
 async function shift(dir: -1 | 1) {
   cursor.value = view.value === 'week' ? addDays(cursor.value, 7 * dir) : addMonths(cursor.value, dir)
   await nextTick()
-  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { x: 50 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: 'power3.out', clearProps: 'transform' })
+  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { x: 50 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
 }
 function goToday() { cursor.value = today }
 async function setView(v: View) {
   view.value = v
   await nextTick()
-  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power3.out', clearProps: 'transform' })
+  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
 }
 onMounted(() => {
   brands.load().catch(() => {})

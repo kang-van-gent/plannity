@@ -46,6 +46,7 @@ const previewChips: Record<number, { c: string; w: string }[]> = {
   19: [{ c: '#6C4CF5', w: '70%' }], 22: [{ c: '#A7E66B', w: '85%' }], 24: [{ c: '#FF6FAE', w: '60%' }], 26: [{ c: '#FFB23F', w: '75%' }], 29: [{ c: '#6C4CF5', w: '65%' }],
 }
 
+const curtain = useCurtain()
 const root = ref<HTMLElement | null>(null)
 let ctx: gsap.Context | null = null
 let mm: gsap.MatchMedia | null = null
@@ -67,7 +68,8 @@ onMounted(() => {
     const underline = root.value!.querySelector<SVGPathElement>('[data-underline] path')
     if (underline && !prefersReducedMotion()) {
       const len = underline.getTotalLength()
-      gsap.fromTo(underline, { strokeDasharray: len, strokeDashoffset: len }, { strokeDashoffset: 0, duration: 1.1, delay: 0.7, ease: 'power2.inOut' })
+      gsap.set(underline, { strokeDasharray: len, strokeDashoffset: len })
+      afterCurtain(curtain, () => gsap.to(underline, { strokeDashoffset: 0, duration: 1.1, delay: 0.6, ease: 'power2.inOut' }))
     }
   }, root.value)
 

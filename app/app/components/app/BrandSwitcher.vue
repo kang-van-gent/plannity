@@ -28,7 +28,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
 
 <template>
   <div ref="root" class="relative min-w-0" @keydown.esc="open = false">
-    <button type="button" class="flex min-w-0 max-w-[10.5rem] items-center gap-2 rounded-2xl border border-line bg-surface px-2.5 py-1.5 text-left shadow-soft transition hover:border-brand-300 sm:max-w-[16rem]"
+    <button type="button" class="flex w-full min-w-0 max-w-[13rem] items-center gap-2 rounded-2xl border border-line bg-surface px-2.5 py-1.5 text-left shadow-soft transition hover:border-brand-300 sm:max-w-[16rem]"
       :aria-expanded="open" aria-haspopup="listbox" @click="open = !open">
       <UiBrandDot v-if="currentBrand" :name="currentBrand.name" :color="currentBrand.color" :size="26" />
       <span v-else class="grid size-[26px] place-items-center rounded-[35%] bg-gradient-to-br from-brand-500 to-pink text-white"><Layers class="size-3.5" /></span>
@@ -38,7 +38,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDoc))
       </span>
       <ChevronDown class="size-4 text-muted transition" :class="open ? 'rotate-180' : ''" />
     </button>
-    <div v-if="open" ref="menu" role="listbox" class="absolute left-0 top-full z-50 mt-2 w-72 rounded-3xl border border-line bg-surface p-2 shadow-panel">
+    <div v-if="open" ref="menu" role="listbox" class="absolute left-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-3xl border border-line bg-surface p-2 shadow-panel">
       <button type="button" role="option" :aria-selected="scope === 'all'" class="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold hover:bg-surface-2" @click="choose('all')">
         <span class="grid size-7 place-items-center rounded-[35%] bg-gradient-to-br from-brand-500 to-pink text-white"><Layers class="size-4" /></span>
         <span class="flex-1">{{ t('brands.allBrands') }}</span>

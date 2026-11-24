@@ -10,8 +10,8 @@ watch(() => wallet.value?.available, (v, old) => {
   if (v === undefined) return
   if (old === undefined || prefersReducedMotion()) { shown.value = v; return }
   const o = { n: shown.value }
-  gsap.to(o, { n: v, duration: 0.9, ease: 'power2.out', onUpdate: () => { shown.value = Math.round(o.n) } })
-  if (pill.value) gsap.fromTo(pill.value, { scale: 1 }, { scale: 1.12, duration: 0.18, yoyo: true, repeat: 1, ease: 'power1.inOut' })
+  gsap.to(o, { n: v, overwrite: true, duration: 0.9, ease: 'power2.out', onUpdate: () => { shown.value = Math.round(o.n) } })
+  if (pill.value) gsap.fromTo(pill.value, { scale: 1 }, { scale: 1.12, duration: 0.18, yoyo: true, repeat: 1, ease: 'power1.inOut', overwrite: true })
 }, { immediate: true })
 </script>
 

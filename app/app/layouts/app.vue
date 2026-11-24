@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FlaskConical, Menu, MessageSquareHeart, WandSparkles } from '@lucide/vue'
+import { FlaskConical, MessageSquareHeart, WandSparkles } from '@lucide/vue'
 
 const { t } = useLocale()
 const brands = useBrands()
@@ -41,29 +41,36 @@ onMounted(async () => {
     </aside>
 
     <div class="min-w-0">
-      <header class="sticky top-0 z-40 border-b border-line bg-bg/80 backdrop-blur-xl">
-        <div class="flex items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 lg:px-10">
-          <button type="button" class="btn-icon btn-ghost lg:hidden" :aria-label="t('nav.menu')" @click="navOpen = true"><Menu class="size-5" /></button>
-          <NuxtLink to="/app" class="hidden shrink-0 sm:flex lg:hidden" aria-label="Plannity"><AppLogo variant="mark" eager class="h-8" /></NuxtLink>
-          <AppBrandSwitcher />
-          <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+      <header class="sticky top-0 z-40 border-b border-line bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+        <div class="flex items-center gap-2 px-4 py-2.5 sm:py-3 sm:gap-3 sm:px-6 lg:px-10">
+          <NuxtLink to="/app" class="flex shrink-0 lg:hidden" aria-label="Plannity"><AppLogo variant="mark" eager class="h-8" /></NuxtLink>
+          <AppBrandSwitcher class="flex-1 sm:flex-none" />
+          <div class="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
             <AppCreditPill />
             <div class="hidden sm:block"><LocaleSwitch /></div>
-            <ThemeToggle />
+            <div class="hidden sm:block"><ThemeToggle /></div>
             <AppProfileMenu />
           </div>
         </div>
       </header>
-      <main id="main" class="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+      <main id="main" class="mx-auto w-full max-w-[1400px] px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pb-10">
         <slot />
       </main>
     </div>
 
+    <AppTabBar @more="navOpen = true" />
+
     <SidePanel :open="navOpen" size="sm" title="Plannity" :subtitle="t('brand.tagline')" @close="navOpen = false">
       <AppNav @navigate="navOpen = false" />
-      <div class="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
-        <span class="text-sm font-semibold">{{ t('common.language') }}</span>
-        <LocaleSwitch />
+      <div class="grid gap-2 rounded-2xl bg-surface-2 p-3">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-sm font-semibold">{{ t('common.language') }}</span>
+          <LocaleSwitch />
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-sm font-semibold">{{ t('nav.theme') }}</span>
+          <ThemeToggle />
+        </div>
       </div>
       <button type="button" class="btn-secondary w-full" @click="navOpen = false; feedbackOpen = true"><MessageSquareHeart class="size-4" />{{ t('feedback.title') }}</button>
       <p v-if="isMock" class="rounded-xl bg-sun/15 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-sun">{{ t('common.mockBadge') }}</p>
