@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "holidays",
+  "info": {
+    "singularName": "holiday",
+    "pluralName": "holidays",
+    "displayName": "Holiday",
+    "description": "Curated Thai key dates (owner empty) plus user-added ones."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "title": {
+      "type": "json",
+      "required": true
+    },
+    "kind": {
+      "type": "enumeration",
+      "enum": [
+        "holiday",
+        "observance",
+        "shopping",
+        "custom"
+      ],
+      "default": "custom"
+    },
+    "country": {
+      "type": "string",
+      "default": "TH",
+      "maxLength": 2
+    },
+    "source": {
+      "type": "string",
+      "required": true
+    },
+    "year": {
+      "type": "integer",
+      "required": true
+    },
+    "verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "private": false
+    }
+  }
+}

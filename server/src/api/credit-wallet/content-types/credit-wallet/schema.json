@@ -1,0 +1,37 @@
+{
+  "kind": "collectionType",
+  "collectionName": "credit_wallets",
+  "info": {
+    "singularName": "credit-wallet",
+    "pluralName": "credit-wallets",
+    "displayName": "Credit Wallet",
+    "description": "One per user. CHECK(available>=0, reserved>=0) added by migration."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "available": {
+      "type": "integer",
+      "default": 0,
+      "min": 0,
+      "required": true
+    },
+    "reserved": {
+      "type": "integer",
+      "default": 0,
+      "min": 0,
+      "required": true
+    },
+    "version": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}

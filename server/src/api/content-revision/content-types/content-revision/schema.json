@@ -1,0 +1,44 @@
+{
+  "kind": "collectionType",
+  "collectionName": "content_revisions",
+  "info": {
+    "singularName": "content-revision",
+    "pluralName": "content-revisions",
+    "displayName": "Content Revision",
+    "description": "Immutable snapshot kept on edit/regenerate."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "content": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::content.content"
+    },
+    "version": {
+      "type": "integer",
+      "required": true
+    },
+    "reason": {
+      "type": "enumeration",
+      "enum": [
+        "create",
+        "edit",
+        "regenerate"
+      ],
+      "required": true
+    },
+    "snapshot": {
+      "type": "json",
+      "required": true
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "private": false
+    }
+  }
+}

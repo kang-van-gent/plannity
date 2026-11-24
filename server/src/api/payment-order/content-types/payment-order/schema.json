@@ -1,0 +1,58 @@
+{
+  "kind": "collectionType",
+  "collectionName": "payment_orders",
+  "info": {
+    "singularName": "payment-order",
+    "pluralName": "payment-orders",
+    "displayName": "Payment Order",
+    "description": "pending → paid/failed/expired/refunded. Money in satang."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "credits": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "amountSatang": {
+      "type": "biginteger",
+      "required": true
+    },
+    "currency": {
+      "type": "string",
+      "default": "THB",
+      "maxLength": 3
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "paid",
+        "failed",
+        "expired",
+        "refunded"
+      ],
+      "default": "pending",
+      "required": true
+    },
+    "provider": {
+      "type": "string",
+      "required": true
+    },
+    "providerRef": {
+      "type": "string",
+      "unique": true
+    },
+    "paidAt": {
+      "type": "datetime"
+    }
+  }
+}

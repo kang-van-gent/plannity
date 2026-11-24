@@ -1,0 +1,61 @@
+{
+  "kind": "collectionType",
+  "collectionName": "credit_ledgers",
+  "info": {
+    "singularName": "credit-ledger",
+    "pluralName": "credit-ledgers",
+    "displayName": "Credit Ledger Entry",
+    "description": "Append-only ledger; operationKey unique makes every operation idempotent."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "wallet": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::credit-wallet.credit-wallet"
+    },
+    "operationKey": {
+      "type": "string",
+      "unique": true,
+      "required": true
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "trial_grant",
+        "purchase",
+        "reserve",
+        "consume",
+        "release",
+        "adjustment"
+      ],
+      "required": true
+    },
+    "deltaAvailable": {
+      "type": "integer",
+      "required": true
+    },
+    "deltaReserved": {
+      "type": "integer",
+      "required": true
+    },
+    "availableAfter": {
+      "type": "integer",
+      "required": true
+    },
+    "refType": {
+      "type": "enumeration",
+      "enum": [
+        "job",
+        "item",
+        "payment"
+      ]
+    },
+    "refId": {
+      "type": "string"
+    }
+  }
+}

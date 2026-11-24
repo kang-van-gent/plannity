@@ -1,0 +1,51 @@
+{
+  "kind": "collectionType",
+  "collectionName": "generation_items",
+  "info": {
+    "singularName": "generation-item",
+    "pluralName": "generation-items",
+    "displayName": "Generation Item",
+    "description": "One unit of work inside a job; unique (job, ordinal) enforced by migration."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "job": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::generation-job.generation-job",
+      "inversedBy": "items"
+    },
+    "ordinal": {
+      "type": "integer",
+      "required": true,
+      "min": 0
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "default": "pending",
+      "required": true
+    },
+    "attempts": {
+      "type": "integer",
+      "default": 0
+    },
+    "errorCode": {
+      "type": "string"
+    },
+    "content": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::content.content"
+    }
+  }
+}

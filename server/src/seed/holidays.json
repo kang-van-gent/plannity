@@ -1,0 +1,158 @@
+[
+  {
+    "date": "2026-10-23",
+    "title": {
+      "th": "วันปิยมหาราช",
+      "en": "King Chulalongkorn Day"
+    },
+    "kind": "holiday",
+    "country": "TH",
+    "source": "ปฏิทินวันหยุดราชการ",
+    "year": 2026,
+    "verified": true
+  },
+  {
+    "date": "2026-11-11",
+    "title": {
+      "th": "11.11 วันช้อปออนไลน์",
+      "en": "11.11 Shopping Day"
+    },
+    "kind": "shopping",
+    "country": "TH",
+    "source": "Marketing calendar",
+    "year": 2026,
+    "verified": true
+  },
+  {
+    "date": "2026-11-24",
+    "title": {
+      "th": "ลอยกระทง (โปรดตรวจสอบ)",
+      "en": "Loy Krathong (please verify)"
+    },
+    "kind": "observance",
+    "country": "TH",
+    "source": "ปฏิทินจันทรคติ — ยังไม่ยืนยัน",
+    "year": 2026,
+    "verified": false
+  },
+  {
+    "date": "2026-12-05",
+    "title": {
+      "th": "วันพ่อแห่งชาติ",
+      "en": "National Father's Day"
+    },
+    "kind": "holiday",
+    "country": "TH",
+    "source": "ปฏิทินวันหยุดราชการ",
+    "year": 2026,
+    "verified": true
+  },
+  {
+    "date": "2026-12-10",
+    "title": {
+      "th": "วันรัฐธรรมนูญ",
+      "en": "Constitution Day"
+    },
+    "kind": "holiday",
+    "country": "TH",
+    "source": "ปฏิทินวันหยุดราชการ",
+    "year": 2026,
+    "verified": true
+  },
+  {
+    "date": "2026-12-12",
+    "title": {
+      "th": "12.12 วันช้อปออนไลน์",
+      "en": "12.12 Shopping Day"
+    },
+    "kind": "shopping",
+    "country": "TH",
+    "source": "Marketing calendar",
+    "year": 2026,
+    "verified": true
+  },
+  {
+    "date": "2026-12-25",
+    "title": {
+      "th": "คริสต์มาส",
+      "en": "Christmas Day"
+    },
+    "kind": "observance",
+    "country": "TH",
+    "source": "Marketing calendar",
+    "year": 2026,
+    "verified": true
+  },
+  {
+    "date": "2026-12-31",
+    "title": {
+      "th": "วันสิ้นปี",
+      "en": "New Year's Eve"
+    },
+    "kind": "holiday",
+    "country": "TH",
+    "source": "ปฏิทินวันหยุดราชการ",
+    "year": 2026,
+    "verified": true
+  },
+  {
+    "date": "2027-01-01",
+    "title": {
+      "th": "วันขึ้นปีใหม่",
+      "en": "New Year's Day"
+    },
+    "kind": "holiday",
+    "country": "TH",
+    "source": "ปฏิทินวันหยุดราชการ",
+    "year": 2027,
+    "verified": true
+  },
+  {
+    "date": "2027-01-09",
+    "title": {
+      "th": "วันเด็กแห่งชาติ",
+      "en": "National Children's Day"
+    },
+    "kind": "observance",
+    "country": "TH",
+    "source": "เสาร์ที่ 2 ของเดือนมกราคม",
+    "year": 2027,
+    "verified": true
+  },
+  {
+    "date": "2027-01-16",
+    "title": {
+      "th": "วันครู",
+      "en": "Teachers' Day"
+    },
+    "kind": "observance",
+    "country": "TH",
+    "source": "ปฏิทินวันสำคัญ",
+    "year": 2027,
+    "verified": true
+  },
+  {
+    "date": "2027-02-06",
+    "title": {
+      "th": "ตรุษจีน (โปรดตรวจสอบ)",
+      "en": "Chinese New Year (please verify)"
+    },
+    "kind": "observance",
+    "country": "TH",
+    "source": "ปฏิทินจันทรคติจีน — ยังไม่ยืนยัน",
+    "year": 2027,
+    "verified": false
+  },
+  {
+    "date": "2027-02-14",
+    "title": {
+      "th": "วันวาเลนไทน์",
+      "en": "Valentine's Day"
+    },
+    "kind": "observance",
+    "country": "TH",
+    "source": "Marketing calendar",
+    "year": 2027,
+    "verified": true
+  }
+]

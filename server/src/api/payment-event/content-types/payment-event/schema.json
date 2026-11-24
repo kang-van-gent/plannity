@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "payment_events",
+  "info": {
+    "singularName": "payment-event",
+    "pluralName": "payment-events",
+    "displayName": "Payment Event",
+    "description": "Verified provider webhook events; providerEventId unique prevents double grants."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "providerEventId": {
+      "type": "string",
+      "unique": true,
+      "required": true
+    },
+    "order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::payment-order.payment-order"
+    },
+    "processedAt": {
+      "type": "datetime"
+    }
+  }
+}

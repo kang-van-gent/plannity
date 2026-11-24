@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Brand tokens (spec §2A / §19). Primary #6C4CF5, ink #211C3A, supporting
+   pink / orange / blue / green, canvas #FBFAFF.
+--------------------------------------------------------------------------- */
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Noto Sans Thai", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fredoka", "Noto Sans Thai", ui-rounded, ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: #f3f0ff;
+  --color-brand-100: #e9e3ff;
+  --color-brand-200: #d4c9ff;
+  --color-brand-300: #b6a3fc;
+  --color-brand-400: #9277f8;
+  --color-brand-500: #6c4cf5;
+  --color-brand-600: #5835e0;
+  --color-brand-700: #4827bd;
+  --color-brand-800: #3a2196;
+  --color-brand-900: #2e1c72;
+
+  --color-ink: #211c3a;
+  --color-pink: #ff6fae;
+  --color-sun: #ffb23f;
+  --color-sky: #62c5f4;
+  --color-lime: #a7e66b;
+  --color-canvas: #fbfaff;
+
+  --color-success: #2fa86a;
+  --color-warning: #f08c00;
+  --color-danger: #e5484d;
+
+  --radius-4xl: 2rem;
+  --shadow-soft: 0 1px 2px rgb(33 28 58 / 0.04), 0 8px 24px -12px rgb(33 28 58 / 0.12);
+  --shadow-pop: 0 18px 40px -16px rgb(108 76 245 / 0.45);
+  --shadow-panel: -24px 0 60px -20px rgb(33 28 58 / 0.35);
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Semantic surfaces that flip with the theme. */
+:root {
+  --bg: #fbfaff;
+  --surface: #ffffff;
+  --surface-2: #f6f4fe;
+  --line: #ebe7f7;
+  --fg: #211c3a;
+  --fg-muted: #6b6588;
+}
+.dark {
+  --bg: #0f0c1e;
+  --surface: #17132b;
+  --surface-2: #1e1938;
+  --line: #2c2650;
+  --fg: #f1eeff;
+  --fg-muted: #a59fc4;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: auto;
+  }
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+  ::selection {
+    @apply bg-brand-500/25;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+  [hidden] { display: none !important; }
+}
+
+/* Entrance animation guard: elements marked by v-anim start hidden only when
+   JS animation is enabled (class set by the boot script). A fallback timer
+   reveals them if hydration never happens. */
+.js-anim:not(.anim-fallback) [data-anim] {
+  opacity: 0;
+}
+
+/* Smooth colour swap when toggling theme without a View Transition. */
+.theme-fade, .theme-fade * {
+  transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease !important;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+    transition-all duration-200 select-none disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+}
+
+@layer components {
+  .btn-primary {
+    @apply btn bg-brand-500 text-white shadow-pop hover:bg-brand-600 hover:-translate-y-0.5 active:translate-y-0;
+  }
+  .btn-secondary {
+    @apply btn border border-line bg-surface text-fg hover:border-brand-300 hover:text-brand-600 dark:hover:text-brand-300;
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-surface-2 hover:text-fg;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:brightness-110;
+  }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-xl; }
+  .btn-lg { @apply px-6 py-3.5 text-base; }
+  .btn-icon { @apply btn p-2.5 rounded-xl; }
+
+  .card {
+    @apply rounded-3xl border border-line bg-surface shadow-soft;
+  }
+  .card-pad { @apply p-5 sm:p-6; }
+
+  .input {
+    @apply w-full rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-fg placeholder:text-muted/70
+      transition focus:border-brand-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-500/15;
+  }
+  .input-error { @apply border-danger focus:border-danger focus:ring-danger/15; }
+  textarea.input { @apply min-h-24 leading-relaxed; }
+  select.input { @apply appearance-none bg-no-repeat pr-10; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6588' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-position: right 0.9rem center; }
+
+  .label { @apply mb-1.5 block text-sm font-semibold text-fg; }
+  .hint { @apply mt-1 text-xs text-muted; }
+  .field-error { @apply mt-1 text-xs font-medium text-danger; }
+
+  .chip-toggle {
+    @apply chip cursor-pointer border border-line bg-surface px-3 py-1.5 text-muted transition hover:border-brand-300 hover:text-fg;
+  }
+  .chip-toggle[aria-pressed="true"], .chip-toggle.is-active {
+    @apply border-brand-500 bg-brand-500 text-white shadow-pop;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-300;
+  }
+  .section-title { @apply font-display text-3xl font-bold sm:text-4xl lg:text-5xl; }
+  .muted { @apply text-muted; }
+
+  .kbd {
+    @apply rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-muted;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-2xl bg-surface-2;
+  }
+
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+}
+
+@utility text-gradient {
+  background: linear-gradient(100deg, #6c4cf5 10%, #ff6fae 55%, #ffb23f 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility bg-dots {
+  background-image: radial-gradient(color-mix(in oklab, var(--fg) 12%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

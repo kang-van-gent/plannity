@@ -1,0 +1,92 @@
+{
+  "kind": "collectionType",
+  "collectionName": "promotion_inquiries",
+  "info": {
+    "singularName": "promotion-inquiry",
+    "pluralName": "promotion-inquiries",
+    "displayName": "Promotion Inquiry",
+    "description": "Upstify service request; shared only with explicit consent (spec §13)."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "reference": {
+      "type": "string",
+      "unique": true
+    },
+    "brand": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::brand.brand"
+    },
+    "content": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::content.content"
+    },
+    "serviceType": {
+      "type": "enumeration",
+      "enum": [
+        "creator_collab",
+        "community_promo",
+        "campaign_consult"
+      ],
+      "required": true
+    },
+    "platform": {
+      "type": "enumeration",
+      "enum": [
+        "facebook",
+        "instagram",
+        "tiktok",
+        "youtube",
+        "line",
+        "x",
+        "linkedin"
+      ]
+    },
+    "postUrl": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "objective": {
+      "type": "enumeration",
+      "enum": [
+        "awareness",
+        "engagement",
+        "consideration",
+        "conversion"
+      ]
+    },
+    "budgetSatang": {
+      "type": "biginteger"
+    },
+    "brief": {
+      "type": "text",
+      "required": true,
+      "maxLength": 2000
+    },
+    "contactConsentAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "submitted",
+        "contacted",
+        "quoted",
+        "closed"
+      ],
+      "default": "submitted"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "private": false
+    }
+  }
+}

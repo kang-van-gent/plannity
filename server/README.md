@@ -1,3 +1,60 @@
+# Plannity — API (Strapi 5)
+
+Content types, owner-scoped controllers, and bootstrap for the Plannity frontend (`../app`).
+
+## What's here
+
+- **`src/api/*`** — collections from spec §16:
+  - user-owned: `brand`, `content`, `content-revision`, `holiday`, `promotion-inquiry`, `feedback`, `generation-job`
+  - internal (written only by services): `generation-item`, `credit-wallet`, `credit-ledger`, `payment-order`, `payment-event`
+- **`src/utils/owner-scoped.js`** — tenant isolation for every user-owned collection:
+  - Reads are always filtered to `ctx.state.user`.
+  - Another user's record returns **404**, so IDs can't be probed.
+  - `owner` is taken from the session, never from the request body.
+  - Relations such as `brand` and `content` must point at the caller's own records.
+  - Optional optimistic versioning (`409 VERSION_CONFLICT`) and business-rule validation, using the spec error envelope `{error:{code,message,fieldErrors,requestId}}`.
+- **`src/api/content/controllers`** — status rules: `scheduled` needs a date, and `published` stamps `postedAt`. (`publishedAt` is reserved by Strapi; the frontend adapter maps between the two.)
+- **`src/api/promotion-inquiry/controllers`** — consent is required; reference, status, and `contactConsentAt` are set by the server.
+- **`src/index.js` bootstrap** (idempotent):
+  - Grants the *authenticated* role only the actions the app uses.
+  - Credit, payment, and generation tables are never exposed.
+  - Seeds the curated Thai key dates from `src/seed/holidays.json`.
+
+## Verified locally
+
+A throwaway SQLite database was booted with two users. These all behaved correctly:
+
+- isolation on list, get, update, and delete
+- cross-tenant relation attach is blocked
+- body `owner` spoofing is ignored
+- version conflict returns 409
+- the status rules are enforced
+- the consent rule is enforced
+- curated dates are shared and read-only
+- anonymous access is rejected
+- credit routes are not exposed
+
+## Still to build (spec Phases C–D)
+
+Custom routes the frontend adapter already calls:
+
+- `GET /api/dashboard`
+- `/api/generation/jobs` (create/get/list/cancel): reserve credits and enqueue in one transaction, BullMQ worker, outbox
+- `POST /api/contents/:id/regenerate`
+- `GET /api/contents/export`
+- `/api/credits/balance`, `/api/credits/ledger`
+- `/api/payments/orders`, `POST /api/payments/webhook` (signature verification, unique event id)
+- `POST /api/auth/verify` (idempotent trial grant)
+- `PUT /api/me`
+
+Also needed: SQL migrations for the constraints the schema can't express:
+
+- `CHECK (available >= 0 AND reserved >= 0)` on wallets
+- unique `(job, ordinal)` on generation items
+- the indexes from spec §16
+
+---
+
 # 🚀 Getting started with Strapi
 
 Strapi comes with a full featured [Command Line Interface](https://docs.strapi.io/dev-docs/cli) (CLI) which lets you scaffold and manage your project in seconds.

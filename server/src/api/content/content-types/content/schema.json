@@ -1,0 +1,145 @@
+{
+  "kind": "collectionType",
+  "collectionName": "contents",
+  "info": {
+    "singularName": "content",
+    "pluralName": "contents",
+    "displayName": "Content",
+    "description": "One planned content item; fields follow the AI output contract (spec §9–10)."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "concept": {
+      "type": "text"
+    },
+    "pillar": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "objective": {
+      "type": "enumeration",
+      "enum": [
+        "awareness",
+        "engagement",
+        "consideration",
+        "conversion"
+      ],
+      "default": "engagement"
+    },
+    "platform": {
+      "type": "enumeration",
+      "enum": [
+        "facebook",
+        "instagram",
+        "tiktok",
+        "youtube",
+        "line",
+        "x",
+        "linkedin"
+      ],
+      "required": true
+    },
+    "format": {
+      "type": "enumeration",
+      "enum": [
+        "static",
+        "carousel",
+        "short_video",
+        "text"
+      ],
+      "required": true
+    },
+    "hook": {
+      "type": "text"
+    },
+    "caption": {
+      "type": "text"
+    },
+    "cta": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "hashtags": {
+      "type": "json"
+    },
+    "visualBrief": {
+      "type": "text"
+    },
+    "videoScript": {
+      "type": "text"
+    },
+    "suggestedDate": {
+      "type": "date"
+    },
+    "rationale": {
+      "type": "text"
+    },
+    "source": {
+      "type": "enumeration",
+      "enum": [
+        "ai",
+        "manual"
+      ],
+      "default": "manual"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "draft",
+        "in_review",
+        "approved",
+        "scheduled",
+        "published"
+      ],
+      "default": "draft",
+      "required": true
+    },
+    "scheduledDate": {
+      "type": "date"
+    },
+    "scheduledTime": {
+      "type": "string",
+      "regex": "^([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "postedAt": {
+      "type": "datetime"
+    },
+    "postUrl": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "archivedAt": {
+      "type": "datetime"
+    },
+    "version": {
+      "type": "integer",
+      "default": 1,
+      "min": 1,
+      "required": true
+    },
+    "jobItemId": {
+      "type": "string",
+      "unique": true
+    },
+    "brand": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::brand.brand",
+      "inversedBy": "contents"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "private": false
+    }
+  }
+}
