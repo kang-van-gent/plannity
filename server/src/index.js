@@ -1,6 +1,7 @@
 'use strict';
 
 const holidays = require('./seed/holidays.json');
+const { configureBuiltInProviders, registerAppleProvider } = require('./auth/social-providers');
 
 /**
  * Actions the signed-in ("authenticated") role may call on core routes.
@@ -41,10 +42,13 @@ async function seedHolidays(strapi) {
 }
 
 module.exports = {
-  register(/* { strapi } */) {},
+  register({ strapi }) {
+    registerAppleProvider(strapi);
+  },
 
   async bootstrap({ strapi }) {
     await grantAuthenticatedPermissions(strapi);
     await seedHolidays(strapi);
+    await configureBuiltInProviders(strapi);
   },
 };

@@ -1,7 +1,7 @@
 import type {
   Brand, BrandInput, Content, ContentInput, ContentPatch, ContentQuery, ContentRevision, DashboardSummary,
   FeedbackInput, GenerationInput, GenerationJob, Holiday, ISODate, LedgerEntry, Paginated, PaymentOrder,
-  PromotionInput, PromotionInquiry, RegisterInput, Session, User, Wallet,
+  PromotionInput, PromotionInquiry, RegisterInput, Session, SocialProvider, User, Wallet,
 } from '~/types'
 
 /**
@@ -16,6 +16,8 @@ export interface DataSource {
   auth: {
     login(email: string, password: string): Promise<Session>
     register(input: RegisterInput): Promise<Session>
+    /** Social sign-in. Real backends return a URL to send the browser to; the mock signs in directly. */
+    social(provider: SocialProvider, next?: string): Promise<Session | { redirect: string }>
     /** Verifies email and grants trial credits exactly once (idempotent). */
     verifyEmail(): Promise<{ granted: number; user: User }>
     forgot(email: string): Promise<void>

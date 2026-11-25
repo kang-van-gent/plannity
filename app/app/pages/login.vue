@@ -19,6 +19,18 @@ const loading = ref(false)
 const forgotOpen = ref(false)
 const forgotEmail = ref('')
 const forgotSending = ref(false)
+const next = computed(() => typeof route.query.next === 'string' && route.query.next.startsWith('/app') ? route.query.next : '/app')
+
+// Back from a failed/cancelled social sign-in (/auth/callback → /login?oauth=…).
+onMounted(() => {
+  const reason = route.query.oauth
+  if (typeof reason !== 'string') return
+  const provider = ({ google: 'Google', facebook: 'Facebook', apple: 'Apple' } as Record<string, string>)[String(route.query.provider)] ?? ''
+  if (reason === 'cancelled') notify.info(t('auth.oauthCancelled'), t('auth.oauthCancelledBody', { provider }))
+  else if (reason === 'exists') notify.warning(t('auth.oauthExists'), t('auth.oauthExistsBody'))
+  else notify.error(t('auth.oauthFailed'), t('auth.oauthFailedBody', { provider }))
+  navigateTo({ query: { ...route.query, oauth: undefined, provider: undefined } }, { replace: true })
+})
 
 function fillDemo() {
   form.email = DEMO_EMAIL
@@ -72,7 +84,10 @@ async function sendReset() {
       <span class="flex-1"><span class="block font-semibold">{{ t('auth.useDemo') }}</span><span class="text-xs text-muted">{{ DEMO_EMAIL }} · {{ DEMO_PASSWORD }}</span></span>
     </button>
 
-    <form v-anim="4" class="mt-6 space-y-4" novalidate @submit.prevent="submit">
+    <AuthSocialAuthButtons v-anim="4" class="mt-6" :next="next" />
+    <div v-anim="4"><div class="my-5 flex items-center gap-3 text-xs font-semibold text-muted"><span class="h-px flex-1 bg-line" />{{ t('auth.orEmail') }}<span class="h-px flex-1 bg-line" /></div></div>
+
+    <form v-anim="5" class="space-y-4" novalidate @submit.prevent="submit">
       <div>
         <label class="label" for="email">{{ t('auth.email') }}</label>
         <input id="email" v-model.trim="form.email" type="email" autocomplete="email" class="input" :class="errors.email && 'input-error'" :aria-invalid="!!errors.email">

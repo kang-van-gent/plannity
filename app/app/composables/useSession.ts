@@ -1,4 +1,4 @@
-import type { RegisterInput, User } from '~/types'
+import type { RegisterInput, SocialProvider, User } from '~/types'
 
 /** Readable routing hint cookie. In mock mode it carries the demo user id; with
  *  Strapi it is just a flag — the real JWT lives in an HttpOnly cookie. */
@@ -43,6 +43,18 @@ export function useSession() {
     return s.user
   }
 
+  /** Returns the user when signed in right away (mock); null when the browser is being redirected. */
+  async function socialLogin(provider: SocialProvider, next = '/app'): Promise<User | null> {
+    const r = await api.auth.social(provider, next)
+    if ('redirect' in r) {
+      window.location.assign(r.redirect)
+      return null
+    }
+    set(r.token || '1')
+    user.value = r.user
+    return r.user
+  }
+
   async function verifyEmail(): Promise<number> {
     const r = await api.auth.verifyEmail()
     user.value = r.user
@@ -57,5 +69,5 @@ export function useSession() {
     useState('wallet').value = null
   }
 
-  return { user, token, isLoggedIn: computed(() => !!token.value), ensure, login, register, verifyEmail, logout }
+  return { user, token, isLoggedIn: computed(() => !!token.value), ensure, login, register, socialLogin, verifyEmail, logout }
 }

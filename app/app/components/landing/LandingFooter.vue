@@ -5,7 +5,7 @@ const config = useRuntimeConfig()
 </script>
 
 <template>
-  <footer class="relative mt-24 overflow-hidden border-t border-line bg-surface">
+  <footer class="relative mt-24 overflow-hidden bg-surface">
     <div class="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
       <div>
         <AppLogo variant="full" class="h-24" />
@@ -28,7 +28,7 @@ const config = useRuntimeConfig()
         </ul>
       </div>
     </div>
-    <div class="border-t border-line">
+    <div>
       <p class="mx-auto max-w-7xl px-5 py-5 text-xs text-muted sm:px-8">© {{ new Date().getFullYear() }} Plannity · {{ t('brand.tagline') }}</p>
     </div>
   </footer>

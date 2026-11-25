@@ -67,7 +67,10 @@ async function verify() {
       <div v-anim class="lg:hidden"><AppLogo variant="lockup" class="h-10" eager /></div>
       <h1 v-anim="1" class="mt-6 font-display text-4xl font-bold lg:mt-0">{{ t('auth.registerTitle') }}</h1>
       <p v-anim="2" class="mt-2 text-muted">{{ t('auth.registerSubtitle', { n: config.public.trialCredits }) }}</p>
-      <form v-anim="3" class="mt-7 space-y-4" novalidate @submit.prevent="submit">
+      <AuthSocialAuthButtons v-anim="3" class="mt-7" next="/app/brands/new?onboarding=1" />
+      <p v-anim="3" class="mt-2.5 text-center text-xs text-muted">{{ t('auth.socialTerms') }} <NuxtLink to="/terms" target="_blank" class="font-semibold text-brand-600 underline dark:text-brand-300">{{ t('footer.terms') }}</NuxtLink> {{ t('common.and') }} <NuxtLink to="/privacy" target="_blank" class="font-semibold text-brand-600 underline dark:text-brand-300">{{ t('footer.privacy') }}</NuxtLink></p>
+      <div v-anim="4"><div class="my-5 flex items-center gap-3 text-xs font-semibold text-muted"><span class="h-px flex-1 bg-line" />{{ t('auth.orEmail') }}<span class="h-px flex-1 bg-line" /></div></div>
+      <form v-anim="5" class="space-y-4" novalidate @submit.prevent="submit">
         <div>
           <label class="label" for="name">{{ t('auth.name') }}</label>
           <input id="name" v-model="form.name" class="input" autocomplete="name" :class="errors.name && 'input-error'">

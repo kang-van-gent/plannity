@@ -22,6 +22,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only. Used by the BFF proxy in server/api when dataSource = 'strapi'.
     strapiUrl: 'http://localhost:1337',
+    // Browser-reachable Strapi URL for social sign-in redirects (defaults to strapiUrl).
+    strapiPublicUrl: '',
     public: {
       /** 'mock' (default, in-browser demo data) or 'strapi' (BFF proxy to the Strapi API). */
       dataSource: 'mock',

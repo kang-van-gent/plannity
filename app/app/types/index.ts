@@ -265,6 +265,8 @@ export interface Session {
   token: string
 }
 
+export type SocialProvider = 'google' | 'facebook' | 'apple'
+
 export interface RegisterInput {
   name: string
   email: string

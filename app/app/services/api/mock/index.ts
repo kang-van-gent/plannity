@@ -237,6 +237,23 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
         persist()
         return { user, token: user.id }
       },
+      async social(provider) {
+        // Demo: one account per provider, email already verified by the "provider".
+        await net({ canFail: false, latency: 700 })
+        const d = load()
+        const email = `${provider}.demo@plannity.example`
+        let u = d.users.find((x) => x.email === email)
+        if (!u) {
+          const name = { google: 'Google Demo', facebook: 'Facebook Demo', apple: 'Apple Demo' }[provider]
+          u = { id: `u_${nextSeq()}`, email, name, verifiedAt: nowISO(), locale: 'th', timezone: 'Asia/Bangkok', createdAt: nowISO(), password: crypto.randomUUID() }
+          d.users.push(u)
+          d.wallets[u.id] = { available: 0, reserved: 0 }
+          post(u.id, 'trial_grant', TRIAL_CREDITS, 0, null, null, `trial:${u.id}`)
+          persist()
+        }
+        const { password: _p, ...user } = clone(u)
+        return { user, token: u.id }
+      },
       async verifyEmail() {
         await net({ canFail: false })
         const u = currentUser()

@@ -108,6 +108,8 @@ export function createStrapiSource(): DataSource {
     auth: {
       login: (email, password) => call<Session>('/api/auth/login', { method: 'POST', body: { email, password } }),
       register: (input) => call<Session>('/api/auth/register', { method: 'POST', body: input }),
+      // Full-page redirect through the Nuxt server route → Strapi → provider → back to /auth/callback.
+      social: async (provider, next) => ({ redirect: `/auth/connect/${provider}${qs({ next })}` }),
       verifyEmail: () => call<{ granted: number; user: User }>(`${BFF}/auth/verify`, { method: 'POST' }),
       forgot: (email) => call<void>(`${BFF}/auth/forgot-password`, { method: 'POST', body: { email } }),
       logout: () => call<void>('/api/auth/logout', { method: 'POST' }),

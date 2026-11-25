@@ -35,3 +35,21 @@ export function rethrow(e: unknown): never {
   const err = e as { status?: number; statusCode?: number; data?: unknown }
   throw createError({ statusCode: err.status ?? err.statusCode ?? 502, data: err.data ?? { error: { message: 'Upstream unavailable' } } })
 }
+
+/** Social sign-in providers the app offers (must match Strapi's provider names). */
+export const SOCIAL_PROVIDERS = ['google', 'facebook', 'apple'] as const
+export type SocialProvider = typeof SOCIAL_PROVIDERS[number]
+export const isSocialProvider = (p: unknown): p is SocialProvider => SOCIAL_PROVIDERS.includes(p as SocialProvider)
+
+/** Short-lived cookie remembering where to land after the provider round-trip. */
+export const OAUTH_NEXT_COOKIE = 'plannity_oauth_next'
+
+/** Only same-app paths are allowed as post-login destinations (no open redirects). */
+export function safeNext(v: unknown): string {
+  return typeof v === 'string' && v.startsWith('/app') && !v.startsWith('//') ? v : '/app'
+}
+
+/** Readable routing hint the client middleware checks (the JWT itself stays HttpOnly). */
+export function setSessionHint(event: H3Event) {
+  setCookie(event, 'plannity-session', '1', { sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 14 })
+}

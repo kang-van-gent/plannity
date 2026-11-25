@@ -12,6 +12,7 @@ const links = computed(() => [
   { to: '/#faq', label: t('nav.faq') },
 ])
 const route = useRoute()
+const onHashClick = useSmoothHash()
 watch(() => route.fullPath, () => { menuOpen.value = false })
 
 function onScroll() { scrolled.value = window.scrollY > 12 }
@@ -27,7 +28,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
       :class="scrolled ? 'border-line bg-surface/85 shadow-soft backdrop-blur-xl' : 'border-transparent'">
       <NuxtLink to="/" class="flex shrink-0" aria-label="Plannity home"><AppLogo variant="lockup" eager class="h-9 sm:h-10" /></NuxtLink>
       <nav class="ml-6 hidden items-center gap-1 lg:flex" :aria-label="t('nav.main')">
-        <NuxtLink v-for="l in links" :key="l.to" :to="l.to" class="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-muted transition hover:bg-surface-2 hover:text-fg">{{ l.label }}</NuxtLink>
+        <NuxtLink v-for="l in links" :key="l.to" :to="l.to" @click.capture="onHashClick($event, l.to)" class="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-muted transition hover:bg-surface-2 hover:text-fg">{{ l.label }}</NuxtLink>
       </nav>
       <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
         <div class="hidden sm:block"><LocaleSwitch /></div>
@@ -45,7 +46,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 
     <SidePanel :open="menuOpen" size="sm" title="Plannity" :subtitle="t('brand.tagline')" @close="menuOpen = false">
       <nav class="grid gap-1" :aria-label="t('nav.main')">
-        <NuxtLink v-for="l in links" :key="l.to" :to="l.to" class="rounded-2xl px-4 py-3 font-display text-lg font-semibold hover:bg-surface-2" @click="menuOpen = false">{{ l.label }}</NuxtLink>
+        <NuxtLink v-for="l in links" :key="l.to" :to="l.to" class="rounded-2xl px-4 py-3 font-display text-lg font-semibold hover:bg-surface-2" @click.capture="onHashClick($event, l.to, { delay: 420 })" @click="menuOpen = false">{{ l.label }}</NuxtLink>
       </nav>
       <div class="grid gap-2 rounded-2xl bg-surface-2 p-3">
         <div class="flex items-center justify-between gap-3">

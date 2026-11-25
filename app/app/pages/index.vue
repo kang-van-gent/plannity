@@ -47,6 +47,7 @@ const previewChips: Record<number, { c: string; w: string }[]> = {
 }
 
 const curtain = useCurtain()
+const onHashClick = useSmoothHash()
 const root = ref<HTMLElement | null>(null)
 let ctx: gsap.Context | null = null
 let mm: gsap.MatchMedia | null = null
@@ -142,7 +143,6 @@ onBeforeUnmount(() => {
     <!-- HERO -->
     <section class="relative px-5 pb-10 pt-10 sm:px-8 sm:pt-16" data-parallax-root>
       <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div class="absolute inset-0 bg-dots opacity-60 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
         <Doodle v-parallax="{ y: -160, rotate: 40 }" variant="petal" class="absolute -left-16 top-24 size-56 text-pink/70 sm:size-72" />
         <Doodle v-parallax="{ y: -90, rotate: -30 }" variant="petal" class="absolute right-[-4rem] top-8 size-64 text-sun/70 sm:size-80" />
         <Doodle v-parallax="{ y: -220, rotate: 25 }" variant="petal" class="absolute bottom-10 left-[12%] size-36 text-sky/60" />
@@ -160,7 +160,7 @@ onBeforeUnmount(() => {
         <p v-anim="3" class="mx-auto mt-8 max-w-2xl text-lg text-muted sm:text-xl">{{ t('landing.hero.subtitle', { price }) }}</p>
         <div v-anim="4" class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <NuxtLink to="/register" class="btn-primary btn-lg group">{{ t('landing.hero.cta') }}<ArrowRight class="size-5 transition group-hover:translate-x-1" /></NuxtLink>
-          <NuxtLink to="/#how" class="btn-secondary btn-lg">{{ t('landing.hero.secondary') }}</NuxtLink>
+          <NuxtLink to="/#how" class="btn-secondary btn-lg" @click.capture="onHashClick($event, '/#how')">{{ t('landing.hero.secondary') }}</NuxtLink>
         </div>
         <p v-anim="5" class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted">
           <span v-for="k in ['trial', 'noSub', 'calendarFree']" :key="k" class="inline-flex items-center gap-1.5"><Check class="size-4 text-success" />{{ t(`landing.hero.points.${k}`, { n: config.public.trialCredits }) }}</span>
@@ -358,7 +358,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- FINAL CTA -->
-    <section data-final class="mx-auto max-w-6xl px-5 py-20 text-center sm:px-8">
+    <section data-final class="relative mx-auto max-w-6xl px-5 py-20 text-center sm:px-8">
       <p class="font-display text-5xl font-bold leading-tight sm:text-7xl">
         <span v-for="(w, i) in ctaWords" :key="i" data-word class="inline-block pr-[0.25em]" :class="i >= 2 ? 'text-brand-500' : ''">{{ w }}</span>
       </p>

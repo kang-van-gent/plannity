@@ -249,6 +249,24 @@ devframes-onboard { position: fixed !important; left: 0; bottom: 0; width: 0; he
   .btn-icon { min-width: 2.5rem; min-height: 2.5rem; }
 }
 
+/* Landing background shapes. Parallax uses the `translate` property (set from
+   JS); the float uses `transform`, so the two never overwrite each other.
+   Only the largest third float. Dark mode lifts opacity instead of a filter. */
+@keyframes landing-float {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-14px) rotate(calc(var(--r, 0deg) + 14deg)); }
+}
+.landing-shape {
+  transform: rotate(var(--r, 0deg));
+  opacity: var(--o, 0.6);
+  will-change: translate;
+}
+.dark .landing-shape { opacity: min(1, calc(var(--o, 0.6) * 1.25)); }
+.landing-shape.is-floating {
+  animation: landing-float 12s ease-in-out infinite;
+  will-change: translate, transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -52,6 +52,11 @@ const en: Messages = {
   },
 
   auth: {
+    continueWith: 'Continue with {provider}', orEmail: 'or use your email', redirecting: 'Redirecting…',
+    socialTerms: 'By continuing with Google, Facebook or Apple you agree to our',
+    oauthFailed: 'Sign-in didn’t work', oauthFailedBody: 'We couldn’t sign you in with {provider}. Please try again.',
+    oauthCancelled: 'Sign-in cancelled', oauthCancelledBody: 'You closed the {provider} window before finishing.',
+    oauthExists: 'This email already has an account', oauthExistsBody: 'Sign in with your email and password instead.',
     sideTitle: 'Plan a whole month of content in minutes', sideBody: 'Brand, goals and calendar in one workflow. No subscription.',
     backHome: 'Home', loginTitle: 'Welcome back', loginSubtitle: 'Log in to manage your content plan',
     useDemo: 'Use the demo account', email: 'Email', password: 'Password', forgot: 'Forgot password?', togglePassword: 'Show/hide password',
