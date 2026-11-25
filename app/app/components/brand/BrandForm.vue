@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ArrowLeft, ArrowRight, Check, Plus, X } from '@lucide/vue'
-import { gsap } from 'gsap'
 import type { BrandInput, ContentLanguage } from '~/types'
 import { DEFAULT_PILLARS, PLATFORMS } from '~/types'
 
@@ -34,6 +33,9 @@ const languages: ContentLanguage[] = ['th', 'en', 'th-en']
 const STEPS = ['basics', 'audience', 'channels'] as const
 const step = ref(0)
 const stepEl = ref<HTMLElement | null>(null)
+// Sections animate in via v-anim: up on first load, sideways when moving between steps.
+const enterFrom = ref<'up' | 'left' | 'right'>('up')
+const enter = computed(() => ({ from: enterFrom.value }))
 const show = (s: (typeof STEPS)[number]) => !props.stepped || STEPS[step.value] === s
 
 function validate(scope: 'basics' | 'all'): boolean {
@@ -46,9 +48,8 @@ function validate(scope: 'basics' | 'all'): boolean {
 
 async function go(dir: 1 | -1) {
   if (dir === 1 && step.value === 0 && !validate('basics')) return
+  enterFrom.value = dir === 1 ? 'right' : 'left'
   step.value = Math.max(0, Math.min(STEPS.length - 1, step.value + dir))
-  await nextTick()
-  if (stepEl.value && !prefersReducedMotion()) gsap.fromTo(stepEl.value, { x: 60 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
 }
 
 function submit() {
@@ -73,7 +74,7 @@ function submit() {
     </ol>
 
     <div ref="stepEl" class="space-y-5">
-      <section v-if="show('basics')" class="card card-pad space-y-4">
+      <section v-if="show('basics')" v-anim="enter" class="card card-pad space-y-4">
         <h2 class="font-display text-lg font-bold">{{ t('brands.sections.basics') }}</h2>
         <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
           <div>
@@ -104,7 +105,7 @@ function submit() {
         </div>
       </section>
 
-      <section v-if="show('audience')" class="card card-pad space-y-4">
+      <section v-if="show('audience')" v-anim="enter" class="card card-pad space-y-4">
         <h2 class="font-display text-lg font-bold">{{ t('brands.sections.audience') }}</h2>
         <div class="grid gap-4 sm:grid-cols-2">
           <div><label class="label" for="b-aud">{{ t('brands.fields.audience') }}</label><textarea id="b-aud" v-model="form.profile.audience" class="input" rows="2" /></div>
@@ -122,7 +123,7 @@ function submit() {
         </div>
       </section>
 
-      <section v-if="show('channels')" class="card card-pad space-y-4">
+      <section v-if="show('channels')" v-anim="enter" class="card card-pad space-y-4">
         <h2 class="font-display text-lg font-bold">{{ t('brands.sections.channels') }}</h2>
         <div>
           <span class="label">{{ t('brands.fields.platforms') }}</span>
@@ -153,12 +154,13 @@ function submit() {
       </section>
     </div>
 
-    <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+    <!-- Sticky action bar above the tab bar on phones/tablets. -->
+    <div class="sticky bottom-[calc(var(--tabbar-h,0px)+0.75rem)] z-30 mt-6 flex items-center justify-end gap-2 max-lg:rounded-[1.5rem] max-lg:border max-lg:border-line max-lg:bg-surface/90 max-lg:p-2 max-lg:shadow-panel max-lg:backdrop-blur-xl lg:static max-lg:[&>.btn-primary]:flex-1">
       <template v-if="stepped">
-        <button v-if="step > 0" type="button" class="btn-secondary mr-auto" @click="go(-1)"><ArrowLeft class="size-4" />{{ t('common.back') }}</button>
-        <button v-if="step > 0 && step < STEPS.length - 1" type="button" class="btn-ghost" :disabled="saving" @click="submit">{{ t('brands.skipAndSave') }}</button>
-        <button v-if="step < STEPS.length - 1" type="button" class="btn-primary" @click="go(1)">{{ t('common.next') }}<ArrowRight class="size-4" /></button>
-        <button v-else type="submit" class="btn-primary" :disabled="saving">{{ saving ? t('common.saving') : (submitLabel ?? t('common.save')) }}</button>
+        <button v-if="step > 0" type="button" class="btn-secondary mr-auto max-sm:px-3.5" :aria-label="t('common.back')" @click="go(-1)"><ArrowLeft class="size-4" /><span class="max-sm:hidden">{{ t('common.back') }}</span></button>
+        <button v-if="step > 0 && step < STEPS.length - 1" type="button" class="btn-ghost max-sm:px-2.5" :disabled="saving" @click="submit">{{ t('brands.skipAndSave') }}</button>
+        <button v-if="step < STEPS.length - 1" type="button" class="btn-primary max-lg:flex-1" @click="go(1)">{{ t('common.next') }}<ArrowRight class="size-4" /></button>
+        <button v-else type="submit" class="btn-primary max-lg:flex-1" :disabled="saving">{{ saving ? t('common.saving') : (submitLabel ?? t('common.save')) }}</button>
       </template>
       <button v-else type="submit" class="btn-primary" :disabled="saving">{{ saving ? t('common.saving') : (submitLabel ?? t('common.save')) }}</button>
     </div>

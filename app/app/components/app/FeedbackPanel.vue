@@ -36,7 +36,7 @@ async function submit() {
 </script>
 
 <template>
-  <SidePanel :open="open" size="sm" :title="t('feedback.title')" :subtitle="t('feedback.subtitle')" @close="emit('close')">
+  <SidePanel :open="open" size="sm" :title="t('feedback.title')" :subtitle="t('feedback.subtitle')" :dirty="rating > 0 || !!comment.trim()" @close="emit('close')">
     <div>
       <p class="label">{{ t('feedback.rating') }}</p>
       <div class="flex gap-1" role="radiogroup" :aria-label="t('feedback.rating')">
@@ -51,8 +51,8 @@ async function submit() {
       <label class="label" for="fb-comment">{{ t('feedback.comment') }}</label>
       <textarea id="fb-comment" v-model="comment" class="input" maxlength="2000" rows="5" :placeholder="t('feedback.commentPh')" />
     </div>
-    <template #footer>
-      <button type="button" class="btn-secondary" @click="emit('close')">{{ t('common.cancel') }}</button>
+    <template #footer="{ close }">
+      <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
       <button type="button" class="btn-primary" :disabled="saving" @click="submit">{{ saving ? t('common.saving') : t('feedback.send') }}</button>
     </template>
   </SidePanel>

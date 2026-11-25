@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Archive, ArchiveRestore, Crosshair, Pencil, Plus, Store, WandSparkles } from '@lucide/vue'
+import { Archive, ArchiveRestore, Crosshair, Eye, FileText, Pencil, Plus, Store, WandSparkles } from '@lucide/vue'
 import type { Brand } from '~/types'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
@@ -40,7 +40,7 @@ function focus(b: Brand) {
 <template>
   <div>
     <UiPageHeader :title="t('nav.brands')" :subtitle="t('brands.subtitle')">
-      <label class="flex cursor-pointer items-center gap-2 text-sm font-semibold text-muted"><input v-model="showArchived" type="checkbox" class="size-4 accent-brand-500">{{ t('brands.showArchived') }}</label>
+      <label class="flex cursor-pointer items-center justify-between gap-2 text-sm font-semibold text-muted max-sm:min-h-11 max-sm:rounded-2xl max-sm:border max-sm:border-line max-sm:bg-surface max-sm:px-3">{{ t('brands.showArchived') }}<input v-model="showArchived" type="checkbox" class="switch"></label>
       <NuxtLink to="/app/brands/new" class="btn-primary"><Plus class="size-4" />{{ t('brands.create') }}</NuxtLink>
     </UiPageHeader>
 
@@ -49,35 +49,54 @@ function focus(b: Brand) {
     <UiEmptyState v-else-if="!list.length" :icon="Store" :title="t('brands.emptyTitle')" :message="t('brands.emptyBody')">
       <NuxtLink to="/app/brands/new?onboarding=1" class="btn-primary"><Plus class="size-4" />{{ t('brands.create') }}</NuxtLink>
     </UiEmptyState>
-    <div v-else class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-      <article v-for="(b, i) in list" :key="b.id" v-anim="i" class="card group relative overflow-hidden transition hover:-translate-y-1 hover:shadow-pop" :class="b.archivedAt ? 'opacity-70' : ''">
-        <div class="relative h-20 overflow-hidden" :style="{ background: `linear-gradient(120deg, ${b.color}, ${b.color}88)` }">
-          <Doodle variant="petal" class="absolute -right-6 -top-8 size-28 text-white/25 transition duration-500 group-hover:rotate-45" />
-          <Doodle variant="spark" class="absolute bottom-3 right-24 size-5 text-white/70" />
+    <div v-else class="grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+      <article v-for="(b, i) in list" :key="b.id" v-anim="i"
+        class="card group relative flex flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-pop"
+        :class="[b.archivedAt && 'opacity-75 saturate-50', brands.scope.value === b.id && 'ring-2 ring-offset-2 ring-offset-bg']"
+        :style="brands.scope.value === b.id ? { '--tw-ring-color': b.color } : undefined">
+        <!-- Banner -->
+        <div class="relative h-24 overflow-hidden sm:h-28" :style="{ background: `linear-gradient(135deg, ${b.color} 0%, color-mix(in srgb, ${b.color} 55%, white) 100%)` }">
+          <div class="absolute inset-0 bg-dots opacity-40 mix-blend-overlay" />
+          <Doodle variant="petal" class="absolute -right-8 -top-10 size-36 text-white/25 transition duration-700 group-hover:rotate-45 group-hover:scale-110" />
+          <Doodle variant="spark" class="absolute right-28 top-5 size-5 text-white/80 transition duration-500 group-hover:rotate-90" />
+          <div class="absolute right-3 top-3 flex gap-1.5">
+            <span v-if="b.archivedAt" class="chip bg-white/90 text-slate-600 shadow-sm"><Archive class="size-3" />{{ t('brands.archivedChip') }}</span>
+            <span v-else-if="brands.scope.value === b.id" class="chip bg-white/90 text-ink shadow-sm"><Eye class="size-3" />{{ t('brands.inScope') }}</span>
+          </div>
         </div>
-        <div class="-mt-8 px-5 pb-5">
-          <UiBrandDot :name="b.name" :color="b.color" :size="56" class="ring-4 ring-surface" />
-          <div class="mt-3 flex items-start gap-2">
-            <div class="min-w-0 flex-1">
-              <h2 class="truncate font-display text-xl font-bold">{{ b.name }}</h2>
-              <p class="truncate text-sm text-muted">{{ b.profile.industry || '—' }}</p>
-            </div>
-            <span v-if="b.archivedAt" class="chip bg-slate-500/10 text-muted">{{ t('brands.archivedChip') }}</span>
-            <span v-else-if="brands.scope.value === b.id" class="chip bg-brand-500/10 text-brand-600 dark:text-brand-300">{{ t('brands.inScope') }}</span>
+
+        <!-- Body (z-10 so the avatar sits above the banner instead of under it) -->
+        <div class="relative z-10 -mt-10 flex flex-1 flex-col px-4 pb-4 sm:px-5 sm:pb-5">
+          <div class="flex items-end justify-between gap-3">
+            <span class="rounded-[1.6rem] bg-surface p-1.5 shadow-soft transition group-hover:-rotate-3">
+              <UiBrandDot :name="b.name" :color="b.color" :size="64" />
+            </span>
+            <span class="mb-1 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-bold tabular-nums text-muted">
+              <FileText class="size-3.5" />{{ t('brands.contentCount', { n: b.contentCount ?? 0 }) }}
+            </span>
           </div>
-          <p class="mt-3 line-clamp-2 text-sm text-muted">{{ b.profile.description }}</p>
-          <div class="mt-3 flex flex-wrap items-center gap-1.5">
+
+          <NuxtLink :to="`/app/brands/${b.id}`" class="mt-3 block min-w-0 after:absolute after:inset-0 after:content-['']">
+            <h2 class="truncate font-display text-xl font-bold transition group-hover:text-brand-600 dark:group-hover:text-brand-300">{{ b.name }}</h2>
+          </NuxtLink>
+          <p class="truncate text-sm font-medium" :style="{ color: `color-mix(in srgb, ${b.color} 70%, var(--fg))` }">{{ b.profile.industry || '—' }}</p>
+          <p class="mt-2.5 line-clamp-2 min-h-[2.75rem] text-sm leading-relaxed text-muted">{{ b.profile.description }}</p>
+
+          <div class="mt-3 flex flex-wrap gap-1.5">
             <UiPlatformBadge v-for="p in b.profile.platforms" :key="p" :platform="p" />
-            <span class="ml-auto text-xs font-semibold text-muted">{{ t('brands.contentCount', { n: b.contentCount ?? 0 }) }}</span>
           </div>
-          <div class="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
-            <NuxtLink :to="`/app/brands/${b.id}`" class="btn-secondary btn-sm"><Pencil class="size-3.5" />{{ t('common.edit') }}</NuxtLink>
-            <template v-if="!b.archivedAt">
-              <button type="button" class="btn-ghost btn-sm" @click="focus(b)"><Crosshair class="size-3.5" />{{ t('brands.focus') }}</button>
-              <NuxtLink :to="`/app/generate?brand=${b.id}`" class="btn-ghost btn-sm"><WandSparkles class="size-3.5" />{{ t('nav.generate') }}</NuxtLink>
-            </template>
-            <button type="button" class="btn-ghost btn-sm ml-auto" :disabled="busy === b.id" :aria-label="b.archivedAt ? t('brands.restore') : t('brands.archive')" @click="toggleArchive(b)">
-              <ArchiveRestore v-if="b.archivedAt" class="size-3.5" /><Archive v-else class="size-3.5" />
+
+          <!-- Actions sit above the full-card link (relative z-10) -->
+          <div class="relative z-10 mt-auto flex items-center gap-2 pt-5">
+            <NuxtLink v-if="!b.archivedAt" :to="`/app/generate?brand=${b.id}`" class="btn-primary btn-sm flex-1"><WandSparkles class="size-4" />{{ t('nav.generate') }}</NuxtLink>
+            <NuxtLink :to="`/app/brands/${b.id}`" class="btn-secondary btn-sm flex-1"><Pencil class="size-3.5" />{{ t('common.edit') }}</NuxtLink>
+            <button v-if="!b.archivedAt" type="button" class="btn-icon btn-secondary p-2" :class="brands.scope.value === b.id && 'border-brand-400 text-brand-600 dark:text-brand-300'"
+              :aria-label="t('brands.focus')" :title="t('brands.focus')" :aria-pressed="brands.scope.value === b.id" @click="focus(b)">
+              <Crosshair class="size-4" />
+            </button>
+            <button type="button" class="btn-icon btn-ghost p-2" :disabled="busy === b.id"
+              :aria-label="b.archivedAt ? t('brands.restore') : t('brands.archive')" :title="b.archivedAt ? t('brands.restore') : t('brands.archive')" @click="toggleArchive(b)">
+              <ArchiveRestore v-if="b.archivedAt" class="size-4" /><Archive v-else class="size-4" />
             </button>
           </div>
         </div>

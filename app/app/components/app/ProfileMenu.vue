@@ -30,7 +30,7 @@ async function signOut() {
 
 <template>
   <div ref="root" class="relative" @keydown.esc="open = false">
-    <button type="button" class="grid size-10 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-pink font-display text-sm font-bold text-white shadow-pop"
+    <button type="button" class="grid size-9 place-items-center rounded-full bg-gradient-to-br transition active:scale-95 sm:size-10 sm:rounded-2xl from-brand-500 to-pink font-display text-sm font-bold text-white shadow-pop"
       :aria-label="t('nav.profile')" :aria-expanded="open" @click="open = !open">
       {{ initials(user?.name ?? 'P').toUpperCase() }}
     </button>

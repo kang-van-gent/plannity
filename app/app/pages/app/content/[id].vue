@@ -182,7 +182,7 @@ onBeforeRouteLeave(async () => {
     <UiErrorState v-if="q.error.value && !content" :error="q.error.value" @retry="q.refresh()" />
     <UiSkeletonList v-else-if="!content || !form" :rows="3" />
     <template v-else>
-      <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div class="mb-5 flex flex-col gap-3 sm:mb-6 sm:gap-4 lg:flex-row lg:items-start">
         <div class="min-w-0 flex-1">
           <div v-anim class="flex flex-wrap items-center gap-2 text-sm">
             <UiBrandDot :name="brand?.name" :color="brand?.color" :size="22" /><span class="font-semibold">{{ brand?.name }}</span>
@@ -192,19 +192,19 @@ onBeforeRouteLeave(async () => {
           </div>
           <h1 v-anim="1" class="mt-2 font-display text-2xl font-bold sm:text-3xl">{{ form.title || t('content.untitled') }}</h1>
         </div>
-        <div v-anim="2" class="flex flex-wrap gap-2">
-          <button type="button" class="btn-secondary btn-sm" @click="copyCaption"><Copy class="size-4" />{{ t('content.copyCaption') }}</button>
-          <button type="button" class="btn-secondary btn-sm" @click="duplicate"><CopyPlus class="size-4" />{{ t('content.duplicate') }}</button>
-          <button type="button" class="btn-secondary btn-sm" :disabled="regenerating" @click="regenerate"><RefreshCw class="size-4" :class="regenerating && 'animate-spin'" />{{ t('content.regenerate') }} · 1</button>
-          <NuxtLink :to="`/app/promote?content=${content.id}`" class="btn-secondary btn-sm"><Megaphone class="size-4" />{{ t('content.promote') }}</NuxtLink>
-          <button type="button" class="btn-ghost btn-sm text-danger" @click="archive"><Archive class="size-4" />{{ t('content.archive') }}</button>
+        <div v-anim="2" class="h-scroll sm:flex-wrap sm:overflow-visible">
+          <button type="button" class="btn-secondary btn-sm max-sm:rounded-full" @click="copyCaption"><Copy class="size-4" />{{ t('content.copyCaption') }}</button>
+          <button type="button" class="btn-secondary btn-sm max-sm:rounded-full" @click="duplicate"><CopyPlus class="size-4" />{{ t('content.duplicate') }}</button>
+          <button type="button" class="btn-secondary btn-sm max-sm:rounded-full" :disabled="regenerating" @click="regenerate"><RefreshCw class="size-4" :class="regenerating && 'animate-spin'" />{{ t('content.regenerate') }} · 1</button>
+          <NuxtLink :to="`/app/promote?content=${content.id}`" class="btn-secondary btn-sm max-sm:rounded-full"><Megaphone class="size-4" />{{ t('content.promote') }}</NuxtLink>
+          <button type="button" class="btn-ghost btn-sm max-sm:rounded-full text-danger" @click="archive"><Archive class="size-4" />{{ t('content.archive') }}</button>
         </div>
       </div>
 
       <!-- Status pipeline: draft → in_review → approved → scheduled → published (user-confirmed) -->
-      <div v-anim class="card mb-5 p-2">
-        <div class="grid grid-cols-5 gap-1">
-          <button v-for="(s, i) in CONTENT_STATUSES" :key="s" type="button" class="relative flex flex-col items-center gap-1 rounded-2xl px-1 py-2.5 text-center text-[11px] font-semibold transition sm:text-sm"
+      <div v-anim class="card mb-5 p-1.5 sm:p-2">
+        <div class="grid grid-cols-5 gap-0.5 sm:gap-1">
+          <button v-for="(s, i) in CONTENT_STATUSES" :key="s" type="button" class="relative flex flex-col items-center gap-1 rounded-2xl px-0.5 py-2.5 text-center text-[10.5px] font-semibold leading-tight transition active:scale-95 sm:px-1 sm:text-sm"
             :class="content.status === s ? 'bg-brand-500 text-white shadow-pop' : CONTENT_STATUSES.indexOf(content.status) > i ? 'text-success hover:bg-surface-2' : 'text-muted hover:bg-surface-2'"
             :aria-pressed="content.status === s" :disabled="saving" @click="setStatus(s)">
             <span class="grid size-6 place-items-center rounded-full" :class="content.status === s ? 'bg-white/25' : CONTENT_STATUSES.indexOf(content.status) > i ? 'bg-success/15' : 'bg-surface-2'">
@@ -248,9 +248,9 @@ onBeforeRouteLeave(async () => {
 
       <!-- Sticky save bar appears when there are unsaved edits -->
       <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="translate-y-full opacity-0" leave-active-class="transition duration-200 ease-in" leave-to-class="translate-y-full opacity-0">
-        <div v-if="dirty" class="sticky bottom-[calc(var(--tabbar-h,0px)+0.75rem)] z-30 mt-6 flex items-center gap-3 rounded-3xl border border-brand-300 bg-surface/95 p-3 pl-5 shadow-panel backdrop-blur">
+        <div v-if="dirty" class="sticky bottom-[calc(var(--tabbar-h,0px)+0.75rem)] z-30 mt-6 flex items-center gap-2 rounded-[1.5rem] border border-brand-300 bg-surface/90 p-2 pl-4 shadow-panel backdrop-blur-xl sm:gap-3 sm:rounded-3xl sm:p-3 sm:pl-5">
           <span class="size-2.5 animate-pulse rounded-full bg-warning" />
-          <p class="flex-1 text-sm font-semibold">{{ t('content.unsaved') }}</p>
+          <p class="min-w-0 flex-1 truncate text-sm font-semibold">{{ t('content.unsaved') }}</p>
           <button type="button" class="btn-ghost btn-sm" @click="setContent(content)">{{ t('content.discard') }}</button>
           <button type="button" class="btn-primary" :disabled="saving" @click="save()"><Save class="size-4" />{{ saving ? t('common.saving') : t('common.save') }}</button>
         </div>
@@ -263,8 +263,8 @@ onBeforeRouteLeave(async () => {
         </div>
         <div><label class="label" for="pub-url">{{ t('content.postUrl') }} <span class="font-normal text-muted">({{ t('common.optional') }})</span></label><input id="pub-url" v-model.trim="publishForm.url" type="url" class="input" placeholder="https://"></div>
         <p class="rounded-2xl bg-surface-2 p-3 text-sm text-muted">{{ t('content.noAutoPost') }}</p>
-        <template #footer>
-          <button type="button" class="btn-secondary" @click="publishOpen = false">{{ t('common.cancel') }}</button>
+        <template #footer="{ close }">
+          <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
           <button type="button" class="btn-primary" :disabled="saving" @click="confirmPublished">{{ t('content.markPublished') }}</button>
         </template>
       </SidePanel>

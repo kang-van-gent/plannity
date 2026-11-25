@@ -150,13 +150,18 @@ export function createStrapiSource(): DataSource {
     },
 
     calendar: {
-      // Scheduled items in range plus the unscheduled tray (scheduledDate = null).
-      range: (from, to, brandId) => many<Content>(`${BFF}/contents${qs({
+      // Scheduled items in range plus (by default) the unscheduled tray (scheduledDate = null).
+      // The calendar asks for the tray once and then only for scheduled items as you navigate.
+      range: (from, to, brandId, opts = {}) => many<Content>(`${BFF}/contents${qs({
         'populate[brand][fields][0]': 'documentId', 'pagination[pageSize]': 100, 'filters[archivedAt][$null]': true,
         ...(brandId ? { 'filters[brand][documentId][$eq]': brandId } : {}),
-        'filters[$or][0][scheduledDate][$null]': true,
-        'filters[$or][1][$and][0][scheduledDate][$gte]': from,
-        'filters[$or][1][$and][1][scheduledDate][$lte]': to,
+        ...(opts.includeUnscheduled === false
+          ? { 'filters[scheduledDate][$gte]': from, 'filters[scheduledDate][$lte]': to }
+          : {
+              'filters[$or][0][scheduledDate][$null]': true,
+              'filters[$or][1][$and][0][scheduledDate][$gte]': from,
+              'filters[$or][1][$and][1][scheduledDate][$lte]': to,
+            }),
       })}`),
       holidays: (from, to) => many<Holiday>(`${BFF}/holidays${qs({ 'filters[date][$gte]': from, 'filters[date][$lte]': to, 'pagination[pageSize]': 100 })}`),
       addHoliday: (input) => one<Holiday>(`${BFF}/holidays`, { method: 'POST', body: { data: input } }),

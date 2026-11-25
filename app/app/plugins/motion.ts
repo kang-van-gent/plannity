@@ -3,6 +3,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import type { Directive } from 'vue'
 
 type AnimFrom = 'up' | 'down' | 'left' | 'right' | 'scale' | 'fade' | 'pop'
+// Number values and `delay` are accepted for compatibility; stagger now comes from on-screen order.
 export type AnimBinding = number | { delay?: number; from?: AnimFrom; scroll?: boolean; duration?: number } | undefined
 
 const FROM: Record<AnimFrom, gsap.TweenVars> = {
@@ -17,7 +18,7 @@ const FROM: Record<AnimFrom, gsap.TweenVars> = {
 
 interface AnimEl extends HTMLElement {
   __anim?: gsap.core.Tween
-  __animPlay?: () => void
+  __animPlay?: (slot: number) => void
   __parallax?: gsap.core.Tween
 }
 
@@ -41,10 +42,34 @@ export default defineNuxtPlugin((nuxtApp) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue
         io!.unobserve(e.target)
-        ;(e.target as AnimEl).__animPlay?.()
+        enqueue(e.target as AnimEl)
       }
     }, { rootMargin: '0px 0px -6% 0px' })
     return io
+  }
+
+  // Everything that becomes visible in the same frame plays as one batch,
+  // staggered in reading order (top→bottom, left→right). Stagger therefore
+  // depends on what is on screen, not on an item's index in a long list, so a
+  // card scrolled into view on its own never waits behind invisible siblings.
+  const STAGGER = 0.06
+  const MAX_SLOTS = 10
+  let queue: AnimEl[] = []
+  let raf = 0
+  function enqueue(el: AnimEl) {
+    queue.push(el)
+    raf ||= requestAnimationFrame(flush)
+  }
+  function flush() {
+    raf = 0
+    const batch = queue.filter((el) => el.isConnected && el.__animPlay)
+    queue = []
+    const pos = new Map(batch.map((el) => [el, el.getBoundingClientRect()] as const))
+    batch.sort((a, b) => {
+      const ra = pos.get(a)!, rb = pos.get(b)!
+      return Math.abs(ra.top - rb.top) > 8 ? ra.top - rb.top : ra.left - rb.left
+    })
+    batch.forEach((el, i) => el.__animPlay?.(Math.min(i, MAX_SLOTS)))
   }
 
   /**
@@ -61,23 +86,33 @@ export default defineNuxtPlugin((nuxtApp) => {
     mounted(el, binding) {
       if (prefersReducedMotion()) { el.style.opacity = '1'; return }
       const v = binding.value
-      const o = typeof v === 'number' ? { delay: Math.min(v, 10) * 0.055 } : (v ?? {})
-      const from = FROM[o.from ?? 'up']
-      el.__animPlay = () => {
+      const o = typeof v === 'number' || v === undefined ? {} : v
+      const kind = o.from ?? 'up'
+      // Phones: shorter travel and duration read as snappier and cost less.
+      const compact = isCompactViewport()
+      const from = compact && kind !== 'pop' ? scaleFrom(FROM[kind], 0.6) : FROM[kind]
+      el.__animPlay = (slot) => {
         el.__animPlay = undefined
         afterCurtain(curtain, () => {
           if (!el.isConnected) return
+          // Pause CSS transitions (Tailwind `transition` covers transform and
+          // opacity) so they don't chase GSAP's per-frame values and judder.
+          const prevTransition = el.style.transition
+          const restore = () => { el.style.transition = prevTransition; el.style.willChange = '' }
+          el.style.transition = 'none'
+          el.style.willChange = 'transform, opacity'
           el.__anim = gsap.fromTo(el, { opacity: 0, ...from }, {
             opacity: 1, x: 0, y: 0, scale: 1, rotate: 0,
-            duration: o.duration ?? 0.7,
-            delay: o.delay ?? 0,
-            ease: o.from === 'pop' ? 'back.out(2)' : 'power3.out',
-            clearProps: 'transform,willChange',
-            onStart: () => { el.style.willChange = 'transform, opacity' },
+            duration: o.duration ?? (compact ? 0.5 : 0.6),
+            delay: slot * (compact ? STAGGER * 0.75 : STAGGER),
+            ease: kind === 'pop' ? 'back.out(1.8)' : 'power3.out',
+            clearProps: 'transform',
+            onComplete: restore,
+            onInterrupt: restore,
           })
         })
       }
-      if (o.scroll === false) el.__animPlay()
+      if (o.scroll === false) enqueue(el)
       else observer().observe(el)
     },
     beforeUnmount(el) {
@@ -85,6 +120,14 @@ export default defineNuxtPlugin((nuxtApp) => {
       el.__animPlay = undefined
       el.__anim?.kill()
     },
+  }
+
+  function scaleFrom(v: gsap.TweenVars, k: number): gsap.TweenVars {
+    const out: gsap.TweenVars = { ...v }
+    if (typeof v.x === 'number') out.x = v.x * k
+    if (typeof v.y === 'number') out.y = v.y * k
+    if (typeof v.scale === 'number') out.scale = 1 - (1 - v.scale) * k
+    return out
   }
 
   /** v-parallax="-80" — scroll-scrubbed vertical drift (scrub: true). */

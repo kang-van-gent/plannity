@@ -52,13 +52,13 @@ async function toggleArchive() {
     <UiErrorState v-if="q.error.value" :error="q.error.value" @retry="q.refresh()" />
     <UiSkeletonList v-else-if="!q.data.value" :rows="3" />
     <template v-else>
-      <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div class="mb-6 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-4 sm:flex sm:flex-row">
         <UiBrandDot v-anim="{ from: 'pop' }" :name="q.data.value.name" :color="q.data.value.color" :size="64" />
         <div class="min-w-0 flex-1">
-          <h1 v-anim="1" class="truncate font-display text-3xl font-bold">{{ q.data.value.name }}</h1>
+          <h1 v-anim="1" class="truncate font-display text-[26px] font-bold sm:text-3xl">{{ q.data.value.name }}</h1>
           <p v-anim="2" class="text-sm text-muted">{{ t('brands.updatedAt', { date: formatDateTime(q.data.value.updatedAt, locale) }) }}<span v-if="q.data.value.archivedAt" class="chip ml-2 bg-slate-500/10 text-muted">{{ t('brands.archivedChip') }}</span></p>
         </div>
-        <div v-anim="3" class="flex flex-wrap gap-2">
+        <div v-anim="3" class="col-span-2 grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:flex-wrap">
           <NuxtLink v-if="!q.data.value.archivedAt" :to="`/app/generate?brand=${q.data.value.id}`" class="btn-primary"><WandSparkles class="size-4" />{{ t('nav.generate') }}</NuxtLink>
           <button type="button" class="btn-secondary" @click="brands.setScope(q.data.value.id); navigateTo('/app/content')"><Library class="size-4" />{{ t('nav.library') }}</button>
           <button type="button" class="btn-secondary" @click="toggleArchive">

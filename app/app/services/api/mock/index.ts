@@ -449,13 +449,14 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
     },
 
     calendar: {
-      async range(from, to, brandId) {
+      async range(from, to, brandId, opts = {}) {
         await net()
+        const withTray = opts.includeUnscheduled !== false
         const d = load()
         const archivedBrands = new Set(d.brands.filter((b) => b.archivedAt).map((b) => b.id))
         return d.contents
           .filter((c) => c.ownerId === uidOf() && !c.archivedAt && !archivedBrands.has(c.brandId) && (!brandId || c.brandId === brandId)
-            && (c.scheduledDate === null || (c.scheduledDate >= from && c.scheduledDate <= to)))
+            && (c.scheduledDate === null ? withTray : c.scheduledDate >= from && c.scheduledDate <= to))
           .map(strip)
       },
       async holidays(from, to) {

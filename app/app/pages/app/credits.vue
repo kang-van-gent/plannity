@@ -95,8 +95,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
   <div>
     <UiPageHeader :title="t('nav.credits')" :subtitle="t('credits.subtitle', { price: formatTHB(price, locale) })" />
 
-    <div class="grid gap-4 md:grid-cols-3">
-      <div v-anim="0" class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 p-6 text-white shadow-pop">
+    <div class="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
+      <div v-anim="0" class="relative col-span-2 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-brand-500 to-brand-700 p-5 text-white shadow-pop sm:rounded-3xl sm:p-6 md:col-span-1">
         <Doodle variant="spark" class="absolute right-5 top-5 size-8 text-sun" />
         <p class="text-sm text-white/75">{{ t('credits.available') }}</p>
         <p class="font-display text-5xl font-bold tabular-nums">{{ wallet?.available ?? '–' }}</p>
@@ -108,18 +108,18 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
 
     <section class="mt-8">
       <h2 v-anim class="font-display text-xl font-bold">{{ t('credits.buy') }}</h2>
-      <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <button v-for="(p, i) in CREDIT_PACKAGES" :key="p" v-anim="i" type="button" class="card card-pad group text-left transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-pop" :disabled="creating !== null" @click="buy(p)">
+      <div class="mt-3 grid grid-cols-2 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-5">
+        <button v-for="(p, i) in CREDIT_PACKAGES" :key="p" v-anim="i" type="button" class="card card-pad pressable group text-left hover:-translate-y-1 hover:border-brand-300 hover:shadow-pop" :disabled="creating !== null" @click="buy(p)">
           <Coins class="size-6 text-sun transition group-hover:rotate-12" />
           <p class="mt-3 font-display text-3xl font-bold">{{ p }}</p>
           <p class="text-sm text-muted">{{ t('credits.unit') }}</p>
           <p class="mt-2 font-semibold">{{ creating === p ? t('common.loading') : formatTHB(p * price, locale) }}</p>
         </button>
-        <div v-anim="4" class="card card-pad">
+        <div v-anim="4" class="card card-pad col-span-2 sm:col-span-1">
           <label for="custom-credits" class="label">{{ t('credits.custom') }}</label>
           <input id="custom-credits" v-model.number="custom" type="number" min="1" max="500" class="input">
           <p class="mt-2 text-sm font-semibold">{{ formatTHB((custom || 0) * price, locale) }}</p>
-          <button type="button" class="btn-primary btn-sm mt-3 w-full" :disabled="creating !== null" @click="buy(custom)">{{ t('credits.buy') }}</button>
+          <button type="button" class="btn-primary mt-3 w-full" :disabled="creating !== null" @click="buy(custom)">{{ t('credits.buy') }}</button>
         </div>
       </div>
       <p class="mt-3 flex items-center gap-2 text-xs text-muted"><FlaskConical class="size-3.5" />{{ t('credits.sandboxNote') }}</p>
@@ -127,11 +127,29 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
 
     <div class="mt-8 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_1fr]">
       <section v-anim class="card overflow-hidden">
-        <h2 class="flex items-center gap-2 border-b border-line px-5 py-4 font-display text-lg font-bold"><Receipt class="size-5 text-brand-500" />{{ t('credits.history') }}</h2>
+        <h2 class="flex items-center gap-2 border-b border-line px-4 py-3.5 font-display text-lg font-bold sm:px-5 sm:py-4"><Receipt class="size-5 text-brand-500" />{{ t('credits.history') }}</h2>
         <UiErrorState v-if="ledger.error.value" compact :error="ledger.error.value" class="m-4" @retry="ledger.refresh()" />
         <UiSkeletonList v-else-if="!ledger.data.value" :rows="3" class="p-4" />
         <p v-else-if="!ledger.data.value.length" class="p-6 text-center text-sm text-muted">{{ t('credits.noHistory') }}</p>
-        <div v-else class="overflow-x-auto">
+        <div v-else>
+          <!-- Phones: list rows instead of a sideways-scrolling table. -->
+          <ul class="divide-y divide-line sm:hidden">
+            <li v-for="l in ledger.data.value.slice(0, ledgerLimit)" :key="l.id" class="flex items-center gap-3 px-4 py-3">
+              <span class="grid size-10 shrink-0 place-items-center rounded-2xl" :class="TYPE_META[l.type].cls"><component :is="TYPE_META[l.type].icon" class="size-4" /></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-semibold">{{ t(`credits.types.${l.type}`) }}</p>
+                <p class="text-xs text-muted">{{ formatDateTime(l.createdAt, locale) }}</p>
+              </div>
+              <div class="text-right">
+                <p class="font-display text-base font-bold tabular-nums">
+                  <span v-if="l.deltaAvailable" :class="l.deltaAvailable > 0 ? 'text-success' : ''">{{ l.deltaAvailable > 0 ? '+' : '' }}{{ l.deltaAvailable }}</span>
+                  <span v-else class="text-sm font-semibold text-muted">{{ t('credits.reservedDelta', { n: (l.deltaReserved > 0 ? '+' : '') + l.deltaReserved }) }}</span>
+                </p>
+                <p class="text-[11px] text-muted tabular-nums">{{ t('credits.cols.balance') }} {{ l.availableAfter }}</p>
+              </div>
+            </li>
+          </ul>
+          <div class="hidden overflow-x-auto sm:block">
           <table class="w-full min-w-[34rem] text-sm">
             <thead class="bg-surface-2 text-left text-xs text-muted">
               <tr><th class="px-5 py-2.5 font-semibold">{{ t('credits.cols.time') }}</th><th class="px-3 py-2.5 font-semibold">{{ t('credits.cols.type') }}</th><th class="px-3 py-2.5 text-right font-semibold">{{ t('credits.cols.amount') }}</th><th class="px-5 py-2.5 text-right font-semibold">{{ t('credits.cols.balance') }}</th></tr>
@@ -148,7 +166,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
               </tr>
             </tbody>
           </table>
-          <button v-if="ledger.data.value.length > ledgerLimit" type="button" class="btn-ghost m-3" @click="ledgerLimit += 20"><ArrowDownLeft class="size-4" />{{ t('common.showMore') }}</button>
+          </div>
+          <button v-if="ledger.data.value.length > ledgerLimit" type="button" class="btn-ghost m-3 max-sm:w-[calc(100%-1.5rem)]" @click="ledgerLimit += 20"><ArrowDownLeft class="size-4" />{{ t('common.showMore') }}</button>
         </div>
       </section>
 
@@ -158,7 +177,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         <UiErrorState v-else-if="orders.error.value" compact :error="orders.error.value" class="m-4" @retry="orders.refresh()" />
         <p v-else-if="!orders.data.value?.length" class="p-6 text-center text-sm text-muted">{{ t('credits.noOrders') }}</p>
         <ul v-else class="divide-y divide-line">
-          <li v-for="o in orders.data.value" :key="o.id" class="flex items-center gap-3 px-5 py-3 text-sm">
+          <li v-for="o in orders.data.value" :key="o.id" class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-sm sm:flex-nowrap sm:px-5">
             <div class="min-w-0 flex-1">
               <p class="font-semibold">{{ t('credits.orderLine', { n: o.credits }) }} · {{ formatTHB(o.amountSatang, locale) }}</p>
               <p class="truncate text-xs text-muted">{{ o.id }} · {{ formatDateTime(o.createdAt, locale) }}</p>

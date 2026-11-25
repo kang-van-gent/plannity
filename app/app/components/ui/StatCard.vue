@@ -13,7 +13,7 @@ watch(() => props.value, (v) => {
 </script>
 
 <template>
-  <div class="card group relative overflow-hidden p-4 transition hover:-translate-y-0.5 hover:shadow-pop sm:p-6">
+  <div class="card group relative overflow-hidden p-4 transition hover:-translate-y-0.5 max-sm:p-3.5 hover:shadow-pop sm:p-6">
     <span class="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full opacity-25 blur-xl transition group-hover:scale-125" :style="{ background: tint ?? '#6C4CF5' }" />
     <div class="relative flex items-start justify-between gap-2">
       <p class="text-xs font-medium leading-snug text-muted sm:text-sm">{{ label }}</p>
@@ -21,7 +21,7 @@ watch(() => props.value, (v) => {
         <component :is="icon" class="size-[18px]" />
       </span>
     </div>
-    <p class="relative mt-2 font-display text-2xl font-bold sm:text-3xl tabular-nums">{{ formatNumber(shown, locale) }}</p>
+    <p class="relative mt-1.5 font-display text-[26px] font-bold leading-none sm:mt-2 sm:text-3xl tabular-nums">{{ formatNumber(shown, locale) }}</p>
     <p v-if="hint" class="relative mt-1 text-[11px] leading-snug text-muted sm:text-xs">{{ hint }}</p>
   </div>
 </template>

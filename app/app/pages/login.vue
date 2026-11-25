@@ -101,8 +101,8 @@ async function sendReset() {
         <input id="forgot-email" v-model.trim="forgotEmail" type="email" class="input" autocomplete="email" @keydown.enter.prevent="sendReset">
         <p class="hint">{{ t('auth.forgotHint') }}</p>
       </div>
-      <template #footer>
-        <button type="button" class="btn-secondary" @click="forgotOpen = false">{{ t('common.cancel') }}</button>
+      <template #footer="{ close }">
+        <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
         <button type="button" class="btn-primary" :disabled="forgotSending" @click="sendReset">{{ forgotSending ? t('common.sending') : t('auth.sendReset') }}</button>
       </template>
     </SidePanel>

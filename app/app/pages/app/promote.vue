@@ -68,12 +68,12 @@ async function submit() {
 
 <template>
   <div>
-    <section v-anim class="relative mb-6 overflow-hidden rounded-[2rem] bg-ink p-6 text-white sm:p-10" data-parallax-root>
+    <section v-anim class="relative mb-5 overflow-hidden rounded-[1.75rem] bg-ink p-5 text-white sm:mb-6 sm:rounded-[2rem] sm:p-10" data-parallax-root>
       <div v-parallax="-40" class="absolute -right-16 -top-20 size-72 rounded-full bg-brand-500/50 blur-3xl" />
       <div v-parallax="-20" class="absolute -bottom-24 left-10 size-64 rounded-full bg-pink/40 blur-3xl" />
       <div class="relative max-w-2xl">
         <span class="eyebrow bg-white/10 text-sun"><Megaphone class="size-3.5" />Upstify</span>
-        <h1 class="mt-3 font-display text-3xl font-bold sm:text-4xl">{{ t('promote.title') }}</h1>
+        <h1 class="mt-3 font-display text-[28px] font-bold leading-tight sm:text-4xl">{{ t('promote.title') }}</h1>
         <p class="mt-2 text-white/75">{{ t('promote.subtitle') }}</p>
         <ul class="mt-4 flex flex-wrap gap-2 text-xs">
           <li v-for="(x, i) in [t('promote.point1'), t('promote.point2'), t('promote.point3')]" :key="i" class="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5"><ShieldCheck class="size-3.5 text-lime" />{{ x }}</li>
@@ -85,10 +85,10 @@ async function submit() {
       <form v-anim class="card card-pad space-y-5" novalidate @submit.prevent="submit">
         <div>
           <span class="label">{{ t('promote.service') }}</span>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <button v-for="s in SERVICES" :key="s.key" type="button" class="rounded-2xl border-2 p-4 text-left transition" :class="form.serviceType === s.key ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="form.serviceType === s.key" @click="form.serviceType = s.key">
-              <component :is="s.icon" class="size-5" :class="form.serviceType === s.key ? 'text-brand-500' : 'text-muted'" />
-              <p class="mt-2 font-semibold">{{ t(`promote.services.${s.key}`) }}</p>
+          <div class="grid gap-2 sm:grid-cols-3 sm:gap-3">
+            <button v-for="s in SERVICES" :key="s.key" type="button" class="pressable grid grid-cols-[auto_1fr] items-start gap-x-3 rounded-2xl border-2 p-3 text-left sm:block sm:p-4" :class="form.serviceType === s.key ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="form.serviceType === s.key" @click="form.serviceType = s.key">
+              <component :is="s.icon" class="row-span-2 mt-0.5 size-5" :class="form.serviceType === s.key ? 'text-brand-500' : 'text-muted'" />
+              <p class="font-semibold sm:mt-2">{{ t(`promote.services.${s.key}`) }}</p>
               <p class="text-xs text-muted">{{ t(`promote.services.${s.key}Hint`) }}</p>
             </button>
           </div>
@@ -115,9 +115,9 @@ async function submit() {
           <input v-model="form.consent" type="checkbox" class="mt-0.5 size-4 accent-brand-500">
           <span><b>{{ t('promote.consentTitle') }}</b><br><span class="text-muted">{{ t('promote.consentBody') }}</span></span>
         </label>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <p class="text-xs text-muted">{{ t('promote.noCredits') }}</p>
-          <button type="submit" class="btn-primary" :disabled="sending"><Send class="size-4" />{{ sending ? t('common.sending') : t('promote.submit') }}</button>
+        <div class="flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <p class="text-center text-xs text-muted sm:text-left">{{ t('promote.noCredits') }}</p>
+          <button type="submit" class="btn-primary max-sm:w-full" :disabled="sending"><Send class="size-4" />{{ sending ? t('common.sending') : t('promote.submit') }}</button>
         </div>
       </form>
 
@@ -127,7 +127,7 @@ async function submit() {
         <UiSkeletonList v-else-if="!list.data.value" :rows="2" class="p-4" />
         <p v-else-if="!list.data.value.length" class="p-6 text-center text-sm text-muted">{{ t('promote.none') }}</p>
         <ul v-else class="divide-y divide-line">
-          <li v-for="i in list.data.value" :key="i.id" class="px-5 py-4 text-sm">
+          <li v-for="i in list.data.value" :key="i.id" class="px-4 py-3.5 text-sm sm:px-5 sm:py-4">
             <div class="flex items-center gap-2"><span class="font-mono text-xs font-bold">{{ i.reference }}</span><span class="chip ml-auto" :class="STATUS_STYLE[i.status]">{{ t(`promote.status.${i.status}`) }}</span></div>
             <p class="mt-1 font-semibold">{{ t(`promote.services.${i.serviceType}`) }} · {{ brands.byId(i.brandId)?.name }}</p>
             <p class="mt-1 line-clamp-2 text-muted">{{ i.brief }}</p>

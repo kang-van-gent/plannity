@@ -99,6 +99,13 @@
   button, a, [role="button"], label { touch-action: manipulation; }
 }
 
+/* Dev only: Nuxt DevTools' onboarding badge (<devframes-onboard>) sits in normal
+   flow at the end of <body> with an absolutely positioned glow that hangs below
+   the viewport, making the page ~24px taller than the layout so the sticky
+   sidebar runs out of room. Pin its host to the viewport so it can't add height.
+   The element doesn't exist in production builds. */
+devframes-onboard { position: fixed !important; left: 0; bottom: 0; width: 0; height: 0; }
+
 /* Entrance animation guard: elements marked by v-anim start hidden only when
    JS animation is enabled (class set by the boot script). A fallback timer
    reveals them if hydration never happens. */
@@ -117,8 +124,10 @@
 }
 
 @utility btn {
+  /* Phones: 44px tall, 15px label (native tap-target size); every button "presses" in. */
   @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold whitespace-nowrap
-    transition-all duration-200 select-none disabled:cursor-not-allowed disabled:opacity-50;
+    transition-all duration-200 select-none active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
+    max-sm:min-h-11 max-sm:text-[15px];
 }
 @utility chip {
   @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
@@ -137,25 +146,26 @@
   .btn-danger {
     @apply btn bg-danger text-white hover:brightness-110;
   }
-  .btn-sm { @apply px-3 py-1.5 text-xs rounded-xl; }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-xl max-sm:min-h-9 max-sm:text-[13px]; }
   .btn-lg { @apply px-6 py-3.5 text-base; }
-  .btn-icon { @apply btn p-2.5 rounded-xl; }
+  .btn-icon { @apply btn p-2.5 rounded-xl max-sm:min-w-11; }
 
   .card {
-    @apply rounded-3xl border border-line bg-surface shadow-soft;
+    @apply rounded-3xl border border-line bg-surface shadow-soft max-sm:rounded-[1.5rem] max-sm:border-line/70;
   }
-  .card-pad { @apply p-5 sm:p-6; }
+  .card-pad { @apply p-4 sm:p-6; }
 
   .input {
     /* 16px on phones: iOS Safari zooms the page when a smaller input is focused. */
     @apply w-full rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-base sm:text-sm text-fg placeholder:text-muted/70
-      transition focus:border-brand-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-500/15;
+      transition focus:border-brand-400 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-500/15
+      max-sm:py-3;
   }
   .input-error { @apply border-danger focus:border-danger focus:ring-danger/15; }
   textarea.input { @apply min-h-24 leading-relaxed; }
   select.input { @apply appearance-none bg-no-repeat pr-10; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6588' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-position: right 0.9rem center; }
 
-  .label { @apply mb-1.5 block text-sm font-semibold text-fg; }
+  .label { @apply mb-1.5 block text-sm font-semibold text-fg max-sm:text-[13px] max-sm:text-muted; }
   .hint { @apply mt-1 text-xs text-muted; }
   .field-error { @apply mt-1 text-xs font-medium text-danger; }
 
@@ -175,6 +185,41 @@
   .kbd {
     @apply rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-muted;
   }
+
+  /* ---- Mobile-app building blocks ---------------------------------------- */
+
+  /* Sideways-scrolling row (filter chips, quick actions). Bleeds to the screen
+     edges on phones so it reads as a native carousel, not a clipped box. */
+  .h-scroll {
+    @apply flex snap-x gap-2 overflow-x-auto overscroll-x-contain max-sm:-mx-4 max-sm:px-4 max-sm:pb-1;
+    scrollbar-width: none;
+  }
+  .h-scroll::-webkit-scrollbar { display: none; }
+  .h-scroll > * { @apply shrink-0 snap-start; }
+
+  /* Pill-shaped compact select/date used in filter rows. */
+  .input.pill { @apply h-10 w-auto rounded-full py-0 text-sm max-sm:py-0; }
+
+  /* Segmented control (iOS style). Children: buttons with aria-pressed. */
+  .segmented { @apply inline-flex rounded-2xl bg-surface-2 p-1; }
+  .segmented > button { @apply flex-1 rounded-xl px-3 py-2 text-sm font-semibold text-muted transition active:scale-[0.97]; }
+  .segmented > button[aria-pressed="true"] { @apply bg-surface text-fg shadow-soft; }
+
+  /* Tappable row / card: native-feeling press state. */
+  .pressable { @apply transition active:scale-[0.985] active:opacity-90; }
+
+  /* iOS-style toggle: <input type="checkbox" class="switch">. */
+  .switch {
+    @apply relative h-6 w-10 shrink-0 cursor-pointer appearance-none rounded-full bg-line transition-colors duration-200 checked:bg-brand-500;
+  }
+  .switch::after {
+    content: "";
+    @apply absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform duration-200;
+  }
+  .switch:checked::after { transform: translateX(1rem); }
+
+  /* Section heading inside a page (outside cards). */
+  .section-label { @apply mb-2 px-1 text-[13px] font-bold uppercase tracking-wider text-muted; }
 
   .skeleton {
     @apply animate-pulse rounded-2xl bg-surface-2;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CalendarDays, Coins, LayoutDashboard, Library, Megaphone, Settings, Store, WandSparkles } from '@lucide/vue'
 
+defineProps<{ collapsed?: boolean }>()
 const emit = defineEmits<{ navigate: [] }>()
 const { t } = useLocale()
 const route = useRoute()
@@ -23,12 +24,15 @@ function isActive(i: { to: string; exact?: boolean; also?: string }) {
 <template>
   <nav class="grid gap-1" :aria-label="t('nav.main')">
     <NuxtLink v-for="i in items" :key="i.to" :to="i.to" :aria-current="isActive(i) ? 'page' : undefined"
-      class="group relative flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-semibold transition"
-      :class="isActive(i) ? 'bg-brand-500 text-white shadow-pop' : 'text-muted hover:bg-surface-2 hover:text-fg'"
+      class="group relative flex items-center gap-3 whitespace-nowrap rounded-2xl py-2.5 text-sm font-semibold transition"
+      :class="[isActive(i) ? 'bg-brand-500 text-white shadow-pop' : 'text-muted hover:bg-surface-2 hover:text-fg', collapsed ? 'justify-center px-0' : 'px-3.5']"
+      :title="collapsed ? i.label : undefined" :aria-label="collapsed ? i.label : undefined"
       @click="emit('navigate')">
-      <component :is="i.icon" class="size-[18px] transition-transform group-hover:scale-110 group-hover:-rotate-6" />
-      {{ i.label }}
-      <Doodle v-if="isActive(i)" variant="spark" class="ml-auto size-3.5 text-sun" />
+      <component :is="i.icon" class="size-[18px] shrink-0 transition-transform group-hover:scale-110 group-hover:-rotate-6" />
+      <template v-if="!collapsed">
+        {{ i.label }}
+        <Doodle v-if="isActive(i)" variant="spark" class="ml-auto size-3.5 text-sun" />
+      </template>
     </NuxtLink>
   </nav>
 </template>

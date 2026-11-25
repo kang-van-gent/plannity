@@ -44,7 +44,7 @@ const brandOf = (id: string) => brands.byId(id)
     <template v-else>
       <UiErrorState v-if="q.error.value && !q.data.value" :error="q.error.value" @retry="q.refresh()" />
       <div v-else-if="!q.data.value" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <div v-for="i in 4" :key="i" class="skeleton h-32" />
+        <div v-for="i in 4" :key="i" class="skeleton h-28 sm:h-32" />
       </div>
       <template v-else>
         <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
@@ -62,7 +62,7 @@ const brandOf = (id: string) => brands.byId(id)
           <div ref="bar" class="mt-4 flex h-4 overflow-hidden rounded-full bg-surface-2">
             <span v-for="s in CONTENT_STATUSES" :key="s" class="h-full" :class="STATUS_META[s].dot" :style="{ width: pct(s) }" />
           </div>
-          <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:flex sm:flex-wrap sm:gap-x-5">
             <span v-for="s in CONTENT_STATUSES" :key="s" class="inline-flex items-center gap-2"><span class="size-2.5 rounded-full" :class="STATUS_META[s].dot" />{{ t(`status.${s}`) }} <b>{{ q.data.value.statusCounts[s] }}</b></span>
           </div>
         </section>
@@ -75,7 +75,7 @@ const brandOf = (id: string) => brands.byId(id)
             </div>
             <ul v-if="q.data.value.upcoming.length" class="mt-3 divide-y divide-line">
               <li v-for="(c, i) in q.data.value.upcoming" :key="c.id" v-anim="i">
-                <NuxtLink :to="`/app/content/${c.id}`" class="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-3 transition hover:bg-surface-2">
+                <NuxtLink :to="`/app/content/${c.id}`" class="pressable -mx-2 flex items-center gap-3 rounded-2xl px-2 py-3 hover:bg-surface-2 active:bg-surface-2">
                   <div class="w-14 shrink-0 rounded-2xl bg-surface-2 py-1.5 text-center">
                     <p class="text-[10px] font-bold uppercase text-muted">{{ formatDate(c.scheduledDate, locale, { weekday: 'short' }) }}</p>
                     <p class="font-display text-lg font-bold leading-none">{{ formatDate(c.scheduledDate, locale, { day: 'numeric' }) }}</p>
@@ -96,7 +96,7 @@ const brandOf = (id: string) => brands.byId(id)
               <h2 class="flex items-center gap-2 font-display text-lg font-bold"><Hourglass class="size-5 text-pink" />{{ t('dashboard.backlog') }}</h2>
               <ul v-if="q.data.value.backlog.length" class="mt-3 space-y-2">
                 <li v-for="c in q.data.value.backlog" :key="c.id">
-                  <NuxtLink :to="`/app/content/${c.id}`" class="flex items-center gap-3 rounded-2xl border border-line px-3 py-2.5 text-sm transition hover:border-brand-300">
+                  <NuxtLink :to="`/app/content/${c.id}`" class="pressable flex items-center gap-3 rounded-2xl border border-line px-3 py-3 text-sm hover:border-brand-300 sm:py-2.5">
                     <span class="w-16 shrink-0 text-xs font-semibold" :class="(c.scheduledDate ?? '') < today ? 'text-danger' : 'text-muted'">{{ formatDate(c.scheduledDate, locale, { day: 'numeric', month: 'short' }) }}</span>
                     <span class="min-w-0 flex-1 truncate font-medium">{{ c.title }}</span>
                     <UiStatusBadge :status="c.status" small />
@@ -113,7 +113,7 @@ const brandOf = (id: string) => brands.byId(id)
               </div>
               <ul v-if="q.data.value.recentJobs.length" class="mt-3 space-y-2">
                 <li v-for="j in q.data.value.recentJobs" :key="j.id">
-                  <NuxtLink :to="`/app/jobs/${j.id}`" class="block rounded-2xl border border-line px-3 py-2.5 transition hover:border-brand-300">
+                  <NuxtLink :to="`/app/jobs/${j.id}`" class="pressable block rounded-2xl border border-line px-3 py-3 hover:border-brand-300 sm:py-2.5">
                     <div class="flex items-center gap-2 text-sm">
                       <span class="min-w-0 flex-1 truncate font-semibold">{{ j.brandName }}</span>
                       <UiJobStatus :status="j.status" />

@@ -102,7 +102,9 @@ onMounted(() => {
     const pin = q('[data-how-pin]')[0] as HTMLElement | undefined
     if (track && pin && desktop) {
       const distance = () => Math.max(0, track.scrollWidth - window.innerWidth)
-      const st = { trigger: pin, start: 'top top+=72', end: () => `+=${distance()}`, scrub: true, pin: true, anticipatePin: 1, invalidateOnRefresh: true }
+      // Pin as soon as the track is centred below the 72px header (not when it hits the header),
+      // so the horizontal scroll kicks in while the section heading is still on screen.
+      const st = { trigger: pin, start: 'center center+=36', end: () => `+=${distance()}`, scrub: true, pin: true, anticipatePin: 1, invalidateOnRefresh: true }
       gsap.to(track, { x: () => -distance(), ease: 'none', scrollTrigger: st })
       gsap.fromTo(q('[data-how-progress]'), { scaleX: 0 }, { scaleX: 1, ease: 'none', scrollTrigger: { ...st, pin: false } })
     } else {
@@ -241,18 +243,25 @@ onBeforeUnmount(() => {
         <span v-anim class="eyebrow">{{ t('landing.how.eyebrow') }}</span>
         <h2 v-anim="1" class="section-title mt-4 max-w-3xl">{{ t('landing.how.title') }}</h2>
       </div>
-      <div data-how-pin class="relative mt-10 overflow-hidden lg:h-[calc(100dvh-72px)] lg:max-h-[640px]">
+      <div data-how-pin class="relative mt-8 overflow-hidden lg:h-[calc(100dvh-72px)] lg:max-h-[580px]">
         <div data-how-track class="relative flex flex-col gap-5 px-5 sm:px-8 lg:h-full lg:w-max lg:flex-row lg:items-center lg:gap-8 lg:px-[max(2rem,calc((100vw-80rem)/2+2rem))]">
           <span data-how-line class="absolute bottom-8 left-[2.6rem] top-8 w-1 origin-top rounded-full bg-gradient-to-b from-brand-500 via-pink to-sun sm:left-[3.35rem] lg:hidden" />
-          <article v-for="(s, i) in steps" :key="s.key" class="card relative ml-10 p-6 sm:ml-12 lg:ml-0 lg:h-[26rem] lg:w-[28rem] lg:p-8">
-            <span class="absolute -left-[3.05rem] top-6 grid size-9 place-items-center rounded-full font-display font-bold text-white ring-4 ring-bg sm:-left-[3.4rem] lg:static lg:size-12 lg:text-xl" :style="{ background: s.color }">{{ i + 1 }}</span>
-            <span class="mt-0 grid size-14 place-items-center rounded-3xl lg:mt-8" :style="{ background: `${s.color}22`, color: s.color }"><component :is="s.icon" class="size-7" /></span>
+          <article v-for="(s, i) in steps" :key="s.key" class="card relative ml-10 flex flex-col p-6 sm:ml-12 lg:ml-0 lg:h-[30rem] lg:w-[28rem] lg:p-7">
+            <div class="flex items-center gap-3">
+              <span class="absolute -left-[3.05rem] top-6 grid size-9 place-items-center rounded-full font-display font-bold text-white ring-4 ring-bg sm:-left-[3.4rem] lg:static lg:size-12 lg:text-xl" :style="{ background: s.color }">{{ i + 1 }}</span>
+              <span class="grid size-12 place-items-center rounded-2xl" :style="{ background: `${s.color}22`, color: s.color }"><component :is="s.icon" class="size-6" /></span>
+            </div>
+            <div class="mt-5 grid h-40 place-items-center overflow-hidden rounded-2xl p-4 lg:h-48" :style="{ background: `color-mix(in srgb, ${s.color} 12%, white)` }">
+              <img :src="`/illustrations/how-${s.key}.svg`" alt="" aria-hidden="true" loading="lazy" decoding="async" class="h-full w-auto max-w-full object-contain">
+            </div>
             <h3 class="mt-5 text-2xl font-bold lg:text-3xl">{{ t(`landing.how.steps.${s.key}.title`) }}</h3>
             <p class="mt-2 text-muted lg:text-lg">{{ t(`landing.how.steps.${s.key}.body`) }}</p>
           </article>
-          <article class="ml-10 flex flex-col justify-center rounded-3xl bg-gradient-to-br from-brand-500 to-pink p-8 text-white sm:ml-12 lg:ml-0 lg:h-[26rem] lg:w-[24rem]">
-            <Doodle variant="spark" class="size-10 text-sun" />
-            <p class="mt-4 font-display text-3xl font-bold">{{ t('landing.how.done') }}</p>
+          <article class="ml-10 flex flex-col justify-center rounded-3xl bg-gradient-to-br from-brand-500 to-pink p-8 text-white sm:ml-12 lg:ml-0 lg:h-[30rem] lg:w-[26rem]">
+            <div class="grid h-40 place-items-center rounded-2xl bg-white/90 p-4 lg:h-48">
+              <img src="/illustrations/how-done.svg" alt="" aria-hidden="true" loading="lazy" decoding="async" class="h-full w-auto max-w-full object-contain">
+            </div>
+            <p class="mt-6 flex items-start gap-3 font-display text-3xl font-bold"><Doodle variant="spark" class="mt-1 size-8 shrink-0 text-sun" />{{ t('landing.how.done') }}</p>
             <NuxtLink to="/register" class="mt-6 inline-flex w-fit items-center gap-2 rounded-2xl bg-white px-5 py-3 font-bold text-brand-600">{{ t('landing.hero.cta') }}<ArrowRight class="size-4" /></NuxtLink>
           </article>
         </div>

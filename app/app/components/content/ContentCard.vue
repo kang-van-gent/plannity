@@ -10,7 +10,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
 </script>
 
 <template>
-  <NuxtLink v-if="layout !== 'row'" :to="`/app/content/${content.id}`" class="card group relative flex flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-pop">
+  <NuxtLink v-if="layout !== 'row'" :to="`/app/content/${content.id}`" class="card pressable group relative flex flex-col overflow-hidden hover:-translate-y-1 hover:shadow-pop">
     <span class="h-1.5 w-full" :style="{ background: brand?.color ?? '#6C4CF5' }" />
     <div class="flex flex-1 flex-col p-4">
       <div class="flex items-center gap-2">
@@ -33,7 +33,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
       </p>
     </div>
   </NuxtLink>
-  <NuxtLink v-else :to="`/app/content/${content.id}`" class="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 transition hover:bg-surface-2 sm:grid-cols-[auto_1fr_8rem_7rem_7rem]">
+  <NuxtLink v-else :to="`/app/content/${content.id}`" class="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3.5 transition hover:bg-surface-2 active:bg-surface-2 sm:py-3 sm:grid-cols-[auto_1fr_8rem_7rem_7rem]">
     <UiPlatformBadge :platform="content.platform" />
     <div class="min-w-0">
       <p class="truncate font-semibold">{{ content.title }}</p>

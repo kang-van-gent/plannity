@@ -8,9 +8,12 @@ const th = {
     reload: 'โหลดใหม่', remove: 'ลบออก', retry: 'ลองอีกครั้ง', save: 'บันทึก', saved: 'บันทึกแล้ว', saving: 'กำลังบันทึก…',
     search: 'ค้นหา', selectAll: 'เลือกทั้งหมด', sending: 'กำลังส่ง…', showMore: 'ดูเพิ่มเติม', toggleTheme: 'สลับโหมดสว่าง/มืด',
     undo: 'เลิกทำ', mockBadge: 'โหมดเดโม · ข้อมูลจำลอง',
+    discardTitle: 'ทิ้งการเปลี่ยนแปลงหรือไม่?', discardBody: 'คุณได้กรอกข้อมูลในฟอร์มนี้แล้ว หากปิดตอนนี้ ข้อมูลจะหายไป',
+    discard: 'ทิ้ง', keepEditing: 'แก้ไขต่อ', resizePanel: 'ลากเพื่อปรับขนาด (ดับเบิลคลิกเพื่อขยาย)',
   },
 
   nav: {
+    collapse: 'ย่อแถบเมนู', expand: 'ขยายแถบเมนู',
     more: 'เพิ่มเติม', tabHome: 'หน้าหลัก', tabLibrary: 'คลัง', tabCreate: 'สร้าง', theme: 'ธีม',
     main: 'เมนูหลัก', menu: 'เมนู', howItWorks: 'วิธีใช้งาน', pricing: 'ราคา', faq: 'คำถามที่พบบ่อย', login: 'เข้าสู่ระบบ',
     tryFree: 'ทดลองฟรี', openApp: 'เข้าสู่แอป', dashboard: 'แดชบอร์ด', brands: 'แบรนด์', generate: 'สร้างด้วย AI',

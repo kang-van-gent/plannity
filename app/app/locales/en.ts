@@ -10,9 +10,12 @@ const en: Messages = {
     reload: 'Reload', remove: 'Remove', retry: 'Try again', save: 'Save', saved: 'Saved', saving: 'Saving…',
     search: 'Search', selectAll: 'Select all', sending: 'Sending…', showMore: 'Show more', toggleTheme: 'Toggle light/dark mode',
     undo: 'Undo', mockBadge: 'Demo mode · mock data',
+    discardTitle: 'Discard your changes?', discardBody: 'You have entered information in this form. If you close it now, it will be lost.',
+    discard: 'Discard', keepEditing: 'Keep editing', resizePanel: 'Drag to resize panel (double-click to expand)',
   },
 
   nav: {
+    collapse: 'Collapse sidebar', expand: 'Expand sidebar',
     more: 'More', tabHome: 'Home', tabLibrary: 'Library', tabCreate: 'Create', theme: 'Theme',
     main: 'Main menu', menu: 'Menu', howItWorks: 'How it works', pricing: 'Pricing', faq: 'FAQ', login: 'Log in',
     tryFree: 'Try free', openApp: 'Open app', dashboard: 'Dashboard', brands: 'Brands', generate: 'Generate with AI',

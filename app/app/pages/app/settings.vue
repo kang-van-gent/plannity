@@ -69,23 +69,23 @@ async function requestDeletion() {
         <div><span class="label">{{ t('settings.timezone') }}</span><p class="input bg-surface-2/50">Asia/Bangkok (UTC+7)</p></div>
         <div><span class="label">{{ t('settings.emailStatus') }}</span><p class="input bg-surface-2/50">{{ session.user.value?.verifiedAt ? t('settings.verified') : t('settings.unverified') }}</p></div>
       </div>
-      <div class="flex justify-end"><button type="button" class="btn-primary" :disabled="savingProfile" @click="saveProfile">{{ savingProfile ? t('common.saving') : t('common.save') }}</button></div>
+      <div class="flex justify-end"><button type="button" class="btn-primary max-sm:w-full" :disabled="savingProfile" @click="saveProfile">{{ savingProfile ? t('common.saving') : t('common.save') }}</button></div>
     </section>
 
     <section v-anim class="card card-pad mt-5 space-y-4">
       <h2 class="flex items-center gap-2 font-display text-lg font-bold"><Palette class="size-5 text-pink" />{{ t('settings.appearance') }}</h2>
       <div>
         <span class="label">{{ t('settings.theme') }}</span>
-        <div class="grid gap-3 sm:grid-cols-3">
-          <button v-for="th in themes" :key="th.v" type="button" class="flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition" :class="theme.pref.value === th.v ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="theme.pref.value === th.v" @click="pickTheme(th.v, $event)">
+        <div class="grid grid-cols-3 gap-2 sm:gap-3">
+          <button v-for="th in themes" :key="th.v" type="button" class="flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 text-center text-sm transition active:scale-[0.97] sm:flex-row sm:gap-3 sm:p-4 sm:text-left sm:text-base" :class="theme.pref.value === th.v ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="theme.pref.value === th.v" @click="pickTheme(th.v, $event)">
             <component :is="th.icon" class="size-5" /><span class="font-semibold">{{ t(`settings.themes.${th.v}`) }}</span>
           </button>
         </div>
       </div>
       <div>
         <span class="label">{{ t('common.language') }}</span>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <button v-for="l in (['th', 'en'] as const)" :key="l" type="button" class="rounded-2xl border-2 p-4 text-left font-semibold transition" :class="locale === l ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="locale === l" @click="setLocale(l)">
+        <div class="grid grid-cols-2 gap-2 sm:gap-3">
+          <button v-for="l in (['th', 'en'] as const)" :key="l" type="button" class="rounded-2xl border-2 p-3 text-center font-semibold transition active:scale-[0.97] sm:p-4 sm:text-left" :class="locale === l ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="locale === l" @click="setLocale(l)">
             {{ l === 'th' ? 'ภาษาไทย' : 'English' }}
           </button>
         </div>
@@ -110,16 +110,16 @@ async function requestDeletion() {
           <button type="button" class="btn-secondary btn-sm" @click="previewConfirm">{{ t('settings.preview.confirm') }}</button>
         </div>
       </div>
-      <button type="button" class="btn-secondary" @click="resetDemo"><RotateCcw class="size-4" />{{ t('settings.reset') }}</button>
+      <button type="button" class="btn-secondary max-sm:w-full" @click="resetDemo"><RotateCcw class="size-4" />{{ t('settings.reset') }}</button>
     </section>
 
     <section v-anim class="card card-pad mt-5 space-y-3">
       <h2 class="flex items-center gap-2 font-display text-lg font-bold"><ShieldAlert class="size-5 text-danger" />{{ t('settings.privacy') }}</h2>
       <p class="text-sm text-muted">{{ t('settings.privacyBody') }}</p>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <NuxtLink to="/app/content" class="btn-secondary">{{ t('content.exportCsv') }}</NuxtLink>
         <NuxtLink to="/privacy" class="btn-ghost">{{ t('footer.privacy') }}</NuxtLink>
-        <button type="button" class="btn-ghost ml-auto text-danger" @click="requestDeletion">{{ t('settings.deleteRequest') }}</button>
+        <button type="button" class="btn-ghost text-danger sm:ml-auto" @click="requestDeletion">{{ t('settings.deleteRequest') }}</button>
       </div>
     </section>
   </div>

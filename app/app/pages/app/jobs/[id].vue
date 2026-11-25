@@ -124,8 +124,8 @@ function keepDrafts() {
         <NuxtLink v-else to="/app/generate" class="btn-primary"><WandSparkles class="size-4" />{{ t('jobs.newJob') }}</NuxtLink>
       </UiPageHeader>
 
-      <section v-anim class="card card-pad grid items-center gap-6 md:grid-cols-[auto_1fr]">
-        <div class="relative mx-auto size-36">
+      <section v-anim class="card card-pad grid items-center gap-4 sm:gap-6 md:grid-cols-[auto_1fr]">
+        <div class="relative mx-auto size-32 sm:size-36">
           <svg viewBox="0 0 120 120" class="size-full -rotate-90">
             <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="10" class="text-surface-2" />
             <circle ref="ring" cx="60" cy="60" r="52" fill="none" stroke="url(#jobGrad)" stroke-width="10" stroke-linecap="round" :stroke-dasharray="C" :stroke-dashoffset="C" />
@@ -135,19 +135,19 @@ function keepDrafts() {
             <div><p class="font-display text-3xl font-bold tabular-nums">{{ pct }}%</p><p class="text-xs text-muted">{{ processed }}/{{ job.requestedCount }}</p></div>
           </div>
         </div>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <div class="rounded-2xl bg-success/10 p-4"><p class="text-xs font-semibold text-success">{{ t('jobs.succeeded') }}</p><p class="font-display text-3xl font-bold">{{ job.completedCount }}</p></div>
           <div class="rounded-2xl bg-danger/10 p-4"><p class="text-xs font-semibold text-danger">{{ t('jobs.failed') }}</p><p class="font-display text-3xl font-bold">{{ job.failedCount }}</p></div>
           <div class="rounded-2xl bg-brand-500/10 p-4"><p class="text-xs font-semibold text-brand-600 dark:text-brand-300">{{ t('jobs.creditsUsed') }}</p><p class="font-display text-3xl font-bold">{{ job.completedCount }}</p></div>
           <div class="rounded-2xl bg-sky/15 p-4"><p class="text-xs font-semibold text-sky-700 dark:text-sky">{{ t('jobs.creditsReturned') }}</p><p class="font-display text-3xl font-bold">{{ job.failedCount + job.cancelledCount }}</p></div>
-          <p v-if="isActive" class="flex items-center gap-2 text-sm text-muted sm:col-span-2 lg:col-span-4"><LoaderCircle class="size-4 animate-spin text-brand-500" />{{ t('jobs.runningHint') }}</p>
+          <p v-if="isActive" class="col-span-2 flex items-center gap-2 text-sm text-muted lg:col-span-4"><LoaderCircle class="size-4 animate-spin text-brand-500" />{{ t('jobs.runningHint') }}</p>
         </div>
       </section>
 
-      <h2 class="mb-3 mt-8 font-display text-xl font-bold">{{ t('jobs.items') }}</h2>
+      <h2 class="mb-3 mt-6 font-display text-xl font-bold sm:mt-8">{{ t('jobs.items') }}</h2>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <template v-for="it in job.items" :key="`${it.id}-${it.status}`">
-          <NuxtLink v-if="it.status === 'succeeded' && it.contentId && contents[it.contentId]" v-anim="{ from: 'pop', scroll: false }" :to="`/app/content/${it.contentId}`" class="card group p-4 transition hover:-translate-y-0.5 hover:shadow-pop">
+          <NuxtLink v-if="it.status === 'succeeded' && it.contentId && contents[it.contentId]" v-anim="{ from: 'pop', scroll: false }" :to="`/app/content/${it.contentId}`" class="card pressable group p-4 hover:-translate-y-0.5 hover:shadow-pop">
             <div class="flex items-center gap-2 text-xs"><span class="font-bold text-muted">#{{ it.ordinal + 1 }}</span><UiPlatformBadge :platform="contents[it.contentId]!.platform" size="xs" /><span class="chip bg-surface-2 py-0.5 text-muted">{{ t(`formats.${contents[it.contentId]!.format}`) }}</span><span class="ml-auto text-muted">{{ formatDate(contents[it.contentId]!.suggestedDate, locale, { day: 'numeric', month: 'short' }) }}</span></div>
             <p class="mt-2 line-clamp-2 font-semibold group-hover:text-brand-600 dark:group-hover:text-brand-300">{{ contents[it.contentId]!.title }}</p>
             <p class="mt-1 line-clamp-2 text-sm text-muted">{{ contents[it.contentId]!.hook }}</p>
@@ -182,15 +182,15 @@ function keepDrafts() {
           <label class="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" class="size-4 accent-brand-500" :checked="chosen.length === done.length" @change="done.forEach((c) => (selected[c.id] = ($event.target as HTMLInputElement).checked))">{{ t('common.selectAll') }}</label>
         </div>
         <ul class="mt-4 divide-y divide-line">
-          <li v-for="c in done" :key="c.id" class="flex flex-wrap items-center gap-3 py-3">
+          <li v-for="c in done" :key="c.id" class="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
             <input v-model="selected[c.id]" type="checkbox" class="size-4 accent-brand-500" :aria-label="c.title">
             <UiPlatformBadge :platform="c.platform" />
             <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ c.title }}</span>
             <span v-if="c.scheduledDate" class="chip bg-success/10 text-success">{{ t('jobs.onCalendar') }}</span>
-            <input v-model="dates[c.id]" type="date" class="input w-40 py-1.5" :disabled="!selected[c.id]" :aria-label="t('content.fields.scheduledDate')">
+            <input v-model="dates[c.id]" type="date" class="input py-1.5 max-sm:ml-7 max-sm:w-[calc(100%-1.75rem)] sm:w-40" :disabled="!selected[c.id]" :aria-label="t('content.fields.scheduledDate')">
           </li>
         </ul>
-        <div class="mt-4 flex flex-wrap justify-end gap-2">
+        <div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <button type="button" class="btn-secondary" @click="keepDrafts"><FileText class="size-4" />{{ t('jobs.keepDrafts') }}</button>
           <button type="button" class="btn-primary" :disabled="saving || !chosen.length" @click="saveToCalendar"><CalendarPlus class="size-4" />{{ saving ? t('common.saving') : t('jobs.saveToCalendar', { n: chosen.length }) }}</button>
         </div>

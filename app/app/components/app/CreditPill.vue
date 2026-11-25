@@ -16,9 +16,9 @@ watch(() => wallet.value?.available, (v, old) => {
 </script>
 
 <template>
-  <span ref="pill" class="inline-flex"><NuxtLink to="/app/credits" class="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sun/25 to-pink/20 px-3 py-2 text-sm font-bold transition hover:shadow-pop"
+  <span ref="pill" class="inline-flex"><NuxtLink to="/app/credits" class="flex h-9 items-center gap-1.5 rounded-full bg-gradient-to-r from-sun/25 to-pink/20 pl-1 pr-3 text-sm font-bold transition hover:shadow-pop active:scale-95 sm:h-10 sm:gap-2 sm:rounded-2xl sm:px-3"
     :title="t('credits.available')">
-    <Coins class="size-4 text-amber-600 dark:text-sun" />
+    <span class="grid size-7 place-items-center rounded-full bg-surface/80 sm:contents"><Coins class="size-4 text-amber-600 dark:text-sun" /></span>
     <span class="tabular-nums">{{ wallet ? formatNumber(shown, locale) : '–' }}</span>
     <span class="hidden font-medium text-muted sm:inline">{{ t('credits.unit') }}</span>
     <span v-if="wallet?.reserved" class="hidden rounded-lg bg-surface/70 px-1.5 py-0.5 text-[10px] font-semibold text-muted md:inline">{{ t('credits.reservedShort', { n: wallet.reserved }) }}</span>

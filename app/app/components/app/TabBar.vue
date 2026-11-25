@@ -41,12 +41,14 @@ function onFocusOut() { setTimeout(() => { keyboard.value = isEditable(document.
 
 // Pages read --tabbar-h to keep their own sticky bars above the tab bar.
 function publishHeight() {
-  const h = bar.value && getComputedStyle(bar.value).display !== 'none' && !keyboard.value ? bar.value.offsetHeight : 0
+  // Floating bar: reserve everything from its top edge to the bottom of the screen.
+  const h = bar.value && getComputedStyle(bar.value).display !== 'none' && !keyboard.value
+    ? Math.max(0, window.innerHeight - bar.value.getBoundingClientRect().top) : 0
   document.documentElement.style.setProperty('--tabbar-h', `${h}px`)
 }
 watch(keyboard, (k) => {
   if (!bar.value) return
-  gsap.to(bar.value, { yPercent: k ? 110 : 0, duration: prefersReducedMotion() ? 0 : 0.3, ease: k ? 'power2.in' : 'power3.out' })
+  gsap.to(bar.value, { yPercent: k ? 160 : 0, duration: prefersReducedMotion() ? 0 : 0.3, ease: k ? 'power2.in' : 'power3.out' })
   publishHeight()
 })
 watch(activeIndex, () => nextTick(() => movePill(true)))
@@ -59,7 +61,7 @@ onMounted(() => {
   if (bar.value) ro.observe(bar.value)
   document.addEventListener('focusin', onFocusIn)
   document.addEventListener('focusout', onFocusOut)
-  if (bar.value && !prefersReducedMotion()) gsap.from(bar.value, { yPercent: 110, duration: 0.6, delay: 0.2, ease: 'power3.out' })
+  if (bar.value && !prefersReducedMotion()) gsap.from(bar.value, { yPercent: 160, duration: 0.6, delay: 0.2, ease: 'power3.out' })
 })
 onBeforeUnmount(() => {
   ro?.disconnect()
@@ -70,24 +72,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <nav ref="bar" class="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+  <!-- Floating "island" tab bar: rounded, frosted, lifted off the home indicator. -->
+  <nav ref="bar" class="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-50 mx-auto max-w-md rounded-[1.75rem] border border-line/80 bg-surface/85 shadow-[0_12px_40px_-12px_rgb(33_28_58/0.35)] backdrop-blur-xl backdrop-saturate-150 lg:hidden"
     :aria-label="t('nav.main')">
-    <div class="relative mx-auto grid max-w-xl grid-cols-5 px-1">
-      <span ref="pill" class="pointer-events-none absolute left-0 top-1.5 h-8 w-14 rounded-full bg-brand-500/12 opacity-0" aria-hidden="true" />
+    <div class="relative grid grid-cols-5 px-1.5 py-1.5">
+      <span ref="pill" class="pointer-events-none absolute left-0 top-1.5 h-[3.25rem] w-[4.25rem] rounded-[1.25rem] bg-brand-500/12 opacity-0" aria-hidden="true" />
       <NuxtLink v-for="(i, idx) in items" :key="i.to" :ref="(el) => setTab(el, idx)" :to="i.to"
         :aria-current="activeIndex === idx ? 'page' : undefined"
-        class="relative flex flex-col items-center gap-0.5 pb-2 pt-1.5 text-[10.5px] font-semibold leading-tight transition-colors"
+        class="relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight transition-colors active:scale-90"
         :class="activeIndex === idx ? 'text-brand-600 dark:text-brand-300' : 'text-muted'">
-        <span v-if="i.primary" class="-mt-5 mb-0.5 grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-pink text-white shadow-pop ring-4 ring-bg transition-transform active:scale-90">
-          <component :is="i.icon" class="size-5" />
+        <span v-if="i.primary" class="grid size-12 place-items-center rounded-[1.1rem] bg-gradient-to-br from-brand-500 to-pink text-white shadow-pop transition-transform"
+          :class="activeIndex === idx ? 'scale-105 ring-2 ring-brand-300/60 ring-offset-2 ring-offset-surface' : ''" :aria-label="i.label">
+          <component :is="i.icon" class="size-[22px]" />
         </span>
-        <span v-else class="grid h-8 w-14 place-items-center transition-transform active:scale-90">
-          <component :is="i.icon" class="size-5" :stroke-width="activeIndex === idx ? 2.4 : 2" />
-        </span>
-        <span class="max-w-full truncate px-0.5">{{ i.label }}</span>
+        <template v-else>
+          <component :is="i.icon" class="size-[22px] transition-transform" :class="activeIndex === idx ? '-translate-y-px' : ''" :stroke-width="activeIndex === idx ? 2.4 : 2" />
+          <span class="max-w-full truncate px-0.5">{{ i.label }}</span>
+        </template>
       </NuxtLink>
-      <button type="button" class="flex flex-col items-center gap-0.5 pb-2 pt-1.5 text-[10.5px] font-semibold leading-tight text-muted" @click="emit('more')">
-        <span class="grid h-8 w-14 place-items-center transition-transform active:scale-90"><Menu class="size-5" /></span>
+      <button type="button" class="flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight text-muted transition active:scale-90" @click="emit('more')">
+        <Menu class="size-[22px]" />
         <span class="max-w-full truncate px-0.5">{{ t('nav.more') }}</span>
       </button>
     </div>

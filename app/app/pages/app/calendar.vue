@@ -29,15 +29,32 @@ const title = computed(() => view.value === 'week'
   : monthLabel(cursor.value, locale.value))
 
 // Local copy for optimistic drag & drop with rollback.
+// The unscheduled tray doesn't depend on the visible dates, so it is fetched once
+// (and again only when the brand scope changes). Navigating months/weeks only
+// fetches scheduled items and keeps the tray's objects untouched — no reload,
+// no re-render, no re-animation. Moves between tray and calendar happen locally.
 const items = ref<Content[]>([])
+let trayBrand: string | null | undefined // brand the tray was loaded for; undefined = not loaded
+let trayChanged = false
 const q = useQuery(async () => {
+  const brandId = brands.currentBrandId.value
+  const needTray = trayBrand !== brandId
   const [c, h] = await Promise.all([
-    api.calendar.range(range.value.from, range.value.to, brands.currentBrandId.value),
+    api.calendar.range(range.value.from, range.value.to, brandId, { includeUnscheduled: needTray }),
     api.calendar.holidays(range.value.from, range.value.to),
   ])
-  items.value = c
+  trayChanged = needTray
+  if (needTray) {
+    items.value = c
+    trayBrand = brandId
+  } else {
+    // Keep the existing tray objects; swap in only the scheduled items.
+    items.value = [...items.value.filter((x) => !x.scheduledDate), ...c.filter((x) => x.scheduledDate)]
+  }
   return { holidays: h }
 }, { watch: [range, brands.currentBrandId] })
+/** Full reload including the tray (after a conflict or an error). */
+function reloadAll() { trayBrand = undefined; return q.refresh() }
 
 const visible = computed(() => items.value.filter((c) => (!filters.platform || c.platform === filters.platform) && (!filters.status || c.status === filters.status)))
 const byDate = computed(() => {
@@ -65,17 +82,81 @@ const grid = ref<HTMLElement | null>(null)
 async function shift(dir: -1 | 1) {
   cursor.value = view.value === 'week' ? addDays(cursor.value, 7 * dir) : addMonths(cursor.value, dir)
   await nextTick()
-  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { x: 50 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
+  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { x: 30 * dir }, { x: 0, duration: 0.45, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
+  revealFrame(dir > 0 ? 'start' : 'end')
 }
-function goToday() { cursor.value = today }
+
+// --- motion ------------------------------------------------------------------
+// 1) revealFrame: the day cells / week columns cascade in (load, month/week change, view change).
+// 2) revealItems: post chips, dots, key-date tags and tray rows pop in whenever data arrives or filters change.
+// CSS transitions on those elements are paused while GSAP drives them, so the two never fight.
+const curtain = useCurtain()
+function tween(els: Element[] | NodeListOf<Element>, from: gsap.TweenVars, to: gsap.TweenVars) {
+  const list = Array.from(els) as HTMLElement[]
+  if (!list.length) return
+  list.forEach((el) => { el.style.transition = 'none' })
+  gsap.fromTo(list, from, { ...to, overwrite: true, clearProps: 'transform,opacity', onComplete: () => list.forEach((el) => { el.style.transition = '' }) })
+}
+function revealFrame(from: 'start' | 'end' = 'start') {
+  if (prefersReducedMotion() || !grid.value) return
+  const root = grid.value
+  if (view.value === 'month') {
+    tween(root.querySelectorAll('[data-cell]'), { opacity: 0, y: 10, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'power2.out', stagger: { grid: [6, 7], from, amount: 0.35 } })
+    tween(root.querySelectorAll('[data-today]'), { scale: 0 }, { scale: 1, duration: 0.6, delay: 0.3, ease: 'back.out(3)' })
+  } else if (view.value === 'week') {
+    tween(root.querySelectorAll('[data-day]'), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out', stagger: { each: 0.05, from } })
+  }
+}
+function revealItems() {
+  if (prefersReducedMotion() || !grid.value) return
+  const root = grid.value.parentElement ?? grid.value
+  if (view.value !== 'list') {
+    tween(root.querySelectorAll('[data-cell] [data-chip], [data-day] [data-chip], [data-dot], [data-holiday]'), { opacity: 0, scale: 0.6, y: 6 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: 'back.out(2)', stagger: { amount: 0.4 }, delay: 0.15 })
+  }
+  // The tray only animates when it was actually (re)loaded, not on month/week navigation.
+  if (trayChanged) {
+    trayChanged = false
+    tween(root.querySelectorAll('[data-tray]'), { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.4, ease: 'power3.out', stagger: 0.03, delay: 0.1 })
+  }
+  revealAgenda()
+}
+const agendaEl = ref<HTMLElement | null>(null)
+function revealAgenda() {
+  if (prefersReducedMotion() || !agendaEl.value) return
+  tween(agendaEl.value.querySelectorAll('[data-agenda]'), { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power3.out', stagger: 0.04 })
+}
+watch(() => q.data.value, () => nextTick(revealItems))
+watch(() => [filters.platform, filters.status], () => nextTick(revealItems))
+function goToday() { cursor.value = today; selectedDay.value = today }
+
+// Phones: month cells show dots; tapping a day lists its items below the grid.
+const selectedDay = ref(today)
+watch(cursor, (c) => { if (!isSameMonth(selectedDay.value, c)) selectedDay.value = c })
+// Swipe the month grid sideways to change month (touch only).
+let swipe: { x: number; y: number } | null = null
+function onSwipeStart(e: PointerEvent) { swipe = e.pointerType === 'touch' ? { x: e.clientX, y: e.clientY } : null }
+function onSwipeEnd(e: PointerEvent) {
+  if (!swipe) return
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y
+  swipe = null
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shift(dx < 0 ? 1 : -1)
+}
 async function setView(v: View) {
   view.value = v
   await nextTick()
-  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
+  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { y: 16 }, { y: 0, duration: 0.4, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
+  revealFrame()
+  revealItems()
 }
+watch(selectedDay, () => nextTick(() => {
+  revealAgenda()
+  const n = grid.value?.querySelector(`[data-cell="${selectedDay.value}"] [data-num]`)
+  if (n && !prefersReducedMotion()) gsap.fromTo(n, { scale: 0.7 }, { scale: 1, duration: 0.4, ease: 'back.out(3)', overwrite: true, clearProps: 'transform' })
+}))
 onMounted(() => {
   brands.load().catch(() => {})
   if (window.matchMedia('(max-width: 767px)').matches) view.value = 'list' // mobile list fallback (spec §11)
+  nextTick(() => afterCurtain(curtain, () => { revealFrame(); if (q.data.value) revealItems() }))
 })
 
 // --- move (drag & drop, keyboard, form) -----------------------------------
@@ -108,6 +189,8 @@ async function move(id: string, date: string | null, opts: { silent?: boolean } 
     await nextTick()
     const el = document.querySelector(`[data-chip="${id}"]`)
     if (el && !prefersReducedMotion()) gsap.fromTo(el, { scale: 0.7, rotate: -4 }, { scale: 1, rotate: 0, duration: 0.5, ease: 'back.out(2.5)' })
+    const target = date && document.querySelector(`[data-cell="${date}"], [data-day="${date}"]`)
+    if (target && !prefersReducedMotion()) gsap.fromTo(target, { boxShadow: 'inset 0 0 0 3px rgba(108,76,245,0.55)' }, { boxShadow: 'inset 0 0 0 0px rgba(108,76,245,0)', duration: 0.9, ease: 'power2.out', clearProps: 'boxShadow' })
     if (!opts.silent) {
       notify.success(date ? t('calendar.moved', { date: formatDate(date, locale.value, { day: 'numeric', month: 'short' }) }) : t('calendar.unscheduled'), c.title, {
         action: { label: t('common.undo'), handler: () => move(id, before.scheduledDate, { silent: true }) },
@@ -115,7 +198,7 @@ async function move(id: string, date: string | null, opts: { silent?: boolean } 
     }
   } catch (e) {
     Object.assign(c, before) // rollback
-    if (isApiError(e) && e.code === 'VERSION_CONFLICT') notify.warning(t('errors.versionConflict'), t('errors.versionConflictHint'), { action: { label: t('common.reload'), handler: () => q.refresh() } })
+    if (isApiError(e) && e.code === 'VERSION_CONFLICT') notify.warning(t('errors.versionConflict'), t('errors.versionConflictHint'), { action: { label: t('common.reload'), handler: () => reloadAll() } })
     else notify.error(t('calendar.moveFailed'), t('calendar.moveFailedBody'), { action: { label: t('common.retry'), handler: () => move(id, date) } })
   }
 }
@@ -214,44 +297,52 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
       <button type="button" class="btn-primary" @click="openCreate(today)"><Plus class="size-4" />{{ t('content.newManual') }}</button>
     </UiPageHeader>
 
-    <div v-anim class="card mb-4 flex flex-wrap items-center gap-2 p-3">
-      <div class="flex items-center gap-1">
+    <div v-anim class="mb-4 flex flex-wrap items-center gap-2 sm:rounded-3xl sm:border sm:border-line sm:bg-surface sm:p-3 sm:shadow-soft">
+      <div class="flex w-full items-center gap-1 sm:w-auto">
         <button type="button" class="btn-icon btn-ghost" :aria-label="t('calendar.prev')" @click="shift(-1)"><ChevronLeft class="size-5" /></button>
-        <button type="button" class="btn-secondary btn-sm" @click="goToday">{{ t('calendar.today') }}</button>
+        <button type="button" class="btn-secondary btn-sm max-sm:order-last max-sm:ml-1 max-sm:rounded-full" @click="goToday">{{ t('calendar.today') }}</button>
+        <h2 class="flex-1 text-center font-display text-xl font-bold sm:hidden" aria-live="polite">{{ title }}</h2>
         <button type="button" class="btn-icon btn-ghost" :aria-label="t('calendar.next')" @click="shift(1)"><ChevronRight class="size-5" /></button>
       </div>
-      <h2 class="min-w-[10rem] font-display text-xl font-bold" aria-live="polite">{{ title }}</h2>
-      <div class="ml-auto flex flex-wrap items-center gap-2">
-        <select v-model="filters.platform" class="input w-auto py-1.5" :aria-label="t('content.fields.platform')"><option value="">{{ t('content.allPlatforms') }}</option><option v-for="p in PLATFORMS" :key="p" :value="p">{{ PLATFORM_META[p].label }}</option></select>
-        <select v-model="filters.status" class="input w-auto py-1.5" :aria-label="t('content.fields.status')"><option value="">{{ t('content.allStatuses') }}</option><option v-for="s in CONTENT_STATUSES" :key="s" :value="s">{{ t(`status.${s}`) }}</option></select>
-        <div class="inline-flex rounded-xl border border-line bg-surface-2 p-0.5" role="group" :aria-label="t('calendar.view')">
-          <button v-for="v in (['month', 'week', 'list'] as View[])" :key="v" type="button" class="flex items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 text-xs font-semibold" :class="view === v ? 'bg-surface shadow-soft' : 'text-muted'" :aria-pressed="view === v" @click="setView(v)">
+      <h2 class="hidden min-w-[10rem] font-display text-xl font-bold sm:block" aria-live="polite">{{ title }}</h2>
+      <div class="h-scroll w-full items-center sm:ml-auto sm:w-auto sm:flex-wrap sm:overflow-visible">
+        <div class="segmented" role="group" :aria-label="t('calendar.view')">
+          <button v-for="v in (['month', 'week', 'list'] as View[])" :key="v" type="button" class="flex items-center gap-1.5 !py-1.5 text-xs" :aria-pressed="view === v" @click="setView(v)">
             <CalendarDays v-if="v === 'month'" class="size-3.5" /><CalendarRange v-else-if="v === 'week'" class="size-3.5" /><List v-else class="size-3.5" />{{ t(`calendar.${v}`) }}
           </button>
         </div>
+        <select v-model="filters.platform" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5" :class="filters.platform ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''" :aria-label="t('content.fields.platform')"><option value="">{{ t('content.allPlatforms') }}</option><option v-for="p in PLATFORMS" :key="p" :value="p">{{ PLATFORM_META[p].label }}</option></select>
+        <select v-model="filters.status" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5" :class="filters.status ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''" :aria-label="t('content.fields.status')"><option value="">{{ t('content.allStatuses') }}</option><option v-for="s in CONTENT_STATUSES" :key="s" :value="s">{{ t(`status.${s}`) }}</option></select>
       </div>
     </div>
 
-    <UiErrorState v-if="q.error.value && !q.data.value" :error="q.error.value" @retry="q.refresh()" />
+    <UiErrorState v-if="q.error.value && !q.data.value" :error="q.error.value" @retry="reloadAll()" />
     <div v-else class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div ref="grid" class="min-w-0" :class="{ 'opacity-60 transition-opacity': q.pending.value }">
         <!-- MONTH -->
-        <div v-if="view === 'month'" class="card overflow-hidden">
+        <div v-if="view === 'month'" class="card touch-pan-y overflow-hidden" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="swipe = null">
           <div class="grid grid-cols-7 border-b border-line bg-surface-2 text-center text-xs font-bold text-muted">
-            <div v-for="w in weekdayNames" :key="w" class="py-2">{{ w }}</div>
+            <div v-for="w in weekdayNames" :key="w" class="py-2 max-sm:text-[11px]">{{ w }}</div>
           </div>
           <div class="grid grid-cols-7">
-            <div v-for="d in monthGrid(cursor)" :key="d" class="group relative min-h-28 border-b border-r border-line p-1.5 transition-colors [&:nth-child(7n)]:border-r-0"
-              :class="[!isSameMonth(d, cursor) && 'bg-surface-2/50', overDate === d && 'bg-brand-500/10 ring-2 ring-inset ring-brand-400']"
+            <div v-for="d in monthGrid(cursor)" :key="d" :data-cell="d" class="group relative min-h-14 border-b border-r border-line p-1 transition-colors max-sm:cursor-pointer sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0"
+              :class="[!isSameMonth(d, cursor) && 'bg-surface-2/50', overDate === d && 'bg-brand-500/10 ring-2 ring-inset ring-brand-400', selectedDay === d && 'max-sm:bg-brand-500/8']"
+              @click="selectedDay = d"
               @dragover.prevent="overDate = d" @dragleave="overDate === d && (overDate = null)" @drop.prevent="onDrop($event, d)">
-              <div class="flex items-center justify-between">
-                <span class="grid size-7 place-items-center rounded-full text-xs font-bold" :class="d === today ? 'bg-brand-500 text-white shadow-pop' : isSameMonth(d, cursor) ? '' : 'text-muted/60'">{{ Number(d.slice(8)) }}</span>
-                <button type="button" class="rounded-lg p-1 text-muted opacity-0 transition hover:bg-brand-500/10 hover:text-brand-500 focus:opacity-100 group-hover:opacity-100" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-3.5" /></button>
+              <div class="flex items-center justify-center sm:justify-between">
+                <span data-num :data-today="d === today ? '' : undefined" class="grid size-7 place-items-center rounded-full text-xs font-bold transition"
+                  :class="[d === today ? 'bg-brand-500 text-white shadow-pop' : isSameMonth(d, cursor) ? '' : 'text-muted/60', selectedDay === d && d !== today && 'max-sm:bg-fg max-sm:text-bg']">{{ Number(d.slice(8)) }}</span>
+                <button type="button" class="hidden rounded-lg p-1 sm:block text-muted opacity-0 transition hover:bg-brand-500/10 hover:text-brand-500 focus:opacity-100 group-hover:opacity-100" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-3.5" /></button>
               </div>
-              <p v-for="h in holidaysByDate.get(d) ?? []" :key="h.id" class="mt-1 flex items-center gap-1 truncate rounded-md bg-sun/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-sun" :title="`${h.title[locale]} · ${h.source} (${h.year})`">
+              <!-- phones: dots -->
+              <div class="mt-1 flex flex-wrap justify-center gap-0.5 sm:hidden" aria-hidden="true">
+                <span v-if="holidaysByDate.get(d)?.length" data-dot class="size-1.5 rounded-full bg-sun" />
+                <span v-for="c in (byDate.get(d) ?? []).slice(0, 3)" :key="c.id" data-dot class="size-1.5 rounded-full" :style="{ background: brandColor(c) }" />
+              </div>
+              <p v-for="h in holidaysByDate.get(d) ?? []" :key="h.id" data-holiday class="mt-1 hidden items-center gap-1 truncate rounded-md sm:flex bg-sun/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-sun" :title="`${h.title[locale]} · ${h.source} (${h.year})`">
                 <AlertTriangle v-if="!h.verified" class="size-3 shrink-0" /><Star v-else class="size-3 shrink-0" />{{ h.title[locale] }}
               </p>
-              <div class="mt-1 space-y-1">
+              <div class="mt-1 hidden space-y-1 sm:block">
                 <button v-for="c in (byDate.get(d) ?? []).slice(0, 3)" :key="c.id" :data-chip="c.id" type="button" draggable="true"
                   class="flex w-full cursor-grab items-center gap-1 rounded-lg border-l-[3px] bg-surface px-1.5 py-1 text-left text-[11px] font-medium shadow-soft transition hover:-translate-y-px hover:shadow-pop active:cursor-grabbing"
                   :class="dragId === c.id && 'opacity-40'" :style="{ borderLeftColor: brandColor(c) }" :title="`${c.title} — ${t('calendar.dragHint')}`"
@@ -266,15 +357,40 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
           </div>
         </div>
 
+        <!-- Phones: agenda for the tapped day -->
+        <section v-if="view === 'month'" ref="agendaEl" class="mt-4 sm:hidden">
+          <div class="mb-2 flex items-center justify-between px-1">
+            <h3 class="font-display text-lg font-bold" :class="selectedDay === today && 'text-brand-500'">{{ formatDate(selectedDay, locale, { weekday: 'long', day: 'numeric', month: 'long' }) }}</h3>
+            <button type="button" class="btn-icon btn-ghost text-brand-500" :aria-label="t('calendar.addOn', { date: formatDate(selectedDay, locale) })" @click="openCreate(selectedDay)"><Plus class="size-5" /></button>
+          </div>
+          <p v-for="h in holidaysByDate.get(selectedDay) ?? []" :key="h.id" data-agenda class="mb-2 flex items-center gap-2 rounded-2xl bg-sun/15 px-3 py-2 text-sm font-semibold text-amber-700 dark:text-sun">
+            <AlertTriangle v-if="!h.verified" class="size-4 shrink-0" /><Star v-else class="size-4 shrink-0" />{{ h.title[locale] }}
+          </p>
+          <div v-if="byDate.get(selectedDay)?.length" class="card divide-y divide-line overflow-hidden">
+            <button v-for="c in byDate.get(selectedDay)" :key="c.id" data-agenda type="button" class="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-surface-2" @click="openQuick(c)">
+              <span class="h-9 w-1 shrink-0 rounded-full" :style="{ background: brandColor(c) }" />
+              <UiPlatformBadge :platform="c.platform" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate font-semibold">{{ c.title }}</span>
+                <span class="text-xs text-muted">{{ c.scheduledTime ?? t('content.unscheduled') }}</span>
+              </span>
+              <UiStatusBadge :status="c.status" small />
+            </button>
+          </div>
+          <button v-else data-agenda type="button" class="w-full rounded-[1.5rem] border border-dashed border-line p-5 text-center text-sm text-muted active:bg-surface-2" @click="openCreate(selectedDay)">
+            <Plus class="mx-auto mb-1 size-5" />{{ t('calendar.addOn', { date: formatDate(selectedDay, locale, { day: 'numeric', month: 'short' }) }) }}
+          </button>
+        </section>
+
         <!-- WEEK -->
         <div v-else-if="view === 'week'" class="grid gap-2 md:grid-cols-7">
-          <section v-for="d in weekDays(cursor)" :key="d" class="card min-h-64 p-2 transition-colors" :class="overDate === d && 'bg-brand-500/10 ring-2 ring-brand-400'"
+          <section v-for="d in weekDays(cursor)" :key="d" :data-day="d" class="card p-2 transition-colors md:min-h-64" :class="overDate === d && 'bg-brand-500/10 ring-2 ring-brand-400'"
             @dragover.prevent="overDate = d" @dragleave="overDate === d && (overDate = null)" @drop.prevent="onDrop($event, d)">
             <header class="mb-2 flex items-center justify-between px-1">
               <div><p class="text-[11px] font-bold uppercase text-muted">{{ formatDate(d, locale, { weekday: 'short' }) }}</p><p class="font-display text-xl font-bold" :class="d === today && 'text-brand-500'">{{ Number(d.slice(8)) }}</p></div>
               <button type="button" class="btn-icon btn-ghost p-1.5" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-4" /></button>
             </header>
-            <p v-for="h in holidaysByDate.get(d) ?? []" :key="h.id" class="mb-1 truncate rounded-md bg-sun/15 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:text-sun">{{ h.title[locale] }}</p>
+            <p v-for="h in holidaysByDate.get(d) ?? []" :key="h.id" data-holiday class="mb-1 truncate rounded-md bg-sun/15 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:text-sun">{{ h.title[locale] }}</p>
             <div class="space-y-1.5">
               <button v-for="c in byDate.get(d) ?? []" :key="c.id" :data-chip="c.id" type="button" draggable="true" class="block w-full cursor-grab rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
                 :style="{ borderLeftColor: brandColor(c) }" @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)" @keydown="onChipKey($event, c)">
@@ -290,12 +406,12 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         <div v-else class="space-y-3">
           <p v-if="!listDays.length" class="card p-8 text-center text-muted">{{ t('calendar.emptyMonth') }}</p>
           <section v-for="(d, i) in listDays" :key="d" v-anim="{ delay: Math.min(i, 10) * 0.04 }" class="card overflow-hidden">
-            <header class="flex items-center gap-3 border-b border-line bg-surface-2 px-4 py-2.5">
-              <span class="font-display text-lg font-bold" :class="d === today && 'text-brand-500'">{{ formatDate(d, locale, { weekday: 'long', day: 'numeric', month: 'long' }) }}</span>
+            <header class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface-2 px-4 py-2.5">
+              <span class="font-display text-base font-bold sm:text-lg" :class="d === today && 'text-brand-500'">{{ formatDate(d, locale, { weekday: 'long', day: 'numeric', month: 'long' }) }}</span>
               <span v-for="h in holidaysByDate.get(d) ?? []" :key="h.id" class="chip bg-sun/15 text-amber-700 dark:text-sun">{{ h.title[locale] }}</span>
               <button type="button" class="btn-icon btn-ghost ml-auto p-1.5" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-4" /></button>
             </header>
-            <button v-for="c in byDate.get(d) ?? []" :key="c.id" type="button" class="flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left last:border-0 hover:bg-surface-2" @click="openQuick(c)">
+            <button v-for="c in byDate.get(d) ?? []" :key="c.id" type="button" class="flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left last:border-0 hover:bg-surface-2 active:bg-surface-2 sm:py-3" @click="openQuick(c)">
               <span class="w-12 shrink-0 text-xs font-semibold text-muted">{{ c.scheduledTime ?? '—' }}</span>
               <span class="h-8 w-1 shrink-0 rounded-full" :style="{ background: brandColor(c) }" />
               <UiPlatformBadge :platform="c.platform" />
@@ -312,7 +428,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         <h2 class="flex items-center gap-2 px-1 font-display text-lg font-bold"><Inbox class="size-5 text-brand-500" />{{ t('calendar.tray') }}<span class="chip ml-auto bg-surface-2 text-muted">{{ unscheduled.length }}</span></h2>
         <p class="px-1 text-xs text-muted">{{ t('calendar.trayHint') }}</p>
         <div class="mt-3 max-h-[60vh] space-y-1.5 overflow-y-auto scrollbar-thin">
-          <button v-for="c in unscheduled" :key="c.id" :data-chip="c.id" type="button" draggable="true" class="flex w-full cursor-grab items-center gap-2 rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
+          <button v-for="c in unscheduled" :key="c.id" :data-chip="c.id" data-tray type="button" draggable="true" class="flex w-full cursor-grab items-center gap-2 rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
             :style="{ borderLeftColor: brandColor(c) }" @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)">
             <UiPlatformBadge :platform="c.platform" size="xs" />
             <span class="min-w-0 flex-1 truncate font-medium">{{ c.title }}</span>
@@ -338,16 +454,16 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         </div>
         <NuxtLink :to="`/app/content/${selected.id}`" class="btn-ghost w-full"><ExternalLink class="size-4" />{{ t('calendar.openEditor') }}</NuxtLink>
       </template>
-      <template #footer>
-        <button type="button" class="btn-secondary" @click="selected = null">{{ t('common.cancel') }}</button>
+      <template #footer="{ close }">
+        <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
         <button type="button" class="btn-primary" :disabled="quickSaving" @click="saveQuick">{{ quickSaving ? t('common.saving') : t('common.save') }}</button>
       </template>
     </SidePanel>
 
     <SidePanel :open="createOpen" size="lg" :title="t('content.newManual')" :subtitle="t('content.newManualHint')" @close="createOpen = false">
       <ContentForm v-model="createForm" :brands="brands.active.value" :errors="createErrors" compact />
-      <template #footer>
-        <button type="button" class="btn-secondary" @click="createOpen = false">{{ t('common.cancel') }}</button>
+      <template #footer="{ close }">
+        <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
         <button type="button" class="btn-primary" :disabled="creating" @click="create">{{ creating ? t('common.saving') : t('content.createFree') }}</button>
       </template>
     </SidePanel>

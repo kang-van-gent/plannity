@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FlaskConical, MessageSquareHeart, WandSparkles } from '@lucide/vue'
+import { FlaskConical, MessageSquareHeart, PanelLeftClose, PanelLeftOpen, WandSparkles } from '@lucide/vue'
 
 const { t } = useLocale()
 const brands = useBrands()
@@ -8,6 +8,8 @@ const notify = useNotify()
 const isMock = useIsMock()
 const navOpen = ref(false)
 const feedbackOpen = ref(false)
+// Desktop sidebar: full (272px) or an icon rail. Cookie so SSR renders the right width.
+const collapsed = useCookie<boolean>('sidebar-collapsed', { default: () => false, maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' })
 const route = useRoute()
 watch(() => route.fullPath, () => { navOpen.value = false })
 
@@ -20,12 +22,37 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-dvh overflow-x-clip lg:grid lg:grid-cols-[272px_minmax(0,1fr)] lg:overflow-x-visible">
-    <aside class="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface px-4 pb-4 pt-5 lg:flex">
-      <NuxtLink to="/app" class="mb-6 flex px-2" aria-label="Plannity"><AppLogo variant="lockup" eager class="h-10" /></NuxtLink>
-      <AppNav />
-      <div class="mt-auto space-y-3">
-        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 p-4 text-white">
+  <div class="min-h-dvh overflow-x-clip transition-[grid-template-columns] duration-300 ease-out lg:grid lg:overflow-x-visible"
+    :class="collapsed ? 'lg:grid-cols-[84px_minmax(0,1fr)]' : 'lg:grid-cols-[272px_minmax(0,1fr)]'">
+    <!-- The column paints the background/border for the full page height; only the
+         contents are sticky. (A sticky h-dvh panel alone leaves a bare strip below
+         it in full-page captures and on overscroll.) -->
+    <aside class="relative z-50 hidden border-r border-line bg-surface lg:block">
+     <!-- Always exactly the window height: logo + footer are fixed-size, the menu
+          between them flexes and scrolls only if the window is too short. -->
+     <div class="sticky top-0 flex h-dvh flex-col pb-4 pt-5 [@media(max-height:720px)]:pb-3 [@media(max-height:720px)]:pt-3" :class="collapsed ? 'px-3' : 'px-4'">
+      <button type="button" class="absolute -right-3.5 top-7 z-10 grid size-7 place-items-center rounded-full border border-line bg-surface text-muted shadow-soft transition hover:scale-110 hover:border-brand-300 hover:text-brand-600 dark:hover:text-brand-300"
+        :aria-label="collapsed ? t('nav.expand') : t('nav.collapse')" :title="collapsed ? t('nav.expand') : t('nav.collapse')" :aria-expanded="!collapsed"
+        @click="collapsed = !collapsed">
+        <PanelLeftOpen v-if="collapsed" class="size-4" /><PanelLeftClose v-else class="size-4" />
+      </button>
+      <NuxtLink to="/app" class="mb-6 flex h-10 shrink-0 items-center [@media(max-height:720px)]:mb-3" :class="collapsed ? 'justify-center' : 'px-2'" aria-label="Plannity">
+        <AppLogo v-if="collapsed" variant="mark" eager class="h-10" /><AppLogo v-else variant="lockup" eager class="h-10" />
+      </NuxtLink>
+      <div class="-mx-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2 scrollbar-thin">
+        <AppNav :collapsed="collapsed" />
+      </div>
+      <div class="shrink-0 space-y-3 pt-2 [@media(max-height:720px)]:space-y-2">
+        <NuxtLink v-if="collapsed" to="/app/generate" class="mx-auto flex size-14 flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-pop transition hover:scale-105"
+          :title="`${t('credits.available')}: ${wallet?.available ?? '–'} · ${t('nav.generate')}`" :aria-label="t('nav.generate')">
+          <WandSparkles class="size-4" /><span class="mt-0.5 font-display text-sm font-bold tabular-nums">{{ wallet?.available ?? '–' }}</span>
+        </NuxtLink>
+        <NuxtLink v-if="!collapsed" to="/app/generate" class="hidden items-center gap-3 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 py-2.5 text-white shadow-pop transition hover:brightness-110 [@media(max-height:720px)]:flex">
+          <span class="grid size-8 place-items-center rounded-xl bg-white/20"><WandSparkles class="size-4" /></span>
+          <span class="min-w-0 flex-1 truncate text-sm font-bold">{{ t('nav.generate') }}</span>
+          <span class="rounded-lg bg-white/20 px-2 py-0.5 font-display text-sm font-bold tabular-nums" :title="t('credits.available')">{{ wallet?.available ?? '–' }}</span>
+        </NuxtLink>
+        <div v-if="!collapsed" class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 p-4 text-white [@media(max-height:720px)]:hidden">
           <Doodle variant="burst" class="absolute right-3 top-2 size-8 text-sun" />
           <p class="text-xs font-semibold text-white/75">{{ t('credits.available') }}</p>
           <p class="font-display text-3xl font-bold tabular-nums">{{ wallet?.available ?? '–' }}</p>
@@ -33,19 +60,22 @@ onMounted(async () => {
             <WandSparkles class="size-4" />{{ t('nav.generate') }}
           </NuxtLink>
         </div>
-        <button type="button" class="btn-ghost w-full justify-start" @click="feedbackOpen = true"><MessageSquareHeart class="size-4" />{{ t('feedback.title') }}</button>
-        <p v-if="isMock" class="flex items-center gap-1.5 rounded-xl bg-sun/15 px-3 py-2 text-[11px] font-semibold text-amber-700 dark:text-sun">
-          <FlaskConical class="size-3.5" />{{ t('common.mockBadge') }}
+        <button type="button" class="btn-ghost w-full" :class="collapsed ? 'justify-center px-0' : 'justify-start'" :title="collapsed ? t('feedback.title') : undefined" :aria-label="collapsed ? t('feedback.title') : undefined" @click="feedbackOpen = true">
+          <MessageSquareHeart class="size-4" /><span v-if="!collapsed">{{ t('feedback.title') }}</span>
+        </button>
+        <p v-if="isMock" class="flex items-center gap-1.5 rounded-xl bg-sun/15 py-2 text-[11px] font-semibold text-amber-700 dark:text-sun" :class="collapsed ? 'justify-center px-0' : 'px-3'" :title="collapsed ? t('common.mockBadge') : undefined">
+          <FlaskConical class="size-3.5" /><span v-if="!collapsed">{{ t('common.mockBadge') }}</span>
         </p>
       </div>
+     </div>
     </aside>
 
     <div class="min-w-0">
-      <header class="sticky top-0 z-40 border-b border-line bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div class="flex items-center gap-2 px-4 py-2.5 sm:py-3 sm:gap-3 sm:px-6 lg:px-10">
-          <NuxtLink to="/app" class="flex shrink-0 lg:hidden" aria-label="Plannity"><AppLogo variant="mark" eager class="h-8" /></NuxtLink>
-          <AppBrandSwitcher class="flex-1 sm:flex-none" />
-          <div class="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+      <header class="sticky top-0 z-40 border-b border-line/70 bg-bg/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150 sm:border-line sm:bg-bg/85">
+        <div class="flex h-14 items-center gap-2 px-3 sm:h-auto sm:gap-3 sm:px-6 sm:py-3 lg:px-10">
+          <NuxtLink to="/app" class="hidden shrink-0 sm:flex lg:hidden" aria-label="Plannity"><AppLogo variant="mark" eager class="h-8" /></NuxtLink>
+          <AppBrandSwitcher class="min-w-0 flex-1 sm:flex-none" />
+          <div class="ml-auto flex shrink-0 items-center gap-2">
             <AppCreditPill />
             <div class="hidden sm:block"><LocaleSwitch /></div>
             <div class="hidden sm:block"><ThemeToggle /></div>
@@ -53,7 +83,7 @@ onMounted(async () => {
           </div>
         </div>
       </header>
-      <main id="main" class="mx-auto w-full max-w-[1400px] px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pb-10">
+      <main id="main" class="mx-auto w-full max-w-[1400px] px-4 pb-[calc(var(--tabbar-h,6rem)+1.5rem)] pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pb-10">
         <slot />
       </main>
     </div>

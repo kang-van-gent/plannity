@@ -49,7 +49,8 @@ export interface DataSource {
   }
 
   calendar: {
-    range(from: ISODate, to: ISODate, brandId: string | null): Promise<Content[]>
+    /** Scheduled items in [from, to]; plus the unscheduled tray unless `includeUnscheduled` is false. */
+    range(from: ISODate, to: ISODate, brandId: string | null, opts?: { includeUnscheduled?: boolean }): Promise<Content[]>
     holidays(from: ISODate, to: ISODate): Promise<Holiday[]>
     addHoliday(input: Pick<Holiday, 'date' | 'title'>): Promise<Holiday>
     removeHoliday(id: string): Promise<void>
