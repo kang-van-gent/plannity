@@ -49,7 +49,13 @@ function ownerScopedController(uid, { ownerField = 'owner', allowShared = false,
     async function relationsOwned(data, user) {
       for (const [field, target] of Object.entries(ownedRelations)) {
         for (const ref of relationRefs(data?.[field])) {
-          const row = await strapi.documents(target).findFirst({ filters: { ...ref, owner: { id: user.id } } });
+          // Brands and contents are shared through Team Workspace: membership is enough.
+          const scope = target === 'api::brand.brand'
+            ? { memberships: { user: { id: user.id }, status: 'active' } }
+            : target === 'api::content.content'
+              ? { brand: { memberships: { user: { id: user.id }, status: 'active' } } }
+              : { owner: { id: user.id } };
+          const row = await strapi.documents(target).findFirst({ filters: { ...ref, ...scope } });
           if (!row) return false;
         }
       }

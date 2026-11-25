@@ -24,6 +24,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
       <div class="mt-auto flex items-center gap-2 pt-4 text-xs text-muted">
         <UiBrandDot :name="brand?.name" :color="brand?.color" :size="18" />
         <span class="min-w-0 flex-1 truncate">{{ brand?.name }}</span>
+        <UiImageCount :count="content.imageCount" />
         <span class="chip bg-pink/10 py-0.5 text-pink">{{ content.pillar }}</span>
       </div>
       <p class="mt-2 flex items-center gap-1.5 text-xs" :class="content.scheduledDate ? 'font-semibold text-fg' : 'text-muted'">
@@ -37,7 +38,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
     <UiPlatformBadge :platform="content.platform" />
     <div class="min-w-0">
       <p class="truncate font-semibold">{{ content.title }}</p>
-      <p class="truncate text-xs text-muted">{{ brand?.name }} · {{ content.pillar }} · {{ t(`formats.${content.format}`) }}</p>
+      <p class="flex min-w-0 items-center gap-1.5 truncate text-xs text-muted"><span class="truncate">{{ brand?.name }} · {{ content.pillar }} · {{ t(`formats.${content.format}`) }}</span><UiImageCount :count="content.imageCount" compact /></p>
     </div>
     <span class="hidden text-sm sm:block" :class="content.scheduledDate ? '' : 'text-muted'">{{ content.scheduledDate ? formatDate(content.scheduledDate, locale, { day: 'numeric', month: 'short' }) : t('content.unscheduled') }}</span>
     <span class="hidden text-xs text-muted sm:block">{{ relativeTime(content.updatedAt, locale) }}</span>

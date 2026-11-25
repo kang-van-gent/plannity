@@ -5,8 +5,8 @@
 // Strapi controllers listed in README → "Strapi endpoints".
 
 import type {
-  Brand, Content, ContentQuery, ContentRevision, DashboardSummary, GenerationJob, Holiday, LedgerEntry,
-  PaymentOrder, PromotionInquiry, Session, User, Wallet,
+  ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, GenerationJob, Holiday, InvitationPreview,
+  InviteResult, LedgerEntry, MyInvitation, PaymentOrder, PromotionInquiry, Session, TeamSummary, User, Wallet,
 } from '~/types'
 import { ApiError, type ApiErrorCode, type DataSource } from './contract'
 
@@ -44,7 +44,25 @@ function norm<T>(row: Row | null | undefined): T {
   if (brand && typeof brand === 'object') out.brandId = brand.documentId ?? brand.id
   // Strapi reserves `publishedAt`; content stores the user-confirmed publish time as `postedAt`.
   if ('postedAt' in row) { out.publishedAt = row.postedAt; delete out.postedAt }
+  // Post images: lists populate ids only (count), the single-content call populates the files.
+  if (Array.isArray(row.images)) {
+    const imgs = row.images as Row[]
+    out.imageCount = imgs.length
+    out.images = imgs.every((i) => typeof i.url === 'string') ? imgs.map(toImage) : undefined
+  }
   return out as T
+}
+
+let mediaBase = ''
+const absUrl = (u: unknown) => (typeof u === 'string' && u.startsWith('/') ? `${mediaBase}${u}` : String(u ?? ''))
+function toImage(f: Row): ContentImage {
+  const formats = (f.formats ?? {}) as Record<string, { url?: string } | undefined>
+  return {
+    id: String(f.id), filename: String(f.name ?? f.filename ?? 'image'), mimeType: String(f.mime ?? f.mimeType ?? ''),
+    size: typeof f.size === 'number' ? (f.mime ? Math.round(f.size * 1024) : f.size) : 0, // Strapi media size is in KB
+    width: (f.width as number) ?? null, height: (f.height as number) ?? null,
+    url: absUrl(f.url), thumbnailUrl: absUrl(f.thumbnailUrl ?? formats.thumbnail?.url ?? formats.small?.url ?? f.url), createdAt: String(f.createdAt ?? ''),
+  }
 }
 
 /** App field names → Strapi field names for content writes. */
@@ -64,6 +82,7 @@ function qs(q: Query): string {
 function contentFilters(q: ContentQuery): Query {
   const f: Query = {
     'populate[brand][fields][0]': 'documentId',
+    'populate[images][fields][0]': 'id', // count only — lists never load image files
     'sort[0]': q.sort === 'date' ? 'scheduledDate:asc' : 'updatedAt:desc',
     'pagination[page]': q.page ?? 1,
     'pagination[pageSize]': Math.min(100, q.pageSize ?? 20),
@@ -83,10 +102,11 @@ function contentFilters(q: ContentQuery): Query {
   return f
 }
 
-export function createStrapiSource(): DataSource {
+export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataSource {
   const BFF = '/api/bff'
+  mediaBase = (opts0.mediaBaseUrl ?? '').replace(/\/$/, '')
 
-  async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown; headers?: Record<string, string>; raw?: boolean } = {}): Promise<T> {
+  async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown; headers?: Record<string, string>; raw?: boolean } = {}): Promise<T> {
     try {
       return await $fetch<T>(path, {
         method: opts.method ?? 'GET',
@@ -133,7 +153,7 @@ export function createStrapiSource(): DataSource {
         const r = await call<{ data: Row[]; meta: { pagination: { page: number; pageSize: number; total: number; pageCount: number } } }>(`${BFF}/contents${qs(contentFilters(q))}`)
         return { data: r.data.map((x) => norm<Content>(x)), meta: r.meta.pagination }
       },
-      get: (id) => one<Content>(`${BFF}/contents/${id}${qs({ 'populate[brand][fields][0]': 'documentId' })}`),
+      get: (id) => one<Content>(`${BFF}/contents/${id}${qs({ 'populate[brand][fields][0]': 'documentId', 'populate[images]': true })}`),
       create: (input) => one<Content>(`${BFF}/contents`, { method: 'POST', body: { data: toStrapiContent(input) } }),
       update: (id, patch) => one<Content>(`${BFF}/contents/${id}`, { method: 'PUT', body: { data: toStrapiContent(patch) } }),
       async archive(id) {
@@ -155,7 +175,7 @@ export function createStrapiSource(): DataSource {
       // Scheduled items in range plus (by default) the unscheduled tray (scheduledDate = null).
       // The calendar asks for the tray once and then only for scheduled items as you navigate.
       range: (from, to, brandId, opts = {}) => many<Content>(`${BFF}/contents${qs({
-        'populate[brand][fields][0]': 'documentId', 'pagination[pageSize]': 100, 'filters[archivedAt][$null]': true,
+        'populate[brand][fields][0]': 'documentId', 'populate[images][fields][0]': 'id', 'pagination[pageSize]': 100, 'filters[archivedAt][$null]': true,
         ...(brandId ? { 'filters[brand][documentId][$eq]': brandId } : {}),
         ...(opts.includeUnscheduled === false
           ? { 'filters[scheduledDate][$gte]': from, 'filters[scheduledDate][$lte]': to }
@@ -195,5 +215,70 @@ export function createStrapiSource(): DataSource {
     feedback: {
       submit: ({ contentId, ...rest }) => call<void>(`${BFF}/feedbacks`, { method: 'POST', body: { data: { ...rest, content: contentId } } }),
     },
+
+    team: {
+      get: (brandId) => data<TeamSummary>(`${BFF}/brands/${brandId}/team`),
+      invite: (brandId, input) => data<InviteResult>(`${BFF}/brands/${brandId}/invitations`, { method: 'POST', body: { data: input } }),
+      resend: (brandId, id) => data<InviteResult>(`${BFF}/brands/${brandId}/invitations/${id}/resend`, { method: 'POST' }),
+      cancel: (brandId, id) => data<void>(`${BFF}/brands/${brandId}/invitations/${id}`, { method: 'DELETE' }),
+      updateRole: (brandId, memberId, role) => data<BrandMember>(`${BFF}/brands/${brandId}/members/${memberId}`, { method: 'PATCH', body: { data: { role } } }),
+      remove: (brandId, memberId) => data<void>(`${BFF}/brands/${brandId}/members/${memberId}`, { method: 'DELETE' }),
+      leave: (brandId) => data<void>(`${BFF}/brands/${brandId}/leave`, { method: 'POST' }),
+    },
+
+    activity: {
+      async list(brandId, q = {}) {
+        const r = await call<{ data: ActivityEntry[]; meta: { page: number; pageSize: number; total: number; pageCount: number } }>(`${BFF}/brands/${brandId}/activity${qs({ ...q })}`)
+        return { data: r.data, meta: r.meta }
+      },
+    },
+
+    invitations: {
+      preview: (token) => data<InvitationPreview>(`${BFF}/invitations/${encodeURIComponent(token)}`),
+      accept: (token) => data<{ brandId: string }>(`${BFF}/invitations/${encodeURIComponent(token)}/accept`, { method: 'POST' }),
+      decline: (token) => data<void>(`${BFF}/invitations/${encodeURIComponent(token)}/decline`, { method: 'POST' }),
+      mine: () => data<MyInvitation[]>(`${BFF}/invitations/mine`),
+      acceptMine: (id) => data<{ brandId: string }>(`${BFF}/invitations/mine/${id}/accept`, { method: 'POST' }),
+      declineMine: (id) => data<void>(`${BFF}/invitations/mine/${id}/decline`, { method: 'POST' }),
+    },
+
+    contentImages: {
+      upload: (contentId, files, onProgress) => sendFiles(`${BFF}/contents/${contentId}/images`, files, onProgress),
+      replace: (contentId, imageId, file) => sendFiles(`${BFF}/contents/${contentId}/images/${imageId}/replace`, [file]),
+      remove: async (contentId, imageId) => (await data<Row[]>(`${BFF}/contents/${contentId}/images/${imageId}`, { method: 'DELETE' })).map(toImage),
+      reorder: async (contentId, imageIds) => (await data<Row[]>(`${BFF}/contents/${contentId}/images/order`, { method: 'PUT', body: { data: { imageIds } } })).map(toImage),
+      async download(contentId, imageId) {
+        const res = await fetch(`${BFF}/contents/${contentId}/images/${imageId}/download`, { credentials: 'same-origin' })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as StrapiErrorBody
+          throw toApiError({ status: res.status, data: body })
+        }
+        return res.blob()
+      },
+    },
+  }
+
+  /** Custom endpoints answer { data }; unwrap it. */
+  async function data<T>(path: string, opts?: Parameters<typeof call>[1]): Promise<T> {
+    return (await call<{ data: T }>(path, opts)).data
+  }
+
+  /** Multipart upload with progress (fetch can't report upload progress). */
+  function sendFiles(url: string, files: File[], onProgress?: (pct: number) => void): Promise<ContentImage[]> {
+    return new Promise((resolve, reject) => {
+      const form = new FormData()
+      for (const f of files) form.append('files', f, f.name)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', url)
+      xhr.setRequestHeader('X-Requested-With', 'plannity')
+      xhr.responseType = 'json'
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100)) }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve(((xhr.response as { data: Row[] }).data ?? []).map(toImage))
+        else reject(toApiError({ status: xhr.status, data: xhr.response as StrapiErrorBody }))
+      }
+      xhr.onerror = () => reject(toApiError({ status: 0 }))
+      xhr.send(form)
+    })
   }
 }

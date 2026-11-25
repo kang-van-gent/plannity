@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarDays, LayoutDashboard, Library, Menu, WandSparkles } from '@lucide/vue'
+import { CalendarDays, LayoutDashboard, Library, Lock, Menu, WandSparkles } from '@lucide/vue'
 import { gsap } from 'gsap'
 
 // Phone/tablet bottom navigation (hidden on lg+, where the sidebar shows).
@@ -8,12 +8,15 @@ import { gsap } from 'gsap'
 const emit = defineEmits<{ more: [] }>()
 const { t } = useLocale()
 const route = useRoute()
-const items = computed(() => [
+const features = useFeatures()
+const notify = useNotify()
+const items = computed(() => ([
   { to: '/app', label: t('nav.tabHome'), icon: LayoutDashboard, exact: true },
   { to: '/app/content', label: t('nav.tabLibrary'), icon: Library },
   { to: '/app/generate', label: t('nav.tabCreate'), icon: WandSparkles, also: '/app/jobs', primary: true },
   { to: '/app/calendar', label: t('nav.calendar'), icon: CalendarDays },
-])
+] as { to: string; label: string; icon: unknown; exact?: boolean; also?: string; primary?: boolean }[]).map((i) => ({ ...i, locked: isLockedPath(i.to, features) })))
+function lockedTap() { notify.info(t('nav.lockedTitle'), t('nav.lockedBody')) }
 const activeIndex = computed(() => items.value.findIndex((i) =>
   i.exact ? route.path === i.to : route.path.startsWith(i.to) || (!!i.also && route.path.startsWith(i.also))))
 
@@ -21,7 +24,7 @@ const bar = ref<HTMLElement | null>(null)
 const pill = ref<HTMLElement | null>(null)
 const tabs: HTMLElement[] = []
 function setTab(el: unknown, i: number) {
-  const node = (el as { $el?: HTMLElement } | null)?.$el
+  const node = (el as { $el?: HTMLElement } | null)?.$el ?? (el instanceof HTMLElement ? el : null)
   if (node) tabs[i] = node
 }
 const keyboard = ref(false)
@@ -39,11 +42,17 @@ const isEditable = (el: EventTarget | null) => el instanceof HTMLElement && (el.
 function onFocusIn(e: FocusEvent) { if (matchMedia('(pointer: coarse)').matches && isEditable(e.target)) keyboard.value = true }
 function onFocusOut() { setTimeout(() => { keyboard.value = isEditable(document.activeElement) && matchMedia('(pointer: coarse)').matches }, 50) }
 
-// Pages read --tabbar-h to keep their own sticky bars above the tab bar.
+// Pages read --tabbar-h to keep their own sticky bars (and the page's bottom
+// padding) clear of the floating tab bar. Measured from layout — the bar's own
+// height plus its CSS bottom offset — never from its on-screen position, so the
+// slide-in/keyboard animations and viewport resizes can't skew it.
 function publishHeight() {
-  // Floating bar: reserve everything from its top edge to the bottom of the screen.
-  const h = bar.value && getComputedStyle(bar.value).display !== 'none' && !keyboard.value
-    ? Math.max(0, window.innerHeight - bar.value.getBoundingClientRect().top) : 0
+  const el = bar.value
+  let h = 0
+  if (el && !keyboard.value) {
+    const cs = getComputedStyle(el)
+    if (cs.display !== 'none') h = Math.round(el.offsetHeight + (Number.parseFloat(cs.bottom) || 0))
+  }
   document.documentElement.style.setProperty('--tabbar-h', `${h}px`)
 }
 watch(keyboard, (k) => {
@@ -59,12 +68,14 @@ onMounted(() => {
   publishHeight()
   ro = new ResizeObserver(() => { movePill(false); publishHeight() })
   if (bar.value) ro.observe(bar.value)
+  window.addEventListener('resize', publishHeight, { passive: true }) // lg breakpoint, safe-area changes
   document.addEventListener('focusin', onFocusIn)
   document.addEventListener('focusout', onFocusOut)
   if (bar.value && !prefersReducedMotion()) gsap.from(bar.value, { yPercent: 160, duration: 0.6, delay: 0.2, ease: 'power3.out' })
 })
 onBeforeUnmount(() => {
   ro?.disconnect()
+  window.removeEventListener('resize', publishHeight)
   document.removeEventListener('focusin', onFocusIn)
   document.removeEventListener('focusout', onFocusOut)
   document.documentElement.style.removeProperty('--tabbar-h')
@@ -77,7 +88,16 @@ onBeforeUnmount(() => {
     :aria-label="t('nav.main')">
     <div class="relative grid grid-cols-5 px-1.5 py-1.5">
       <span ref="pill" class="pointer-events-none absolute left-0 top-1.5 h-[3.25rem] w-[4.25rem] rounded-[1.25rem] bg-brand-500/12 opacity-0" aria-hidden="true" />
-      <NuxtLink v-for="(i, idx) in items" :key="i.to" :ref="(el) => setTab(el, idx)" :to="i.to"
+      <template v-for="(i, idx) in items" :key="i.to">
+      <button v-if="i.locked" :ref="(el) => setTab(el, idx)" type="button" aria-disabled="true" :aria-label="`${i.label} (${t('nav.comingSoon')})`"
+        class="relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight text-muted transition active:scale-90" @click="lockedTap">
+        <span v-if="i.primary" class="relative grid size-12 place-items-center rounded-[1.1rem] bg-surface-2 text-muted/70">
+          <component :is="i.icon" class="size-[22px]" />
+          <span class="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-surface text-muted shadow-soft ring-1 ring-line"><Lock class="size-3" /></span>
+        </span>
+        <template v-else><component :is="i.icon" class="size-[22px] opacity-60" /><span class="max-w-full truncate px-0.5">{{ i.label }}</span></template>
+      </button>
+      <NuxtLink v-else :ref="(el) => setTab(el, idx)" :to="i.to"
         :aria-current="activeIndex === idx ? 'page' : undefined"
         class="relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight transition-colors active:scale-90"
         :class="activeIndex === idx ? 'text-brand-600 dark:text-brand-300' : 'text-muted'">
@@ -90,6 +110,7 @@ onBeforeUnmount(() => {
           <span class="max-w-full truncate px-0.5">{{ i.label }}</span>
         </template>
       </NuxtLink>
+      </template>
       <button type="button" class="flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight text-muted transition active:scale-90" @click="emit('more')">
         <Menu class="size-[22px]" />
         <span class="max-w-full truncate px-0.5">{{ t('nav.more') }}</span>

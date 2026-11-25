@@ -5,21 +5,27 @@
 // built against realistic behaviour. Enabled when NUXT_PUBLIC_DATA_SOURCE=mock.
 
 import type {
-  Brand, BrandInput, Content, ContentDraft, ContentQuery, DashboardSummary, GenerationInput, GenerationJob,
+  ActivityChange, Brand, BrandInput, BrandInvitation, BrandMember, BrandRole, Content, ContentDraft, ContentImage, ContentQuery, DashboardSummary, GenerationInput, GenerationJob,
   Holiday, ItemStatus, LedgerEntry, LedgerType, Paginated, PaymentOrder, PromotionInquiry, User, Wallet,
 } from '~/types'
+import { inviteError, leaveError, removeError, roleCan, roleChangeError, type Permission } from '~/utils/permissions'
+import { DEFAULT_IMAGE_LIMITS, IMAGE_MIME_TYPES, sniffFile, type ImageLimits } from '~/utils/images'
+import { CONTENT_AUDIT_FIELDS, classifyBrand, classifyContent, diffBrand, diffFields } from '~/utils/activity'
 import { CONTENT_STATUSES, FORMATS, OBJECTIVES, PLATFORMS } from '~/types'
 import { addDays, diffDays, isValidISODate, nowISO, todayISO } from '~/utils/date'
 import { normalizeTitle, uid } from '~/utils/format'
 import { buildContentCsv } from '~/utils/csv'
 import { ApiError, type DataSource } from '../contract'
-import { buildSeed, type MockDB, type MockJob, type Owned } from './seed'
+import { buildSeed, membership, type MockBrand, type MockContentImage, type MockDB, type MockInvitation, type MockJob, type Owned } from './seed'
 import { hashString, mockGenerate, validateDraft } from './llm'
 
 const DB_KEY = 'plannity-mock-db-v3'
 const CFG_KEY = 'plannity-mock-config'
 const PRICE_SATANG = 1000
 const TRIAL_CREDITS = 3
+/** Default seats per brand (active members + pending invitations) until plans exist. */
+const DEFAULT_SEATS = 5
+const INVITE_TTL_DAYS = 7
 
 export interface MockConfig {
   /** Average simulated latency in ms. */
@@ -45,6 +51,14 @@ function load(): MockDB {
     try { db = JSON.parse(raw) as MockDB } catch { db = null }
   }
   if (!db) { db = buildSeed(); persist() }
+  // Migrate stores saved before Team Workspace / post images: each brand's creator becomes its Owner.
+  if (!db.memberships) {
+    db.memberships = db.brands.map((b) => membership(b.id, b.ownerId, 'owner', b.createdAt))
+    db.invitations = []
+    persist()
+  }
+  db.contentImages ??= []
+  db.activity ??= []
   return db
 }
 
@@ -85,7 +99,37 @@ function strip<T extends { ownerId?: unknown }>(row: T): Omit<T, 'ownerId'> {
 }
 const nextSeq = () => ++load().seq
 
-export function createMockSource(getToken: () => string | null | undefined): DataSource {
+// ---- image files: IndexedDB (localStorage is far too small for images) ----
+const IDB_NAME = 'plannity-mock-images'
+let idbPromise: Promise<IDBDatabase> | null = null
+function idb(): Promise<IDBDatabase> {
+  return (idbPromise ??= new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1)
+    req.onupgradeneeded = () => req.result.createObjectStore('files')
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  }))
+}
+async function idbDo<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+  const db = await idb()
+  return new Promise((resolve, reject) => {
+    const req = fn(db.transaction('files', mode).objectStore('files'))
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+const objectUrls = new Map<string, string>()
+
+async function sha256(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+function randomToken(): string {
+  const b = crypto.getRandomValues(new Uint8Array(32))
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export function createMockSource(getToken: () => string | null | undefined, limits: ImageLimits = DEFAULT_IMAGE_LIMITS): DataSource {
   // ---------------------------------------------------------------- helpers
   function currentUser(): MockDB['users'][number] {
     const token = getToken()
@@ -95,16 +139,43 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
   }
   const uidOf = () => currentUser().id
 
-  function ownBrand(id: string): Owned<Brand> {
-    const b = load().brands.find((x) => x.id === id && x.ownerId === uidOf())
-    // Same 404 for "missing" and "someone else's" — no cross-tenant probing.
-    if (!b) throw new ApiError(404, 'NOT_FOUND', 'Brand not found')
+  // ---- Team Workspace authorization (brand membership, not ownership) ----
+  function activeMember(brandId: string, userId: string) {
+    return load().memberships.find((m) => m.brandId === brandId && m.userId === userId && m.status === 'active')
+  }
+  function roleIn(brandId: string): BrandRole | null {
+    return activeMember(brandId, uidOf())?.role ?? null
+  }
+  /** Brands the current user is an active member of. */
+  function myBrandIds(): Set<string> {
+    const me = uidOf()
+    return new Set(load().memberships.filter((m) => m.userId === me && m.status === 'active').map((m) => m.brandId))
+  }
+  function brandAccess(id: string, perm: Permission): MockBrand {
+    const b = load().brands.find((x) => x.id === id)
+    const role = b ? roleIn(b.id) : null
+    // Same 404 for "missing" and "not a member" — no cross-tenant probing.
+    if (!b || !role) throw new ApiError(404, 'NOT_FOUND', 'Brand not found')
+    if (!roleCan(role, perm)) throw new ApiError(403, 'FORBIDDEN', 'Your role in this brand does not allow this')
     return b
   }
-  function ownContent(id: string): Owned<Content> {
-    const c = load().contents.find((x) => x.id === id && x.ownerId === uidOf())
-    if (!c) throw new ApiError(404, 'NOT_FOUND', 'Content not found')
+  function contentAccess(id: string, perm: Permission): Owned<Content> {
+    const c = load().contents.find((x) => x.id === id)
+    const role = c ? roleIn(c.brandId) : null
+    if (!c || !role) throw new ApiError(404, 'NOT_FOUND', 'Content not found')
+    if (!roleCan(role, perm)) throw new ApiError(403, 'FORBIDDEN', 'Your role in this brand does not allow this')
     return c
+  }
+  function brandView(b: MockBrand): Brand {
+    const { ownerId: _o, maxSeats, ...rest } = clone(b)
+    return { ...rest, myRole: roleIn(b.id) ?? 'viewer', maxSeats: maxSeats ?? DEFAULT_SEATS }
+  }
+  function imagesOf(contentId: string): MockContentImage[] {
+    return load().contentImages.filter((i) => i.contentId === contentId).sort((a, b) => a.sortOrder - b.sortOrder)
+  }
+  /** Lists/calendar carry only the image count — no files are loaded. */
+  function contentView(c: Owned<Content>): Content {
+    return { ...strip(c), imageCount: imagesOf(c.id).length }
   }
   function wallet(userId: string) {
     const d = load()
@@ -293,7 +364,8 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
       const d = load()
       const me = uidOf()
       const today = todayISO()
-      const scope = d.contents.filter((c) => c.ownerId === me && !c.archivedAt && (!brandId || c.brandId === brandId)
+      const mine = myBrandIds()
+      const scope = d.contents.filter((c) => mine.has(c.brandId) && !c.archivedAt && (!brandId || c.brandId === brandId)
         && !d.brands.find((b) => b.id === c.brandId)?.archivedAt)
       const statusCounts = Object.fromEntries(CONTENT_STATUSES.map((s) => [s, scope.filter((c) => c.status === s).length])) as DashboardSummary['statusCounts']
       const byDate = (a: Content, b: Content) => (a.scheduledDate ?? '').localeCompare(b.scheduledDate ?? '') || (a.scheduledTime ?? '').localeCompare(b.scheduledTime ?? '')
@@ -301,12 +373,12 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
       jobs.forEach(advance)
       return {
         wallet: walletView(me),
-        brandCount: d.brands.filter((b) => b.ownerId === me && !b.archivedAt).length,
+        brandCount: d.brands.filter((b) => mine.has(b.id) && !b.archivedAt).length,
         monthCount: scope.filter((c) => c.scheduledDate?.slice(0, 7) === today.slice(0, 7)).length,
         statusCounts,
-        upcoming: scope.filter((c) => c.scheduledDate && c.scheduledDate >= today && c.scheduledDate <= addDays(today, 6)).sort(byDate).slice(0, 8).map(strip),
+        upcoming: scope.filter((c) => c.scheduledDate && c.scheduledDate >= today && c.scheduledDate <= addDays(today, 6)).sort(byDate).slice(0, 8).map(contentView),
         backlog: scope.filter((c) => c.status !== 'published' && c.scheduledDate && (c.scheduledDate < today
-          || (['draft', 'in_review'].includes(c.status) && c.scheduledDate <= addDays(today, 7)))).sort(byDate).slice(0, 6).map(strip),
+          || (['draft', 'in_review'].includes(c.status) && c.scheduledDate <= addDays(today, 7)))).sort(byDate).slice(0, 6).map(contentView),
         recentJobs: jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5).map(jobView),
       }
     },
@@ -315,47 +387,53 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
       async list(opts) {
         await net()
         const d = load()
-        const me = uidOf()
+        const mine = myBrandIds()
         return d.brands
-          .filter((b) => b.ownerId === me && (opts?.includeArchived || !b.archivedAt))
+          .filter((b) => mine.has(b.id) && (opts?.includeArchived || !b.archivedAt))
           .sort((a, b) => Number(!!a.archivedAt) - Number(!!b.archivedAt) || a.createdAt.localeCompare(b.createdAt))
-          .map((b) => ({ ...strip(b), contentCount: d.contents.filter((c) => c.brandId === b.id && !c.archivedAt).length }))
+          .map((b) => ({ ...brandView(b), contentCount: d.contents.filter((c) => c.brandId === b.id && !c.archivedAt).length }))
       },
       async get(id) {
         await net()
-        return strip(ownBrand(id))
+        return brandView(brandAccess(id, 'brand.read'))
       },
       async create(input) {
         await net()
         validateBrand(input)
         const now = nowISO()
-        const b: Owned<Brand> = { id: `b_${nextSeq()}`, ownerId: uidOf(), name: input.name.trim(), color: input.color, profile: clone(input.profile), archivedAt: null, createdAt: now, updatedAt: now }
+        const b: MockBrand = { id: `b_${nextSeq()}`, ownerId: uidOf(), name: input.name.trim(), color: input.color, profile: clone(input.profile), archivedAt: null, createdAt: now, updatedAt: now }
         load().brands.push(b)
+        load().memberships.push(membership(b.id, uidOf(), 'owner', now)) // creator = Owner
+        logActivity(b.id, 'brand.created', 'brand', b.id, b.name)
         persist()
-        return strip(b)
+        return brandView(b)
       },
       async update(id, input) {
         await net()
-        const b = ownBrand(id)
+        const b = brandAccess(id, 'brand.update')
         const merged = { name: input.name ?? b.name, color: input.color ?? b.color, profile: { ...b.profile, ...input.profile } }
         validateBrand(merged)
+        const changes = diffBrand(b, merged)
         Object.assign(b, merged, { updatedAt: nowISO() })
+        logActivity(b.id, classifyBrand(changes), 'brand', b.id, b.name, changes)
         persist()
-        return strip(b)
+        return brandView(b)
       },
       async archive(id) {
         await net()
-        const b = ownBrand(id)
+        const b = brandAccess(id, 'brand.delete') // archiving is the owner-only "delete"
         b.archivedAt = nowISO() // history is retained, nothing is deleted
+        logActivity(b.id, 'brand.archived', 'brand', b.id, b.name)
         persist()
-        return strip(b)
+        return brandView(b)
       },
       async restore(id) {
         await net()
-        const b = ownBrand(id)
+        const b = brandAccess(id, 'brand.delete')
         b.archivedAt = null
+        logActivity(b.id, 'brand.restored', 'brand', b.id, b.name)
         persist()
-        return strip(b)
+        return brandView(b)
       },
     },
 
@@ -366,14 +444,14 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
       },
       async get(id) {
         await net()
-        return strip(ownContent(id))
+        const c = contentAccess(id, 'content.read')
+        return { ...contentView(c), images: await Promise.all(imagesOf(c.id).map(imageView)) }
       },
       async create(input) {
         await net()
-        ownBrand(input.brandId)
+        const brand = brandAccess(input.brandId, 'content.create')
         if (!input.title?.trim()) fieldError({ title: 'required' })
         if (input.scheduledDate && !isValidISODate(input.scheduledDate)) fieldError({ scheduledDate: 'invalid_date' })
-        const brand = ownBrand(input.brandId)
         const now = nowISO()
         const c: Owned<Content> = {
           title: input.title.trim(), concept: input.concept ?? '', pillar: input.pillar ?? brand.profile.pillars[0] ?? 'Education',
@@ -387,15 +465,16 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
         }
         load().contents.push(c)
         addRevision(c, 'create')
+        logContent(c, 'content.created')
         persist()
-        return strip(c)
+        return contentView(c)
       },
       async update(id, patch) {
         await net()
-        const c = ownContent(id)
+        const c = contentAccess(id, 'content.update')
         if (patch.version !== c.version) throw new ApiError(409, 'VERSION_CONFLICT', 'This content was changed elsewhere. Reload to get the latest version.')
         const next = { ...c, ...patch }
-        if (next.brandId !== c.brandId) ownBrand(next.brandId)
+        if (next.brandId !== c.brandId) brandAccess(next.brandId, 'content.create')
         const errors: Record<string, string> = {}
         if (!next.title?.trim()) errors.title = 'required'
         if (next.scheduledDate && !isValidISODate(next.scheduledDate)) errors.scheduledDate = 'invalid_date'
@@ -407,29 +486,34 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
         if (next.status !== 'published') next.publishedAt = null
         const contentChanged = (['title', 'caption', 'hook', 'concept', 'cta', 'visualBrief', 'videoScript'] as const).some((k) => k in patch && patch[k] !== c[k])
         if (contentChanged) addRevision(c, 'edit')
+        const changes = diffFields(c, next, CONTENT_AUDIT_FIELDS)
         Object.assign(c, next, { version: c.version + 1, updatedAt: nowISO() })
+        logContent(c, classifyContent(changes), changes)
         persist()
-        return strip(c)
+        return contentView(c)
       },
       async archive(id) {
         await net()
-        const c = ownContent(id)
+        const c = contentAccess(id, 'content.delete')
         Object.assign(c, { archivedAt: nowISO(), version: c.version + 1, updatedAt: nowISO() })
+        logContent(c, 'content.archived')
         persist()
-        return strip(c)
+        return contentView(c)
       },
       async duplicate(id) {
         await net()
-        const src = ownContent(id)
+        const src = contentAccess(id, 'content.read')
+        brandAccess(src.brandId, 'content.create')
         const now = nowISO()
-        const copy: Owned<Content> = { ...clone(src), id: `c_${nextSeq()}`, title: `${src.title} (copy)`, jobItemId: null, source: 'manual', status: 'draft', scheduledDate: null, scheduledTime: null, publishedAt: null, postUrl: null, version: 1, createdAt: now, updatedAt: now }
+        const copy: Owned<Content> = { ...clone(src), ownerId: uidOf(), id: `c_${nextSeq()}`, title: `${src.title} (copy)`, jobItemId: null, source: 'manual', status: 'draft', scheduledDate: null, scheduledTime: null, publishedAt: null, postUrl: null, version: 1, createdAt: now, updatedAt: now }
         load().contents.push(copy)
+        logContent(copy, 'content.duplicated', [{ field: 'source', from: src.title, to: copy.title }])
         persist()
-        return strip(copy)
+        return contentView(copy)
       },
       async revisions(id) {
         await net()
-        ownContent(id)
+        contentAccess(id, 'content.read')
         return load().revisions.filter((r) => r.contentId === id).sort((a, b) => b.version - a.version || b.createdAt.localeCompare(a.createdAt))
           .map((r) => ({ id: r.id, contentId: r.contentId, version: r.version, reason: r.reason, snapshot: snapshot(r.snapshot), createdAt: r.createdAt }))
       },
@@ -437,10 +521,10 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
         await net({ latency: 1400 })
         const d = load()
         const me = uidOf()
-        const c = ownContent(id)
+        const c = contentAccess(id, 'content.update')
         const opKey = `regen:${me}:${key}`
-        if (d.idempotency[opKey]) return strip(c)
-        const brand = ownBrand(c.brandId)
+        if (d.idempotency[opKey]) return contentView(c)
+        const brand = brandAccess(c.brandId, 'brand.read')
         if (wallet(me).available < 1) throw new ApiError(409, 'INSUFFICIENT_CREDITS', 'Not enough credits')
         const itemId = `ri_${nextSeq()}`
         post(me, 'reserve', -1, 1, 'item', itemId, `reserve:${itemId}`)
@@ -452,29 +536,255 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
           throw new ApiError(503, 'PROVIDER_UNAVAILABLE', 'Generation failed. No credit was charged.')
         }
         addRevision(c, 'regenerate') // original is kept as a revision
+        logContent(c, 'content.regenerated')
         Object.assign(c, draft, { suggestedDate: c.suggestedDate, version: c.version + 1, updatedAt: nowISO() })
         post(me, 'consume', 0, -1, 'item', itemId, `consume:${itemId}`)
         d.idempotency[opKey] = itemId
         persist()
-        return strip(c)
+        return contentView(c)
       },
       async exportCsv(q) {
         await net()
         const rows = filterContents({ ...q, page: 1, pageSize: 10_000 })
-        return buildContentCsv(rows, load().brands.filter((b) => b.ownerId === uidOf()))
+        const mine = myBrandIds()
+        return buildContentCsv(rows, load().brands.filter((b) => mine.has(b.id)).map(brandView))
+      },
+    },
+
+    // ------------------------------------------------------ Team Workspace
+    team: {
+      async get(brandId) {
+        await net()
+        const b = brandAccess(brandId, 'member.read')
+        expireInvites()
+        const me = uidOf()
+        const d = load()
+        const members: BrandMember[] = d.memberships.filter((m) => m.brandId === b.id && m.status === 'active')
+          .map((m) => {
+            const u = d.users.find((x) => x.id === m.userId)
+            return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, joinedAt: m.joinedAt, isYou: m.userId === me }
+          })
+          .sort((x, y) => ROLE_ORDER[x.role] - ROLE_ORDER[y.role] || x.joinedAt.localeCompare(y.joinedAt))
+        const invitations = d.invitations.filter((i) => i.brandId === b.id && i.status === 'pending').map(inviteView)
+          .sort((x, y) => y.createdAt.localeCompare(x.createdAt))
+        return { brandId: b.id, maxSeats: b.maxSeats ?? DEFAULT_SEATS, seatsUsed: members.length + invitations.length, members, invitations }
+      },
+      async invite(brandId, input) {
+        await net()
+        const b = brandAccess(brandId, 'brand.read')
+        const role = roleIn(b.id)!
+        const err = inviteError(role, input.role)
+        if (err === 'forbidden') throw new ApiError(403, 'FORBIDDEN', 'You do not have permission to invite members')
+        if (err) fieldError({ role: 'invalid_role' })
+        const email = input.email.trim().toLowerCase()
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fieldError({ email: 'invalid_email' })
+        expireInvites()
+        const d = load()
+        const existing = d.users.find((u) => u.email === email)
+        if (existing && activeMember(b.id, existing.id)) throw new ApiError(409, 'ALREADY_MEMBER', 'This user is already a member.')
+        if (d.invitations.some((i) => i.brandId === b.id && i.email === email && i.status === 'pending')) {
+          throw new ApiError(409, 'DUPLICATE_INVITE', 'An invitation has already been sent.')
+        }
+        if (seatsUsedIn(b.id) >= (b.maxSeats ?? DEFAULT_SEATS)) throw new ApiError(409, 'SEAT_LIMIT', 'Your team has reached its seat limit.')
+        const token = randomToken()
+        const now = nowISO()
+        const inv: MockInvitation = {
+          id: `inv_${nextSeq()}`, brandId: b.id, email, role: input.role, tokenHash: await sha256(token), status: 'pending',
+          invitedByUserId: uidOf(), expiresAt: new Date(Date.now() + INVITE_TTL_DAYS * 864e5).toISOString(),
+          acceptedByUserId: null, acceptedAt: null, createdAt: now, updatedAt: now,
+        }
+        d.invitations.push(inv)
+        logActivity(b.id, 'member.invited', 'member', inv.id, email, [{ field: 'role', from: null, to: input.role }])
+        persist()
+        return { invitation: inviteView(inv), inviteUrl: inviteUrl(token), emailSent: false }
+      },
+      async resend(brandId, invitationId) {
+        await net()
+        const b = brandAccess(brandId, 'member.invite')
+        expireInvites()
+        const inv = load().invitations.find((i) => i.id === invitationId && i.brandId === b.id)
+        if (!inv) throw new ApiError(404, 'NOT_FOUND', 'Invitation not found')
+        if (inv.status !== 'pending') throw new ApiError(409, 'INVITE_INVALID', `This invitation is ${inv.status}.`)
+        const token = randomToken() // new link; the old one stops working
+        Object.assign(inv, { tokenHash: await sha256(token), expiresAt: new Date(Date.now() + INVITE_TTL_DAYS * 864e5).toISOString(), updatedAt: nowISO() })
+        logActivity(b.id, 'member.invite_resent', 'member', inv.id, inv.email)
+        persist()
+        return { invitation: inviteView(inv), inviteUrl: inviteUrl(token), emailSent: false }
+      },
+      async cancel(brandId, invitationId) {
+        await net()
+        const b = brandAccess(brandId, 'member.invite')
+        const inv = load().invitations.find((i) => i.id === invitationId && i.brandId === b.id)
+        if (!inv) throw new ApiError(404, 'NOT_FOUND', 'Invitation not found')
+        if (inv.status === 'pending') {
+          Object.assign(inv, { status: 'cancelled', updatedAt: nowISO() })
+          logActivity(b.id, 'member.invite_cancelled', 'member', inv.id, inv.email)
+        }
+        persist()
+      },
+      async updateRole(brandId, memberId, role) {
+        await net()
+        const b = brandAccess(brandId, 'brand.read')
+        const m = load().memberships.find((x) => x.id === memberId && x.brandId === b.id && x.status === 'active')
+        if (!m) throw new ApiError(404, 'NOT_FOUND', 'Member not found')
+        throwMemberError(roleChangeError(roleIn(b.id)!, m.role, role, ownerCount(b.id)))
+        if (m.role !== role) logActivity(b.id, 'member.role_changed', 'member', m.id, load().users.find((x) => x.id === m.userId)?.name ?? null, [{ field: 'role', from: m.role, to: role }])
+        Object.assign(m, { role, roleUpdatedAt: nowISO(), updatedAt: nowISO() })
+        persist()
+        const u = load().users.find((x) => x.id === m.userId)
+        return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, joinedAt: m.joinedAt, isYou: m.userId === uidOf() }
+      },
+      async remove(brandId, memberId) {
+        await net()
+        const b = brandAccess(brandId, 'brand.read')
+        const m = load().memberships.find((x) => x.id === memberId && x.brandId === b.id && x.status === 'active')
+        if (!m) throw new ApiError(404, 'NOT_FOUND', 'Member not found')
+        throwMemberError(m.userId === uidOf() ? leaveError(m.role, ownerCount(b.id)) : removeError(roleIn(b.id)!, m.role, ownerCount(b.id)))
+        // Access ends now; their content, images and attribution stay.
+        Object.assign(m, { status: 'removed', updatedAt: nowISO() })
+        logActivity(b.id, m.userId === uidOf() ? 'member.left' : 'member.removed', 'member', m.id, load().users.find((x) => x.id === m.userId)?.name ?? null, [{ field: 'role', from: m.role, to: null }])
+        persist()
+      },
+      async leave(brandId) {
+        await net()
+        const b = brandAccess(brandId, 'brand.read')
+        const m = activeMember(b.id, uidOf())!
+        throwMemberError(leaveError(m.role, ownerCount(b.id)))
+        Object.assign(m, { status: 'removed', updatedAt: nowISO() })
+        logActivity(b.id, 'member.left', 'member', m.id, currentUser().name, [{ field: 'role', from: m.role, to: null }])
+        persist()
+      },
+    },
+
+    invitations: {
+      async preview(token) {
+        await net({ latency: 200 })
+        expireInvites()
+        const inv = await byToken(token)
+        const d = load()
+        const b = d.brands.find((x) => x.id === inv.brandId)
+        return {
+          status: inv.status, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5',
+          inviterName: d.users.find((u) => u.id === inv.invitedByUserId)?.name ?? '—', email: inv.email, role: inv.role, expiresAt: inv.expiresAt,
+        }
+      },
+      async accept(token) {
+        await net()
+        return acceptInvitation(await byToken(token))
+      },
+      async decline(token) {
+        await net()
+        declineInvitation(await byToken(token))
+      },
+      async mine() {
+        await net({ latency: 200 })
+        expireInvites()
+        const d = load()
+        const email = currentUser().email
+        return d.invitations.filter((i) => i.email === email && i.status === 'pending' && !activeMember(i.brandId, uidOf())).map((i) => {
+          const b = d.brands.find((x) => x.id === i.brandId)
+          return { id: i.id, brandId: i.brandId, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5', inviterName: d.users.find((u) => u.id === i.invitedByUserId)?.name ?? '—', role: i.role, expiresAt: i.expiresAt }
+        })
+      },
+      async acceptMine(id) {
+        await net()
+        return acceptInvitation(mineById(id))
+      },
+      async declineMine(id) {
+        await net()
+        declineInvitation(mineById(id))
+      },
+    },
+
+    activity: {
+      async list(brandId, q = {}) {
+        await net({ latency: 200 })
+        const b = brandAccess(brandId, 'brand.read') // any member may read
+        const rows = load().activity
+          .filter((a) => a.brandId === b.id && (!q.entityType || a.entityType === q.entityType) && (!q.entityId || a.entityId === q.entityId))
+          .sort((x, y) => y.createdAt.localeCompare(x.createdAt) || y.id.localeCompare(x.id))
+        const pageSize = Math.min(50, Math.max(1, q.pageSize ?? 30))
+        const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
+        const page = Math.min(pageCount, Math.max(1, q.page ?? 1))
+        return { data: clone(rows.slice((page - 1) * pageSize, page * pageSize)), meta: { page, pageSize, total: rows.length, pageCount } }
+      },
+    },
+
+    // --------------------------------------------------------- post images
+    contentImages: {
+      async upload(contentId, files, onProgress) {
+        await net()
+        const c = contentAccess(contentId, 'contentImage.upload')
+        const current = imagesOf(c.id)
+        if (current.length + files.length > limits.maxCount) {
+          throw new ApiError(400, 'TOO_MANY_IMAGES', `A post can have up to ${limits.maxCount} images.`)
+        }
+        const checked = await Promise.all(files.map(checkImage)) // validate everything before saving anything
+        let order = current.length ? Math.max(...current.map((i) => i.sortOrder)) + 1 : 0
+        for (const [n, f] of checked.entries()) {
+          await storeImage(c.id, f, order++)
+          onProgress?.(Math.round(((n + 1) / checked.length) * 100))
+        }
+        logContent(c, 'content.image_added', [{ field: 'images', from: null, to: files.map((f) => f.name) }])
+        persist()
+        return Promise.all(imagesOf(c.id).map(imageView))
+      },
+      async replace(contentId, imageId, file) {
+        await net()
+        const c = contentAccess(contentId, 'contentImage.replace')
+        const old = imagesOf(c.id).find((i) => i.id === imageId)
+        if (!old) throw new ApiError(404, 'NOT_FOUND', 'This image was already removed')
+        const f = await checkImage(file)
+        await storeImage(c.id, f, old.sortOrder) // keeps its position
+        await dropImage(old)
+        logContent(c, 'content.image_replaced', [{ field: 'images', from: old.filename, to: file.name }])
+        persist()
+        return Promise.all(imagesOf(c.id).map(imageView))
+      },
+      async remove(contentId, imageId) {
+        await net()
+        const c = contentAccess(contentId, 'contentImage.delete')
+        const img = imagesOf(c.id).find((i) => i.id === imageId)
+        if (!img) throw new ApiError(404, 'NOT_FOUND', 'This image was already removed')
+        await dropImage(img)
+        logContent(c, 'content.image_removed', [{ field: 'images', from: img.filename, to: null }])
+        persist()
+        return Promise.all(imagesOf(c.id).map(imageView))
+      },
+      async reorder(contentId, imageIds) {
+        await net({ latency: 150 })
+        const c = contentAccess(contentId, 'contentImage.replace')
+        const imgs = imagesOf(c.id)
+        if (imageIds.length !== imgs.length || !imgs.every((i) => imageIds.includes(i.id))) {
+          throw new ApiError(409, 'CONFLICT', 'The images changed in the meantime. Reload and try again.')
+        }
+        const before = imgs.map((i) => i.filename)
+        imageIds.forEach((id, n) => { imgs.find((i) => i.id === id)!.sortOrder = n })
+        logContent(c, 'content.images_reordered', [{ field: 'images', from: before, to: imagesOf(c.id).map((i) => i.filename) }])
+        persist()
+        return Promise.all(imagesOf(c.id).map(imageView))
+      },
+      async download(contentId, imageId) {
+        await net({ latency: 120 })
+        const c = contentAccess(contentId, 'contentImage.read')
+        const img = imagesOf(c.id).find((i) => i.id === imageId)
+        const blob = img ? await idbDo<Blob | undefined>('readonly', (st) => st.get(img.id)) : undefined
+        if (!img || !blob) throw new ApiError(404, 'NOT_FOUND', 'This image is no longer available')
+        return blob
       },
     },
 
     calendar: {
       async range(from, to, brandId, opts = {}) {
         await net()
+        const mineBrands = myBrandIds()
         const withTray = opts.includeUnscheduled !== false
         const d = load()
         const archivedBrands = new Set(d.brands.filter((b) => b.archivedAt).map((b) => b.id))
         return d.contents
-          .filter((c) => c.ownerId === uidOf() && !c.archivedAt && !archivedBrands.has(c.brandId) && (!brandId || c.brandId === brandId)
+          .filter((c) => mineBrands.has(c.brandId) && !c.archivedAt && !archivedBrands.has(c.brandId) && (!brandId || c.brandId === brandId)
             && (c.scheduledDate === null ? withTray : c.scheduledDate >= from && c.scheduledDate <= to))
-          .map(strip)
+          .map(contentView)
       },
       async holidays(from, to) {
         await net({ latency: 150 })
@@ -511,7 +821,7 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
         if (!idempotencyKey) throw new ApiError(400, 'INVALID_INPUT', 'Idempotency-Key is required')
         const existing = d.idempotency[`job:${me}:${idempotencyKey}`]
         if (existing) return jobView(d.jobs.find((j) => j.id === existing)!)
-        const brand = ownBrand(input.brandId)
+        const brand = brandAccess(input.brandId, 'content.create')
         validateGeneration(input, brand)
         if (wallet(me).available < input.count) {
           throw new ApiError(409, 'INSUFFICIENT_CREDITS', 'Not enough credits', { count: 'insufficient_credits' })
@@ -623,8 +933,8 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
       },
       async create(input) {
         await net()
-        ownBrand(input.brandId)
-        if (input.contentId) ownContent(input.contentId)
+        brandAccess(input.brandId, 'brand.read')
+        if (input.contentId) contentAccess(input.contentId, 'content.read')
         const errors: Record<string, string> = {}
         if (!input.consent) errors.consent = 'consent_required'
         if (input.brief.trim().length < 10) errors.brief = 'brief_short'
@@ -666,7 +976,7 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
     if (Object.keys(errors).length) fieldError(errors)
   }
 
-  function validateGeneration(i: GenerationInput, brand: Brand) {
+  function validateGeneration(i: GenerationInput, brand: MockBrand) {
     const e: Record<string, string> = {}
     if (brand.archivedAt) e.brandId = 'brand_archived'
     if (!brand.name || !brand.profile.description) e.brandId = 'brand_incomplete'
@@ -688,7 +998,7 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
     if (Object.keys(e).length) fieldError(e)
   }
 
-  function planItems(i: GenerationInput, brand: Brand): MockJob['plan'] {
+  function planItems(i: GenerationInput, brand: MockBrand): MockJob['plan'] {
     const pillars: string[] = []
     if (i.pillarMix) {
       for (const [p, w] of Object.entries(i.pillarMix)) for (let k = 0; k < Math.round((w / 100) * i.count); k++) pillars.push(p)
@@ -709,7 +1019,8 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
     const me = uidOf()
     const s = q.search?.trim().toLowerCase()
     const archivedBrands = new Set(d.brands.filter((b) => b.archivedAt).map((b) => b.id))
-    const rows = d.contents.filter((c) => c.ownerId === me
+    const mine = myBrandIds()
+    const rows = d.contents.filter((c) => mine.has(c.brandId)
       && (q.includeArchived || (!c.archivedAt && !archivedBrands.has(c.brandId)))
       && (!q.brandId || c.brandId === q.brandId)
       && (!s || c.title.toLowerCase().includes(s) || c.caption.toLowerCase().includes(s))
@@ -721,7 +1032,124 @@ export function createMockSource(getToken: () => string | null | undefined): Dat
     rows.sort(q.sort === 'date'
       ? (a, b) => (a.scheduledDate ?? '9999').localeCompare(b.scheduledDate ?? '9999')
       : (a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    return rows.map(strip)
+    return rows.map(contentView)
+  }
+
+  // ---- activity log (append-only, written here only) ----------------------
+  function logActivity(brandId: string, action: string | null, entityType: 'brand' | 'content' | 'member', entityId: string, entityTitle: string | null, changes: ActivityChange[] = []) {
+    if (!action) return
+    const u = currentUser()
+    load().activity.push({ id: `a_${nextSeq()}`, brandId, actorId: u.id, actorName: u.name, action, entityType, entityId, entityTitle, changes, createdAt: nowISO() })
+  }
+  const logContent = (c: Content, action: string | null, changes: ActivityChange[] = []) => logActivity(c.brandId, action, 'content', c.id, c.title, changes)
+
+  // ---- Team Workspace helpers -------------------------------------------
+  const ROLE_ORDER: Record<BrandRole, number> = { owner: 0, admin: 1, editor: 2, viewer: 3 }
+  function ownerCount(brandId: string) {
+    return load().memberships.filter((m) => m.brandId === brandId && m.status === 'active' && m.role === 'owner').length
+  }
+  function expireInvites() {
+    const now = nowISO()
+    for (const i of load().invitations) if (i.status === 'pending' && i.expiresAt < now) Object.assign(i, { status: 'expired', updatedAt: now })
+  }
+  /** Seats = active members + pending invitations (cancelled/declined/expired don't count). */
+  function seatsUsedIn(brandId: string) {
+    const d = load()
+    return d.memberships.filter((m) => m.brandId === brandId && m.status === 'active').length
+      + d.invitations.filter((i) => i.brandId === brandId && i.status === 'pending').length
+  }
+  function inviteView(i: MockInvitation): BrandInvitation {
+    const by = load().users.find((u) => u.id === i.invitedByUserId)
+    return { id: i.id, email: i.email, role: i.role, status: i.status, invitedByName: by?.name ?? '—', createdAt: i.createdAt, expiresAt: i.expiresAt }
+  }
+  function inviteUrl(token: string) {
+    return `${typeof location !== 'undefined' ? location.origin : ''}/invite/${token}`
+  }
+  function throwMemberError(code: string | null) {
+    if (!code) return
+    if (code === 'last_owner') throw new ApiError(409, 'LAST_OWNER', 'A brand must always keep at least one Owner.')
+    if (code === 'invalid_role') fieldError({ role: 'invalid_role' })
+    throw new ApiError(403, 'FORBIDDEN', code === 'owner_only' ? 'Only an Owner can change ownership.' : 'Your role in this brand does not allow this')
+  }
+  async function byToken(token: string): Promise<MockInvitation> {
+    const hash = await sha256(token)
+    const inv = load().invitations.find((i) => i.tokenHash === hash)
+    if (!inv) throw new ApiError(404, 'INVITE_INVALID', 'This invitation link is not valid.')
+    return inv
+  }
+  function mineById(id: string): MockInvitation {
+    const inv = load().invitations.find((i) => i.id === id && i.email === currentUser().email)
+    if (!inv) throw new ApiError(404, 'INVITE_INVALID', 'This invitation is no longer available.')
+    return inv
+  }
+  function checkPending(inv: MockInvitation) {
+    expireInvites()
+    if (inv.status === 'expired') throw new ApiError(410, 'INVITE_EXPIRED', 'This invitation has expired. Ask for a new one.')
+    if (inv.status !== 'pending') throw new ApiError(409, 'INVITE_INVALID', `This invitation was already ${inv.status}.`)
+    // The signed-in account must be the invited email.
+    if (currentUser().email !== inv.email) throw new ApiError(403, 'EMAIL_MISMATCH', `This invitation was sent to ${inv.email}.`)
+  }
+  function acceptInvitation(inv: MockInvitation) {
+    checkPending(inv)
+    const d = load()
+    const b = d.brands.find((x) => x.id === inv.brandId)
+    if (!b) throw new ApiError(404, 'NOT_FOUND', 'Brand not found')
+    // Re-check seats at acceptance (this invitation is already counted in seatsUsedIn).
+    if (seatsUsedIn(b.id) > (b.maxSeats ?? DEFAULT_SEATS)) throw new ApiError(409, 'SEAT_LIMIT', 'This team has reached its seat limit.')
+    const me = uidOf()
+    const now = nowISO()
+    const prev = d.memberships.find((m) => m.brandId === b.id && m.userId === me) // one row per brand+user
+    if (prev) Object.assign(prev, { role: inv.role, status: 'active', joinedAt: now, updatedAt: now, roleUpdatedAt: now })
+    else d.memberships.push(membership(b.id, me, inv.role, now))
+    Object.assign(inv, { status: 'accepted', acceptedByUserId: me, acceptedAt: now, updatedAt: now })
+    logActivity(b.id, 'member.joined', 'member', inv.id, currentUser().name, [{ field: 'role', from: null, to: inv.role }])
+    persist()
+    return { brandId: b.id }
+  }
+  function declineInvitation(inv: MockInvitation) {
+    checkPending(inv)
+    Object.assign(inv, { status: 'declined', updatedAt: nowISO() })
+    logActivity(inv.brandId, 'member.invite_declined', 'member', inv.id, inv.email)
+    persist()
+  }
+
+  // ---- post image helpers -------------------------------------------------
+  async function checkImage(file: File) {
+    const type = await sniffFile(file) // real content, not the extension
+    if (!type || !(IMAGE_MIME_TYPES as readonly string[]).includes(type)) {
+      throw new ApiError(400, 'FILE_TYPE', `"${file.name}" isn't a JPG, PNG, WEBP or GIF image.`)
+    }
+    if (file.size > limits.maxBytes) throw new ApiError(400, 'FILE_TOO_LARGE', `"${file.name}" is larger than ${Math.round(limits.maxBytes / 1048576)} MB.`)
+    return { file, type }
+  }
+  async function storeImage(contentId: string, f: { file: File; type: string }, sortOrder: number) {
+    let width: number | null = null
+    let height: number | null = null
+    try { const bmp = await createImageBitmap(f.file); width = bmp.width; height = bmp.height; bmp.close() } catch { /* dimensions are optional */ }
+    const id = `img_${nextSeq()}`
+    try {
+      await idbDo('readwrite', (st) => st.put(f.file.slice(0, f.file.size, f.type), id))
+    } catch {
+      throw new ApiError(507, 'STORAGE', 'Could not save the image (browser storage is full or unavailable).')
+    }
+    const now = nowISO()
+    load().contentImages.push({ id, contentId, filename: f.file.name, mimeType: f.type, size: f.file.size, width, height, sortOrder, uploadedBy: uidOf(), createdAt: now, updatedAt: now })
+  }
+  async function dropImage(img: MockContentImage) {
+    const d = load()
+    d.contentImages = d.contentImages.filter((i) => i.id !== img.id)
+    await idbDo('readwrite', (st) => st.delete(img.id)).catch(() => {})
+    const url = objectUrls.get(img.id)
+    if (url) { URL.revokeObjectURL(url); objectUrls.delete(img.id) }
+  }
+  async function imageView(img: MockContentImage): Promise<ContentImage> {
+    let url = objectUrls.get(img.id)
+    if (!url) {
+      const blob = await idbDo<Blob | undefined>('readonly', (st) => st.get(img.id)).catch(() => undefined)
+      url = blob ? URL.createObjectURL(blob) : ''
+      if (url) objectUrls.set(img.id, url)
+    }
+    return { id: img.id, filename: img.filename, mimeType: img.mimeType, size: img.size, width: img.width, height: img.height, url, thumbnailUrl: url, createdAt: img.createdAt }
   }
 
   function paginate<T>(rows: T[], q: ContentQuery): Paginated<T> {

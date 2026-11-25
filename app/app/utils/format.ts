@@ -32,3 +32,8 @@ export function clamp(n: number, min: number, max: number): number {
 export function normalizeTitle(s: string): string {
   return s.toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '')
 }
+
+/** Post-login destination from ?next= — only in-app pages and invitation links (no open redirects). */
+export function safeNextPath(v: unknown, fallback = '/app'): string {
+  return typeof v === 'string' && !v.startsWith('//') && (v.startsWith('/app') || /^\/invite\/[\w-]+$/.test(v)) ? v : fallback
+}

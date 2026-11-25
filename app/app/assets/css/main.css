@@ -97,6 +97,13 @@
   :where(.grid, .inline-grid) > * { min-width: 0; }
 
   button, a, [role="button"], label { touch-action: manipulation; }
+
+  /* Scroll containers must be the containing block of their absolutely
+     positioned descendants (e.g. Tailwind `sr-only` labels inside badges).
+     Otherwise those escape the container's clipping and stretch the whole
+     page by the list's full unscrolled height. Zero specificity, so an
+     explicit absolute/fixed/sticky utility on the same element still wins. */
+  :where(.overflow-auto, .overflow-y-auto, .overflow-x-auto, .overflow-scroll, .overflow-y-scroll, .overflow-x-scroll, .h-scroll) { position: relative; }
 }
 
 /* Dev only: Nuxt DevTools' onboarding badge (<devframes-onboard>) sits in normal
@@ -202,7 +209,7 @@ devframes-onboard { position: fixed !important; left: 0; bottom: 0; width: 0; he
 
   /* Segmented control (iOS style). Children: buttons with aria-pressed. */
   .segmented { @apply inline-flex rounded-2xl bg-surface-2 p-1; }
-  .segmented > button { @apply flex-1 rounded-xl px-3 py-2 text-sm font-semibold text-muted transition active:scale-[0.97]; }
+  .segmented > button { @apply flex-1 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-muted transition active:scale-[0.97]; }
   .segmented > button[aria-pressed="true"] { @apply bg-surface text-fg shadow-soft; }
 
   /* Tappable row / card: native-feeling press state. */

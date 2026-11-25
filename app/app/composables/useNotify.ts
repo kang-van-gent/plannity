@@ -85,6 +85,13 @@ export function useNotify() {
           return push('warning', opts.title ?? t('errors.invalidInput'), t('errors.invalidInputHint'))
         case 'NOT_FOUND':
           return push('error', t('errors.notFound'), undefined, { action })
+        // Team Workspace / post images: short title + the server's specific explanation.
+        case 'FORBIDDEN': case 'SEAT_LIMIT': case 'ALREADY_MEMBER': case 'DUPLICATE_INVITE': case 'INVITE_EXPIRED':
+        case 'INVITE_INVALID': case 'EMAIL_MISMATCH': case 'LAST_OWNER': case 'FILE_TYPE': case 'FILE_TOO_LARGE':
+        case 'TOO_MANY_IMAGES':
+          return push('warning', opts.title ?? t(`errors.codes.${e.code}`), e.message)
+        case 'STORAGE':
+          return push('error', opts.title ?? t('errors.codes.STORAGE'), e.message, { action })
         case 'UNAUTHENTICATED':
           return push('error', opts.title ?? t('errors.unauthenticated'), e.message)
         default:

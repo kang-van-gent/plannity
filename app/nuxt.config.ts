@@ -31,6 +31,14 @@ export default defineNuxtConfig({
       creditPriceSatang: 1000,
       trialCredits: 3,
       contactEmail: 'hello@plannity.example',
+      /** Locked for now; set NUXT_PUBLIC_FEATURE_AI_GENERATE / NUXT_PUBLIC_FEATURE_PROMOTE=true to open. */
+      featureAiGenerate: false,
+      featurePromote: false,
+      /** Post images (must match the backend's CONTENT_IMAGE_MAX_MB / CONTENT_IMAGE_MAX_COUNT). */
+      imageMaxMb: 10,
+      imageMaxCount: 10,
+      /** Where Strapi serves uploaded media (relative /uploads URLs are resolved against it). */
+      mediaBaseUrl: '',
     },
   },
 

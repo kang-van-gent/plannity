@@ -37,5 +37,14 @@ export function useQuery<T>(fn: () => Promise<T>, opts: { watch?: WatchSource[];
   if (opts.watch?.length) watch(opts.watch, () => refresh())
   if (opts.immediate !== false && import.meta.client) refresh()
 
-  return { data, error, pending, loaded, refresh }
+  /**
+   * True only when the data on screen is the latest completed response. Screens
+   * whose query depends on inputs (filters, range, brand) render a skeleton
+   * while !ready instead of the stale data, so the real content mounts once,
+   * with fresh data, and plays its entrance animation once. Silent refreshes
+   * keep it true, so the content stays put.
+   */
+  const ready = computed(() => loaded.value && !pending.value)
+
+  return { data, error, pending, loaded, ready, refresh }
 }

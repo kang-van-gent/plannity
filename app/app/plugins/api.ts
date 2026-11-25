@@ -14,8 +14,10 @@ export default defineNuxtPlugin(() => {
   const kind = config.public.dataSource === 'strapi' ? 'strapi' : 'mock'
   let loading: Promise<DataSource> | null = null
   const load = () => (loading ??= kind === 'strapi'
-    ? import('~/services/api/strapi').then((m) => m.createStrapiSource())
-    : import('~/services/api/mock').then((m) => m.createMockSource(() => token.value)))
+    ? import('~/services/api/strapi').then((m) => m.createStrapiSource({ mediaBaseUrl: String(config.public.mediaBaseUrl || '') }))
+    : import('~/services/api/mock').then((m) => m.createMockSource(() => token.value, {
+      maxBytes: Number(config.public.imageMaxMb) * 1024 * 1024, maxCount: Number(config.public.imageMaxCount),
+    })))
 
   type Fn = (...args: unknown[]) => Promise<unknown>
   const call = (path: string[], args: unknown[]) => load().then((src) => {

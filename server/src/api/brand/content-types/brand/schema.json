@@ -5,7 +5,7 @@
     "singularName": "brand",
     "pluralName": "brands",
     "displayName": "Brand",
-    "description": "A brand profile owned by a user (spec §8)."
+    "description": "A brand profile owned by a user (spec \u00a78)."
   },
   "options": {
     "draftAndPublish": false
@@ -39,6 +39,23 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::content.content",
+      "mappedBy": "brand"
+    },
+    "maxSeats": {
+      "type": "integer",
+      "min": 1,
+      "description": "Seat limit (active members + pending invitations). Empty = TEAM_DEFAULT_SEATS. Set by plan/billing, never by members."
+    },
+    "memberships": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::brand-membership.brand-membership",
+      "mappedBy": "brand"
+    },
+    "invitations": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::brand-invitation.brand-invitation",
       "mappedBy": "brand"
     }
   }

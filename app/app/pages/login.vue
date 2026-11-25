@@ -12,14 +12,15 @@ const api = useApi()
 const isMock = useIsMock()
 const route = useRoute()
 
-const form = reactive({ email: '', password: '' })
+// Pre-filled when arriving from an invitation link.
+const form = reactive({ email: typeof route.query.email === 'string' ? route.query.email : '', password: '' })
 const errors = reactive<Record<string, string>>({})
 const show = ref(false)
 const loading = ref(false)
 const forgotOpen = ref(false)
 const forgotEmail = ref('')
 const forgotSending = ref(false)
-const next = computed(() => typeof route.query.next === 'string' && route.query.next.startsWith('/app') ? route.query.next : '/app')
+const next = computed(() => safeNextPath(route.query.next))
 
 // Back from a failed/cancelled social sign-in (/auth/callback → /login?oauth=…).
 onMounted(() => {
@@ -46,7 +47,7 @@ async function submit() {
   try {
     const user = await session.login(form.email, form.password)
     notify.success(t('auth.welcomeBack', { name: user.name }), t('auth.welcomeBackBody'))
-    const next = typeof route.query.next === 'string' && route.query.next.startsWith('/app') ? route.query.next : '/app'
+    const next = safeNextPath(route.query.next)
     await navigateTo(next)
   } catch (e) {
     if (isApiError(e) && e.status === 401) {

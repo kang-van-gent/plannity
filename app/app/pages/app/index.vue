@@ -12,6 +12,7 @@ const { user } = useSession()
 const brands = useBrands()
 const { wallet } = useWallet()
 
+const features = useFeatures()
 const q = useQuery(() => api.dashboard(brands.currentBrandId.value), { watch: [brands.currentBrandId] })
 watch(() => q.data.value?.wallet, (w) => { if (w) wallet.value = w })
 
@@ -34,16 +35,18 @@ const brandOf = (id: string) => brands.byId(id)
   <div>
     <UiPageHeader :title="`${greeting}, ${user?.name?.split(' ')[0] ?? ''}`" :subtitle="t('dashboard.subtitle', { date: formatDate(today, locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) })">
       <NuxtLink to="/app/calendar" class="btn-secondary"><Plus class="size-4" />{{ t('content.newManual') }}</NuxtLink>
-      <NuxtLink to="/app/generate" class="btn-primary"><WandSparkles class="size-4" />{{ t('nav.generate') }}</NuxtLink>
+      <NuxtLink v-if="features.aiGenerate" to="/app/generate" class="btn-primary"><WandSparkles class="size-4" />{{ t('nav.generate') }}</NuxtLink>
     </UiPageHeader>
+
+    <TeamInvitationsBanner @changed="q.refresh({ silent: true })" />
 
     <UiEmptyState v-if="noBrands" :icon="Store" :title="t('dashboard.emptyTitle')" :message="t('dashboard.emptyBody', { n: wallet?.available ?? 0 })">
       <NuxtLink to="/app/brands/new?onboarding=1" class="btn-primary"><Rocket class="size-4" />{{ t('brands.create') }}</NuxtLink>
     </UiEmptyState>
 
     <template v-else>
-      <UiErrorState v-if="q.error.value && !q.data.value" :error="q.error.value" @retry="q.refresh()" />
-      <div v-else-if="!q.data.value" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <UiErrorState v-if="q.error.value && !q.ready.value" :error="q.error.value" @retry="q.refresh()" />
+      <div v-else-if="!q.data.value || !q.ready.value" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <div v-for="i in 4" :key="i" class="skeleton h-28 sm:h-32" />
       </div>
       <template v-else>
@@ -106,7 +109,7 @@ const brandOf = (id: string) => brands.byId(id)
               <p v-else class="mt-3 flex items-center gap-2 text-sm text-muted"><CheckCircle2 class="size-4 text-success" />{{ t('dashboard.noBacklog') }}</p>
             </section>
 
-            <section v-anim class="card card-pad">
+            <section v-if="features.aiGenerate" v-anim class="card card-pad">
               <div class="flex items-center justify-between">
                 <h2 class="font-display text-lg font-bold">{{ t('dashboard.recentJobs') }}</h2>
                 <NuxtLink to="/app/generate" class="btn-ghost btn-sm">{{ t('nav.generate') }}<ArrowRight class="size-3.5" /></NuxtLink>

@@ -22,7 +22,7 @@ async function save(input: BrandInput) {
     await brands.load(true)
     brands.setScope(b.id)
     notify.success(t('brands.created'), onboarding.value ? t('brands.createdOnboarding') : b.name)
-    await navigateTo(onboarding.value ? `/app/generate?brand=${b.id}` : `/app/brands/${b.id}`)
+    await navigateTo(onboarding.value && useFeatures().aiGenerate ? `/app/generate?brand=${b.id}` : `/app/brands/${b.id}`)
   } catch (e) {
     if (isApiError(e)) serverErrors.value = e.fieldErrors
     notify.fromError(e)

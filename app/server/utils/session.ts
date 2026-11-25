@@ -46,7 +46,7 @@ export const OAUTH_NEXT_COOKIE = 'plannity_oauth_next'
 
 /** Only same-app paths are allowed as post-login destinations (no open redirects). */
 export function safeNext(v: unknown): string {
-  return typeof v === 'string' && v.startsWith('/app') && !v.startsWith('//') ? v : '/app'
+  return typeof v === 'string' && !v.startsWith('//') && (v.startsWith('/app') || /^\/invite\/[\w-]+$/.test(v)) ? v : '/app'
 }
 
 /** Readable routing hint the client middleware checks (the JWT itself stays HttpOnly). */

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertTriangle, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Inbox, List, Plus, Star, Trash2, ExternalLink } from '@lucide/vue'
+import { AlertTriangle, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Inbox, List, LoaderCircle, Plus, Star, Trash2, ExternalLink } from '@lucide/vue'
 import { gsap } from 'gsap'
 import type { Content, ContentFormModel, ContentStatus, Holiday } from '~/types'
 import { CONTENT_STATUSES, PLATFORMS } from '~/types'
@@ -22,7 +22,7 @@ const range = computed(() => {
   if (view.value === 'week') { const d = weekDays(cursor.value); return { from: d[0]!, to: d[6]! } }
   if (view.value === 'list') return { from: startOfMonth(cursor.value), to: endOfMonth(cursor.value) }
   const g = monthGrid(cursor.value)
-  return { from: g[0]!, to: g[41]! }
+  return { from: g[0]!, to: g[g.length - 1]! }
 })
 const title = computed(() => view.value === 'week'
   ? `${formatDate(range.value.from, locale.value, { day: 'numeric', month: 'short' })} – ${formatDate(range.value.to, locale.value, { day: 'numeric', month: 'short', year: 'numeric' })}`
@@ -36,23 +36,36 @@ const title = computed(() => view.value === 'week'
 const items = ref<Content[]>([])
 let trayBrand: string | null | undefined // brand the tray was loaded for; undefined = not loaded
 let trayChanged = false
+// Identifies what's on screen; data is only shown when it matches.
+const rangeKey = computed(() => `${range.value.from}|${range.value.to}|${brands.currentBrandId.value ?? ''}`)
 const q = useQuery(async () => {
+  const key = rangeKey.value
   const brandId = brands.currentBrandId.value
   const needTray = trayBrand !== brandId
-  const [c, h] = await Promise.all([
+  const [contents, holidays] = await Promise.all([
     api.calendar.range(range.value.from, range.value.to, brandId, { includeUnscheduled: needTray }),
     api.calendar.holidays(range.value.from, range.value.to),
   ])
-  trayChanged = needTray
-  if (needTray) {
-    items.value = c
-    trayBrand = brandId
+  return { key, brandId, needTray, contents, holidays }
+}, { watch: [rangeKey] })
+// Applied here, not inside the fetch: useQuery discards out-of-order responses,
+// so a slow older request can never overwrite newer posts.
+watch(() => q.data.value, (d) => {
+  if (!d) return
+  if (d.needTray) {
+    items.value = d.contents
+    trayBrand = d.brandId
+    trayChanged = true
   } else {
     // Keep the existing tray objects; swap in only the scheduled items.
-    items.value = [...items.value.filter((x) => !x.scheduledDate), ...c.filter((x) => x.scheduledDate)]
+    items.value = [...items.value.filter((x) => !x.scheduledDate), ...d.contents.filter((x) => x.scheduledDate)]
   }
-  return { holidays: h }
-}, { watch: [range, brands.currentBrandId] })
+  nextTick(() => afterCurtain(curtain, reveal))
+})
+/** The visible range's data has arrived (silent refreshes keep it true). */
+const ready = computed(() => q.data.value?.key === rangeKey.value && q.ready.value)
+/** Tray is (re)loading for a newly selected brand. */
+const trayLoading = computed(() => !ready.value && trayBrand !== brands.currentBrandId.value)
 /** Full reload including the tray (after a conflict or an error). */
 function reloadAll() { trayBrand = undefined; return q.refresh() }
 
@@ -81,9 +94,7 @@ const listDays = computed(() => {
 const grid = ref<HTMLElement | null>(null)
 async function shift(dir: -1 | 1) {
   cursor.value = view.value === 'week' ? addDays(cursor.value, 7 * dir) : addMonths(cursor.value, dir)
-  await nextTick()
-  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { x: 30 * dir }, { x: 0, duration: 0.45, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
-  revealFrame(dir > 0 ? 'start' : 'end')
+  revealDir = dir > 0 ? 'start' : 'end' // the ripple direction shows which way we moved
 }
 
 // --- motion ------------------------------------------------------------------
@@ -97,21 +108,34 @@ function tween(els: Element[] | NodeListOf<Element>, from: gsap.TweenVars, to: g
   list.forEach((el) => { el.style.transition = 'none' })
   gsap.fromTo(list, from, { ...to, overwrite: true, clearProps: 'transform,opacity', onComplete: () => list.forEach((el) => { el.style.transition = '' }) })
 }
+// Every element gets exactly one entrance. Items revealed (on their own or as
+// part of a cell/column ripple) are marked data-shown, so a later refetch that
+// returns the same posts, or a view change, never animates them a second time.
+const ITEM_SEL = '[data-cell] [data-chip], [data-day] [data-chip], [data-dot], [data-holiday]'
+function markShown(els: Iterable<Element>) { for (const el of els) (el as HTMLElement).dataset.shown = '' }
 function revealFrame(from: 'start' | 'end' = 'start') {
-  if (prefersReducedMotion() || !grid.value) return
+  if (!grid.value) return
   const root = grid.value
+  // Items already on screen move in with their cell/column, so they don't pop again.
+  markShown(root.querySelectorAll(ITEM_SEL))
+  if (prefersReducedMotion()) return
   if (view.value === 'month') {
-    tween(root.querySelectorAll('[data-cell]'), { opacity: 0, y: 10, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'power2.out', stagger: { grid: [6, 7], from, amount: 0.35 } })
+    const cells = root.querySelectorAll('[data-cell]')
+    tween(cells, { opacity: 0, y: 10, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'power2.out', stagger: { grid: [Math.ceil(cells.length / 7), 7], from, amount: 0.35 } })
     tween(root.querySelectorAll('[data-today]'), { scale: 0 }, { scale: 1, duration: 0.6, delay: 0.3, ease: 'back.out(3)' })
   } else if (view.value === 'week') {
     tween(root.querySelectorAll('[data-day]'), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out', stagger: { each: 0.05, from } })
   }
 }
 function revealItems() {
-  if (prefersReducedMotion() || !grid.value) return
+  if (!grid.value) return
+  if (prefersReducedMotion()) { markShown(grid.value.querySelectorAll(ITEM_SEL)); return }
   const root = grid.value.parentElement ?? grid.value
   if (view.value !== 'list') {
-    tween(root.querySelectorAll('[data-cell] [data-chip], [data-day] [data-chip], [data-dot], [data-holiday]'), { opacity: 0, scale: 0.6, y: 6 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: 'back.out(2)', stagger: { amount: 0.4 }, delay: 0.15 })
+    // Only items that haven't had their entrance yet (new data, filters revealing more).
+    const fresh = [...root.querySelectorAll(ITEM_SEL)].filter((el) => !(el as HTMLElement).hasAttribute('data-shown'))
+    markShown(fresh)
+    tween(fresh, { opacity: 0, scale: 0.6, y: 6 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: 'back.out(2)', stagger: { amount: Math.min(0.4, fresh.length * 0.03) }, delay: 0.15 })
   }
   // The tray only animates when it was actually (re)loaded, not on month/week navigation.
   if (trayChanged) {
@@ -120,12 +144,26 @@ function revealItems() {
   }
   revealAgenda()
 }
+// Entrance runs when the data for what's on screen lands (not on click, when the
+// content is still a skeleton): the frame ripples in once per view+range, and
+// after that only genuinely new items pop.
+let revealedKey = ''
+let revealDir: 'start' | 'end' = 'start'
+function reveal() {
+  if (!ready.value) return
+  const k = `${view.value}|${rangeKey.value}`
+  if (k !== revealedKey) {
+    revealedKey = k
+    revealFrame(revealDir)
+    revealDir = 'start'
+  }
+  revealItems()
+}
 const agendaEl = ref<HTMLElement | null>(null)
 function revealAgenda() {
   if (prefersReducedMotion() || !agendaEl.value) return
   tween(agendaEl.value.querySelectorAll('[data-agenda]'), { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power3.out', stagger: 0.04 })
 }
-watch(() => q.data.value, () => nextTick(revealItems))
 watch(() => [filters.platform, filters.status], () => nextTick(revealItems))
 function goToday() { cursor.value = today; selectedDay.value = today }
 
@@ -142,11 +180,13 @@ function onSwipeEnd(e: PointerEvent) {
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shift(dx < 0 ? 1 : -1)
 }
 async function setView(v: View) {
+  if (v === view.value) return
   view.value = v
   await nextTick()
-  if (grid.value && !prefersReducedMotion()) gsap.fromTo(grid.value, { y: 16 }, { y: 0, duration: 0.4, ease: 'power3.out', overwrite: true, clearProps: 'transform' })
-  revealFrame()
-  revealItems()
+  // One entrance per view: month cells / week columns ripple in with their posts
+  // inside; list sections use their own v-anim. If the range changed, the
+  // skeleton shows until the data lands and the watcher reveals it.
+  reveal()
 }
 watch(selectedDay, () => nextTick(() => {
   revealAgenda()
@@ -156,13 +196,18 @@ watch(selectedDay, () => nextTick(() => {
 onMounted(() => {
   brands.load().catch(() => {})
   if (window.matchMedia('(max-width: 767px)').matches) view.value = 'list' // mobile list fallback (spec §11)
-  nextTick(() => afterCurtain(curtain, () => { revealFrame(); if (q.data.value) revealItems() }))
 })
 
 // --- move (drag & drop, keyboard, form) -----------------------------------
 const dragId = ref<string | null>(null)
 const overDate = ref<string | null>(null)
+// Team Workspace: only roles with content.update can move items (backend enforces too).
+const perms = usePerms()
+const canMove = (c: Content) => !brands.loaded.value || perms.can('content.update', c.brandId)
+const creatableBrands = computed(() => perms.brandsWhere('content.create'))
+const canCreateAny = computed(() => !brands.loaded.value || creatableBrands.value.length > 0)
 function onDragStart(e: DragEvent, c: Content) {
+  if (!canMove(c)) { e.preventDefault(); return }
   dragId.value = c.id
   e.dataTransfer?.setData('text/plain', c.id)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
@@ -170,6 +215,8 @@ function onDragStart(e: DragEvent, c: Content) {
 function onDragEnd() { dragId.value = null; overDate.value = null }
 function onDrop(e: DragEvent, date: string | null) {
   const id = e.dataTransfer?.getData('text/plain') || dragId.value
+  const c = items.value.find((x) => x.id === id)
+  if (c && !canMove(c)) { overDate.value = null; dragId.value = null; return }
   overDate.value = null
   dragId.value = null
   if (id) move(id, date)
@@ -204,7 +251,7 @@ async function move(id: string, date: string | null, opts: { silent?: boolean } 
 }
 
 function onChipKey(e: KeyboardEvent, c: Content) {
-  if (!e.altKey || !c.scheduledDate) return
+  if (!e.altKey || !c.scheduledDate || !canMove(c)) return
   const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key]
   if (!delta) return
   e.preventDefault()
@@ -244,7 +291,9 @@ const createErrors = ref<Record<string, string>>({})
 const creating = ref(false)
 function openCreate(date: string) {
   if (!brands.active.value.length) { notify.warning(t('generate.noBrandTitle'), t('generate.noBrandBody')); return }
-  createForm.value = emptyContentForm(brands.currentBrand.value ?? brands.active.value[0], date)
+  if (!creatableBrands.value.length) return
+  const scoped = brands.currentBrand.value && creatableBrands.value.includes(brands.currentBrand.value) ? brands.currentBrand.value : creatableBrands.value[0]
+  createForm.value = emptyContentForm(scoped, date)
   createErrors.value = {}
   createOpen.value = true
 }
@@ -294,17 +343,17 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
   <div>
     <UiPageHeader :title="t('nav.calendar')" :subtitle="t('calendar.subtitle')">
       <button type="button" class="btn-secondary" @click="keyOpen = true"><Star class="size-4" />{{ t('calendar.keyDates') }}</button>
-      <button type="button" class="btn-primary" @click="openCreate(today)"><Plus class="size-4" />{{ t('content.newManual') }}</button>
+      <button v-if="canCreateAny" type="button" class="btn-primary" @click="openCreate(today)"><Plus class="size-4" />{{ t('content.newManual') }}</button>
     </UiPageHeader>
 
     <div v-anim class="mb-4 flex flex-wrap items-center gap-2 sm:rounded-3xl sm:border sm:border-line sm:bg-surface sm:p-3 sm:shadow-soft">
       <div class="flex w-full items-center gap-1 sm:w-auto">
         <button type="button" class="btn-icon btn-ghost" :aria-label="t('calendar.prev')" @click="shift(-1)"><ChevronLeft class="size-5" /></button>
         <button type="button" class="btn-secondary btn-sm max-sm:order-last max-sm:ml-1 max-sm:rounded-full" @click="goToday">{{ t('calendar.today') }}</button>
-        <h2 class="flex-1 text-center font-display text-xl font-bold sm:hidden" aria-live="polite">{{ title }}</h2>
+        <h2 class="flex flex-1 items-center justify-center gap-2 font-display text-xl font-bold sm:hidden" aria-live="polite">{{ title }}<LoaderCircle v-if="!ready" class="size-4 animate-spin text-brand-500" :aria-label="t('common.loading')" /></h2>
         <button type="button" class="btn-icon btn-ghost" :aria-label="t('calendar.next')" @click="shift(1)"><ChevronRight class="size-5" /></button>
       </div>
-      <h2 class="hidden min-w-[10rem] font-display text-xl font-bold sm:block" aria-live="polite">{{ title }}</h2>
+      <h2 class="hidden min-w-[10rem] items-center gap-2 font-display text-xl font-bold sm:flex" aria-live="polite">{{ title }}<LoaderCircle v-if="!ready" class="size-4 animate-spin text-brand-500" :aria-label="t('common.loading')" /></h2>
       <div class="h-scroll w-full items-center sm:ml-auto sm:w-auto sm:flex-wrap sm:overflow-visible">
         <div class="segmented" role="group" :aria-label="t('calendar.view')">
           <button v-for="v in (['month', 'week', 'list'] as View[])" :key="v" type="button" class="flex items-center gap-1.5 !py-1.5 text-xs" :aria-pressed="view === v" @click="setView(v)">
@@ -316,23 +365,42 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
       </div>
     </div>
 
-    <UiErrorState v-if="q.error.value && !q.data.value" :error="q.error.value" @retry="reloadAll()" />
+    <UiErrorState v-if="q.error.value && !ready" :error="q.error.value" @retry="reloadAll()" />
     <div v-else class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-      <div ref="grid" class="min-w-0" :class="{ 'opacity-60 transition-opacity': q.pending.value }">
+      <div ref="grid" class="min-w-0" :aria-busy="!ready">
+        <!-- Loading: a skeleton shaped like the current view (never stale data). -->
+        <template v-if="!ready">
+          <div v-if="view === 'month'" class="card overflow-hidden" aria-hidden="true">
+            <div class="grid grid-cols-7 border-b border-line bg-surface-2"><div v-for="w in weekdayNames" :key="w" class="py-2"><div class="skeleton mx-auto h-3 w-8" /></div></div>
+            <div class="grid grid-cols-7">
+              <div v-for="d in monthGrid(cursor)" :key="d" class="min-h-14 border-b border-r border-line p-1.5 sm:min-h-28 [&:nth-child(7n)]:border-r-0 [&:nth-last-child(-n+7)]:border-b-0">
+                <div class="skeleton size-6 rounded-full max-sm:mx-auto" />
+                <div class="skeleton mt-2 hidden h-5 w-11/12 rounded-lg sm:block" :class="Number(d.slice(8)) % 3 ? 'opacity-0' : ''" />
+              </div>
+            </div>
+          </div>
+          <div v-else-if="view === 'week'" class="grid gap-2 md:grid-cols-7" aria-hidden="true">
+            <div v-for="i in 7" :key="i" class="card p-2 md:min-h-64"><div class="skeleton h-3 w-10" /><div class="skeleton mt-2 h-6 w-8" /><div class="skeleton mt-4 h-16 w-full rounded-xl" /></div>
+          </div>
+          <div v-else class="space-y-3" aria-hidden="true">
+            <div v-for="i in 4" :key="i" class="card overflow-hidden"><div class="border-b border-line bg-surface-2 px-4 py-3"><div class="skeleton h-5 w-48" /></div><div class="flex items-center gap-3 px-4 py-3.5"><div class="skeleton h-4 w-12" /><div class="skeleton h-5 flex-1" /><div class="skeleton h-5 w-20 rounded-full" /></div></div>
+          </div>
+        </template>
+        <template v-else>
         <!-- MONTH -->
         <div v-if="view === 'month'" class="card touch-pan-y overflow-hidden" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="swipe = null">
           <div class="grid grid-cols-7 border-b border-line bg-surface-2 text-center text-xs font-bold text-muted">
             <div v-for="w in weekdayNames" :key="w" class="py-2 max-sm:text-[11px]">{{ w }}</div>
           </div>
           <div class="grid grid-cols-7">
-            <div v-for="d in monthGrid(cursor)" :key="d" :data-cell="d" class="group relative min-h-14 border-b border-r border-line p-1 transition-colors max-sm:cursor-pointer sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0"
+            <div v-for="d in monthGrid(cursor)" :key="d" :data-cell="d" class="group relative min-h-14 border-b border-r border-line p-1 transition-colors max-sm:cursor-pointer sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0 [&:nth-last-child(-n+7)]:border-b-0"
               :class="[!isSameMonth(d, cursor) && 'bg-surface-2/50', overDate === d && 'bg-brand-500/10 ring-2 ring-inset ring-brand-400', selectedDay === d && 'max-sm:bg-brand-500/8']"
               @click="selectedDay = d"
               @dragover.prevent="overDate = d" @dragleave="overDate === d && (overDate = null)" @drop.prevent="onDrop($event, d)">
               <div class="flex items-center justify-center sm:justify-between">
                 <span data-num :data-today="d === today ? '' : undefined" class="grid size-7 place-items-center rounded-full text-xs font-bold transition"
                   :class="[d === today ? 'bg-brand-500 text-white shadow-pop' : isSameMonth(d, cursor) ? '' : 'text-muted/60', selectedDay === d && d !== today && 'max-sm:bg-fg max-sm:text-bg']">{{ Number(d.slice(8)) }}</span>
-                <button type="button" class="hidden rounded-lg p-1 sm:block text-muted opacity-0 transition hover:bg-brand-500/10 hover:text-brand-500 focus:opacity-100 group-hover:opacity-100" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-3.5" /></button>
+                <button v-if="canCreateAny" type="button" class="hidden rounded-lg p-1 sm:block text-muted opacity-0 transition hover:bg-brand-500/10 hover:text-brand-500 focus:opacity-100 group-hover:opacity-100" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-3.5" /></button>
               </div>
               <!-- phones: dots -->
               <div class="mt-1 flex flex-wrap justify-center gap-0.5 sm:hidden" aria-hidden="true">
@@ -343,12 +411,13 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
                 <AlertTriangle v-if="!h.verified" class="size-3 shrink-0" /><Star v-else class="size-3 shrink-0" />{{ h.title[locale] }}
               </p>
               <div class="mt-1 hidden space-y-1 sm:block">
-                <button v-for="c in (byDate.get(d) ?? []).slice(0, 3)" :key="c.id" :data-chip="c.id" type="button" draggable="true"
+                <button v-for="c in (byDate.get(d) ?? []).slice(0, 3)" :key="c.id" :data-chip="c.id" type="button" :draggable="canMove(c)"
                   class="flex w-full cursor-grab items-center gap-1 rounded-lg border-l-[3px] bg-surface px-1.5 py-1 text-left text-[11px] font-medium shadow-soft transition hover:-translate-y-px hover:shadow-pop active:cursor-grabbing"
                   :class="dragId === c.id && 'opacity-40'" :style="{ borderLeftColor: brandColor(c) }" :title="`${c.title} — ${t('calendar.dragHint')}`"
                   @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)" @keydown="onChipKey($event, c)">
                   <UiPlatformBadge :platform="c.platform" size="xs" />
                   <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
+                  <UiImageCount :count="c.imageCount" compact />
                   <span class="size-1.5 shrink-0 rounded-full" :class="STATUS_META[c.status].dot" />
                 </button>
                 <button v-if="(byDate.get(d)?.length ?? 0) > 3" type="button" class="w-full rounded-lg px-1.5 text-left text-[11px] font-semibold text-brand-600 hover:bg-brand-500/10 dark:text-brand-300" @click="cursor = d; setView('week')">+{{ byDate.get(d)!.length - 3 }} {{ t('calendar.more') }}</button>
@@ -361,7 +430,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         <section v-if="view === 'month'" ref="agendaEl" class="mt-4 sm:hidden">
           <div class="mb-2 flex items-center justify-between px-1">
             <h3 class="font-display text-lg font-bold" :class="selectedDay === today && 'text-brand-500'">{{ formatDate(selectedDay, locale, { weekday: 'long', day: 'numeric', month: 'long' }) }}</h3>
-            <button type="button" class="btn-icon btn-ghost text-brand-500" :aria-label="t('calendar.addOn', { date: formatDate(selectedDay, locale) })" @click="openCreate(selectedDay)"><Plus class="size-5" /></button>
+            <button v-if="canCreateAny" type="button" class="btn-icon btn-ghost text-brand-500" :aria-label="t('calendar.addOn', { date: formatDate(selectedDay, locale) })" @click="openCreate(selectedDay)"><Plus class="size-5" /></button>
           </div>
           <p v-for="h in holidaysByDate.get(selectedDay) ?? []" :key="h.id" data-agenda class="mb-2 flex items-center gap-2 rounded-2xl bg-sun/15 px-3 py-2 text-sm font-semibold text-amber-700 dark:text-sun">
             <AlertTriangle v-if="!h.verified" class="size-4 shrink-0" /><Star v-else class="size-4 shrink-0" />{{ h.title[locale] }}
@@ -372,12 +441,12 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
               <UiPlatformBadge :platform="c.platform" />
               <span class="min-w-0 flex-1">
                 <span class="block truncate font-semibold">{{ c.title }}</span>
-                <span class="text-xs text-muted">{{ c.scheduledTime ?? t('content.unscheduled') }}</span>
+                <span class="flex items-center gap-2 text-xs text-muted">{{ c.scheduledTime ?? t('content.unscheduled') }}<UiImageCount :count="c.imageCount" /></span>
               </span>
               <UiStatusBadge :status="c.status" small />
             </button>
           </div>
-          <button v-else data-agenda type="button" class="w-full rounded-[1.5rem] border border-dashed border-line p-5 text-center text-sm text-muted active:bg-surface-2" @click="openCreate(selectedDay)">
+          <button v-else-if="canCreateAny" data-agenda type="button" class="w-full rounded-[1.5rem] border border-dashed border-line p-5 text-center text-sm text-muted active:bg-surface-2" @click="openCreate(selectedDay)">
             <Plus class="mx-auto mb-1 size-5" />{{ t('calendar.addOn', { date: formatDate(selectedDay, locale, { day: 'numeric', month: 'short' }) }) }}
           </button>
         </section>
@@ -388,13 +457,13 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
             @dragover.prevent="overDate = d" @dragleave="overDate === d && (overDate = null)" @drop.prevent="onDrop($event, d)">
             <header class="mb-2 flex items-center justify-between px-1">
               <div><p class="text-[11px] font-bold uppercase text-muted">{{ formatDate(d, locale, { weekday: 'short' }) }}</p><p class="font-display text-xl font-bold" :class="d === today && 'text-brand-500'">{{ Number(d.slice(8)) }}</p></div>
-              <button type="button" class="btn-icon btn-ghost p-1.5" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-4" /></button>
+              <button v-if="canCreateAny" type="button" class="btn-icon btn-ghost p-1.5" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-4" /></button>
             </header>
             <p v-for="h in holidaysByDate.get(d) ?? []" :key="h.id" data-holiday class="mb-1 truncate rounded-md bg-sun/15 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:text-sun">{{ h.title[locale] }}</p>
             <div class="space-y-1.5">
-              <button v-for="c in byDate.get(d) ?? []" :key="c.id" :data-chip="c.id" type="button" draggable="true" class="block w-full cursor-grab rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
+              <button v-for="c in byDate.get(d) ?? []" :key="c.id" :data-chip="c.id" type="button" :draggable="canMove(c)" class="block w-full cursor-grab rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
                 :style="{ borderLeftColor: brandColor(c) }" @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)" @keydown="onChipKey($event, c)">
-                <span class="flex items-center gap-1.5 text-[10px] text-muted"><UiPlatformBadge :platform="c.platform" size="xs" />{{ c.scheduledTime ?? '' }}</span>
+                <span class="flex items-center gap-1.5 text-[10px] text-muted"><UiPlatformBadge :platform="c.platform" size="xs" />{{ c.scheduledTime ?? '' }}<UiImageCount class="ml-auto" :count="c.imageCount" compact /></span>
                 <span class="mt-1 line-clamp-3 font-semibold">{{ c.title }}</span>
                 <UiStatusBadge :status="c.status" small class="mt-1.5" />
               </button>
@@ -409,17 +478,19 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
             <header class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface-2 px-4 py-2.5">
               <span class="font-display text-base font-bold sm:text-lg" :class="d === today && 'text-brand-500'">{{ formatDate(d, locale, { weekday: 'long', day: 'numeric', month: 'long' }) }}</span>
               <span v-for="h in holidaysByDate.get(d) ?? []" :key="h.id" class="chip bg-sun/15 text-amber-700 dark:text-sun">{{ h.title[locale] }}</span>
-              <button type="button" class="btn-icon btn-ghost ml-auto p-1.5" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-4" /></button>
+              <button v-if="canCreateAny" type="button" class="btn-icon btn-ghost ml-auto p-1.5" :aria-label="t('calendar.addOn', { date: formatDate(d, locale) })" @click="openCreate(d)"><Plus class="size-4" /></button>
             </header>
             <button v-for="c in byDate.get(d) ?? []" :key="c.id" type="button" class="flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left last:border-0 hover:bg-surface-2 active:bg-surface-2 sm:py-3" @click="openQuick(c)">
               <span class="w-12 shrink-0 text-xs font-semibold text-muted">{{ c.scheduledTime ?? '—' }}</span>
               <span class="h-8 w-1 shrink-0 rounded-full" :style="{ background: brandColor(c) }" />
               <UiPlatformBadge :platform="c.platform" />
               <span class="min-w-0 flex-1 truncate font-medium">{{ c.title }}</span>
+              <UiImageCount :count="c.imageCount" />
               <UiStatusBadge :status="c.status" small />
             </button>
           </section>
         </div>
+        </template>
       </div>
 
       <!-- Unscheduled tray -->
@@ -427,13 +498,14 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         @dragover.prevent="overDate = 'tray'" @dragleave="overDate === 'tray' && (overDate = null)" @drop.prevent="onDrop($event, null)">
         <h2 class="flex items-center gap-2 px-1 font-display text-lg font-bold"><Inbox class="size-5 text-brand-500" />{{ t('calendar.tray') }}<span class="chip ml-auto bg-surface-2 text-muted">{{ unscheduled.length }}</span></h2>
         <p class="px-1 text-xs text-muted">{{ t('calendar.trayHint') }}</p>
-        <div class="mt-3 max-h-[60vh] space-y-1.5 overflow-y-auto scrollbar-thin">
-          <button v-for="c in unscheduled" :key="c.id" :data-chip="c.id" data-tray type="button" draggable="true" class="flex w-full cursor-grab items-center gap-2 rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
+        <div class="relative mt-3 max-h-[60vh] space-y-1.5 overflow-y-auto scrollbar-thin">
+          <template v-if="trayLoading"><div v-for="i in 4" :key="i" class="skeleton h-9 rounded-xl" aria-hidden="true" /></template>
+          <button v-for="c in unscheduled" v-else :key="c.id" :data-chip="c.id" data-tray type="button" :draggable="canMove(c)" class="flex w-full cursor-grab items-center gap-2 rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
             :style="{ borderLeftColor: brandColor(c) }" @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)">
             <UiPlatformBadge :platform="c.platform" size="xs" />
             <span class="min-w-0 flex-1 truncate font-medium">{{ c.title }}</span>
           </button>
-          <p v-if="!unscheduled.length" class="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted">{{ t('calendar.trayEmpty') }}</p>
+          <p v-if="!trayLoading && !unscheduled.length" class="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted">{{ t('calendar.trayEmpty') }}</p>
         </div>
         <p class="mt-3 px-1 text-[11px] text-muted">{{ t('calendar.keyboardHint') }}</p>
       </aside>
@@ -443,6 +515,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
       <template v-if="selected">
         <div class="flex flex-wrap items-center gap-2"><UiPlatformBadge :platform="selected.platform" with-label /><UiStatusBadge :status="selected.status" /><span class="chip bg-pink/10 text-pink">{{ selected.pillar }}</span></div>
         <p class="rounded-2xl bg-surface-2 p-3 text-sm">{{ selected.hook || selected.caption.slice(0, 160) }}</p>
+        <fieldset :disabled="!canMove(selected)" class="contents">
         <div class="grid grid-cols-2 gap-3">
           <div><label class="label" for="q-date">{{ t('content.fields.scheduledDate') }}</label><input id="q-date" v-model="quick.date" type="date" class="input"></div>
           <div><label class="label" for="q-time">{{ t('content.fields.scheduledTime') }}</label><input id="q-time" v-model="quick.time" type="time" class="input"></div>
@@ -452,16 +525,18 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
           <select id="q-status" v-model="quick.status" class="input"><option v-for="s in CONTENT_STATUSES" :key="s" :value="s">{{ t(`status.${s}`) }}</option></select>
           <p class="hint">{{ t('content.statusHint') }}</p>
         </div>
+        </fieldset>
+        <p v-if="!canMove(selected)" class="rounded-2xl bg-surface-2 p-3 text-xs text-muted">{{ t('content.viewOnly') }}</p>
         <NuxtLink :to="`/app/content/${selected.id}`" class="btn-ghost w-full"><ExternalLink class="size-4" />{{ t('calendar.openEditor') }}</NuxtLink>
       </template>
       <template #footer="{ close }">
         <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
-        <button type="button" class="btn-primary" :disabled="quickSaving" @click="saveQuick">{{ quickSaving ? t('common.saving') : t('common.save') }}</button>
+        <button v-if="selected && canMove(selected)" type="button" class="btn-primary" :disabled="quickSaving" @click="saveQuick">{{ quickSaving ? t('common.saving') : t('common.save') }}</button>
       </template>
     </SidePanel>
 
     <SidePanel :open="createOpen" size="lg" :title="t('content.newManual')" :subtitle="t('content.newManualHint')" @close="createOpen = false">
-      <ContentForm v-model="createForm" :brands="brands.active.value" :errors="createErrors" compact />
+      <ContentForm v-model="createForm" :brands="creatableBrands" :errors="createErrors" compact />
       <template #footer="{ close }">
         <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
         <button type="button" class="btn-primary" :disabled="creating" @click="create">{{ creating ? t('common.saving') : t('content.createFree') }}</button>

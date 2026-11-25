@@ -1,6 +1,9 @@
 'use strict';
 
-const { ownerScopedController } = require('../../../utils/owner-scoped');
+const { brandScopedController } = require('../../../utils/brand-access');
 
-// Every action is scoped to the signed-in user.
-module.exports = ownerScopedController('api::content-revision.content-revision', { ownedRelations: { content: 'api::content.content' } });
+// Read-only for members (revisions are written by the server on edit/regenerate).
+module.exports = brandScopedController('api::content-revision.content-revision', {
+  brandPath: 'content.brand',
+  perms: { read: 'content.read', create: 'content.update', update: 'content.update', delete: 'content.delete' },
+});

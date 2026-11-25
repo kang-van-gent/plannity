@@ -1,0 +1,22 @@
+{
+  "kind": "collectionType",
+  "collectionName": "activity_logs",
+  "info": {
+    "singularName": "activity-log",
+    "pluralName": "activity-logs",
+    "displayName": "Activity Log",
+    "description": "Append-only record of who changed what in a brand, and when. Written by the server only; never edited or deleted through the API."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "brand": { "type": "relation", "relation": "manyToOne", "target": "api::brand.brand" },
+    "actor": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "actorName": { "type": "string", "required": true, "description": "Snapshot, so history stays readable after renames or removal." },
+    "action": { "type": "string", "required": true, "maxLength": 60 },
+    "entityType": { "type": "enumeration", "enum": ["brand", "content", "member"], "required": true },
+    "entityId": { "type": "string", "required": true },
+    "entityTitle": { "type": "string", "maxLength": 200, "description": "Snapshot of the content title / brand name / email at the time." },
+    "changes": { "type": "json", "description": "[{ field, from, to }] — long text truncated." }
+  }
+}

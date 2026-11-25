@@ -1,0 +1,27 @@
+{
+  "kind": "collectionType",
+  "collectionName": "brand_memberships",
+  "info": {
+    "singularName": "brand-membership",
+    "pluralName": "brand-memberships",
+    "displayName": "Brand Membership",
+    "description": "A user's role in one brand (Team Workspace). Permissions are derived from this, never from a global user role."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "brand": { "type": "relation", "relation": "manyToOne", "target": "api::brand.brand", "inversedBy": "memberships" },
+    "user": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "role": { "type": "enumeration", "enum": ["owner", "admin", "editor", "viewer"], "required": true },
+    "status": { "type": "enumeration", "enum": ["active", "removed"], "default": "active", "required": true },
+    "joinedAt": { "type": "datetime" },
+    "roleUpdatedAt": { "type": "datetime" },
+    "memberKey": {
+      "type": "string",
+      "unique": true,
+      "required": true,
+      "private": true,
+      "description": "brandDocumentId:userId — database-level guard against duplicate memberships."
+    }
+  }
+}

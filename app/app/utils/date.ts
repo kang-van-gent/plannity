@@ -60,10 +60,13 @@ export function startOfWeek(iso: string): string {
   return addDays(iso, -weekday(iso))
 }
 
-/** 6×7 grid of dates covering the month of `iso`. */
+/** Whole weeks covering the month of `iso` (4–6 rows × 7), so no trailing row of next month. */
 export function monthGrid(iso: string): string[] {
   const first = startOfWeek(startOfMonth(iso))
-  return Array.from({ length: 42 }, (_, i) => addDays(first, i))
+  const last = addDays(startOfWeek(endOfMonth(iso)), 6)
+  const days: string[] = []
+  for (let d = first; d <= last; d = addDays(d, 1)) days.push(d)
+  return days
 }
 
 export function weekDays(iso: string): string[] {

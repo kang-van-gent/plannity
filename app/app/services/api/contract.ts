@@ -2,6 +2,7 @@ import type {
   Brand, BrandInput, Content, ContentInput, ContentPatch, ContentQuery, ContentRevision, DashboardSummary,
   FeedbackInput, GenerationInput, GenerationJob, Holiday, ISODate, LedgerEntry, Paginated, PaymentOrder,
   PromotionInput, PromotionInquiry, RegisterInput, Session, SocialProvider, User, Wallet,
+  BrandRole, ContentImage, InvitationPreview, InviteResult, MyInvitation, TeamSummary, BrandMember, ActivityEntityType, ActivityEntry,
 } from '~/types'
 
 /**
@@ -27,6 +28,42 @@ export interface DataSource {
   }
 
   dashboard(brandId: string | null): Promise<DashboardSummary>
+
+  /** Team Workspace: brand-scoped members and invitations. Backend enforces every rule. */
+  team: {
+    get(brandId: string): Promise<TeamSummary>
+    invite(brandId: string, input: { email: string; role: BrandRole }): Promise<InviteResult>
+    resend(brandId: string, invitationId: string): Promise<InviteResult>
+    cancel(brandId: string, invitationId: string): Promise<void>
+    updateRole(brandId: string, memberId: string, role: BrandRole): Promise<BrandMember>
+    remove(brandId: string, memberId: string): Promise<void>
+    leave(brandId: string): Promise<void>
+  }
+
+  invitations: {
+    /** Public: what an invitation link is for (works signed out). */
+    preview(token: string): Promise<InvitationPreview>
+    accept(token: string): Promise<{ brandId: string }>
+    decline(token: string): Promise<void>
+    /** Pending invitations addressed to the signed-in user's email. */
+    mine(): Promise<MyInvitation[]>
+    acceptMine(id: string): Promise<{ brandId: string }>
+    declineMine(id: string): Promise<void>
+  }
+
+  /** Who did what, when, in a brand (any member may read; only the server writes). */
+  activity: {
+    list(brandId: string, q?: { entityType?: ActivityEntityType; entityId?: string; page?: number; pageSize?: number }): Promise<Paginated<ActivityEntry>>
+  }
+
+  /** Post images. Mutations need content-edit permission; returns the content's full, ordered list. */
+  contentImages: {
+    upload(contentId: string, files: File[], onProgress?: (pct: number) => void): Promise<ContentImage[]>
+    replace(contentId: string, imageId: string, file: File): Promise<ContentImage[]>
+    remove(contentId: string, imageId: string): Promise<ContentImage[]>
+    reorder(contentId: string, imageIds: string[]): Promise<ContentImage[]>
+    download(contentId: string, imageId: string): Promise<Blob>
+  }
 
   brands: {
     list(opts?: { includeArchived?: boolean }): Promise<Brand[]>
@@ -88,6 +125,10 @@ export interface DataSource {
 export type ApiErrorCode =
   | 'INVALID_INPUT' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT'
   | 'INSUFFICIENT_CREDITS' | 'VERSION_CONFLICT' | 'RATE_LIMITED' | 'PROVIDER_UNAVAILABLE' | 'NETWORK' | 'UNKNOWN'
+  // Team Workspace
+  | 'SEAT_LIMIT' | 'ALREADY_MEMBER' | 'DUPLICATE_INVITE' | 'INVITE_EXPIRED' | 'INVITE_INVALID' | 'EMAIL_MISMATCH' | 'LAST_OWNER'
+  // Post images
+  | 'FILE_TYPE' | 'FILE_TOO_LARGE' | 'TOO_MANY_IMAGES' | 'STORAGE'
 
 /** Mirrors the error envelope in spec §17: {error:{code,message,fieldErrors,requestId}}. */
 export class ApiError extends Error {

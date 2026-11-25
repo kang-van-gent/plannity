@@ -57,6 +57,107 @@ export interface Brand {
   createdAt: ISODateTime
   updatedAt: ISODateTime
   contentCount?: number
+  /** The current user's role in this brand (Team Workspace). */
+  myRole: BrandRole
+  /** Seat limit: active members + pending invitations. */
+  maxSeats: number
+}
+
+// ---- Team Workspace --------------------------------------------------------
+export type BrandRole = 'owner' | 'admin' | 'editor' | 'viewer'
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'cancelled' | 'expired'
+
+export interface BrandMember {
+  id: string
+  userId: string
+  name: string
+  email: string
+  role: BrandRole
+  joinedAt: ISODateTime
+  isYou: boolean
+}
+
+export interface BrandInvitation {
+  id: string
+  email: string
+  role: BrandRole
+  status: InvitationStatus
+  invitedByName: string
+  createdAt: ISODateTime
+  expiresAt: ISODateTime
+}
+
+export interface TeamSummary {
+  brandId: string
+  maxSeats: number
+  seatsUsed: number
+  members: BrandMember[]
+  /** Pending invitations only. */
+  invitations: BrandInvitation[]
+}
+
+export interface InviteResult {
+  invitation: BrandInvitation
+  /** Shown to the inviter so they can share it if email isn't configured. */
+  inviteUrl: string
+  emailSent: boolean
+}
+
+/** Public view of an invitation link (before/after sign-in). */
+export interface InvitationPreview {
+  status: InvitationStatus
+  brandName: string
+  brandColor: string
+  inviterName: string
+  email: string
+  role: BrandRole
+  expiresAt: ISODateTime
+}
+
+/** A pending invitation addressed to the signed-in user's email. */
+export interface MyInvitation {
+  id: string
+  brandId: string
+  brandName: string
+  brandColor: string
+  inviterName: string
+  role: BrandRole
+  expiresAt: ISODateTime
+}
+
+// ---- Activity log ------------------------------------------------------------
+export type ActivityEntityType = 'brand' | 'content' | 'member'
+export interface ActivityChange { field: string; from: unknown; to: unknown }
+/** Append-only "who did what, when" entry, written by the server. */
+export interface ActivityEntry {
+  id: string
+  brandId: string
+  actorId: string | null
+  /** Name at the time of the action (stays readable after renames/removal). */
+  actorName: string
+  /** e.g. content.updated, content.status_changed, brand.archived, member.role_changed */
+  action: string
+  entityType: ActivityEntityType
+  entityId: string
+  /** Content title / brand name / member at the time. */
+  entityTitle: string | null
+  changes: ActivityChange[]
+  createdAt: ISODateTime
+}
+
+// ---- Post images -----------------------------------------------------------
+export interface ContentImage {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+  width: number | null
+  height: number | null
+  /** Full-size file (preview/download). */
+  url: string
+  /** Small version for grids; falls back to url. */
+  thumbnailUrl: string
+  createdAt: ISODateTime
 }
 
 export type BrandInput = Pick<Brand, 'name' | 'color'> & { profile: BrandProfile }
@@ -93,6 +194,10 @@ export interface Content extends ContentDraft {
   version: number
   createdAt: ISODateTime
   updatedAt: ISODateTime
+  /** Number of attached post images (lists/calendar: no image files are loaded). */
+  imageCount?: number
+  /** Attached images in order — only on the single-content endpoint. */
+  images?: ContentImage[]
 }
 
 export type ContentInput = Partial<Omit<Content, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'jobItemId' | 'source'>> & {

@@ -16,11 +16,20 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   const idem = getHeader(event, 'idempotency-key')
   if (idem) headers['idempotency-key'] = idem
 
-  let body: string | undefined
+  let body: string | Uint8Array | undefined
   if (method !== 'GET' && method !== 'HEAD') {
-    body = (await readRawBody(event)) ?? undefined
-    if (body) headers['content-type'] = 'application/json'
+    const ct = getHeader(event, 'content-type') ?? ''
+    if (ct.startsWith('multipart/form-data')) {
+      // Post image uploads: pass the multipart body through untouched (boundary included).
+      body = (await readRawBody(event, false)) ?? undefined
+      headers['content-type'] = ct
+    } else {
+      body = (await readRawBody(event)) ?? undefined
+      if (body) headers['content-type'] = 'application/json'
+    }
   }
+  // Image downloads are binary; everything else is JSON (CSV export is text).
+  const binary = /^contents\/[^/]+\/images\/[^/]+\/download$/.test(path)
 
   const search = getRequestURL(event).search
   try {
@@ -29,12 +38,14 @@ export default defineEventHandler(async (event): Promise<unknown> => {
       headers,
       body,
       ignoreResponseError: true,
-      responseType: path.startsWith('contents/export') ? 'text' : 'json',
+      responseType: binary ? 'arrayBuffer' : path.startsWith('contents/export') ? 'text' : 'json',
     })
     setResponseStatus(event, res.status)
-    const ct = res.headers.get('content-type')
-    if (ct) setHeader(event, 'content-type', ct)
-    return res._data
+    for (const h of ['content-type', 'content-disposition', 'cache-control']) {
+      const v = res.headers.get(h)
+      if (v) setHeader(event, h, v)
+    }
+    return binary && res._data instanceof ArrayBuffer ? new Uint8Array(res._data) : res._data
   } catch {
     throw createError({ statusCode: 503, data: { error: { code: 'PROVIDER_UNAVAILABLE', message: 'API is unavailable' } } })
   }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Archive, ArchiveRestore, Crosshair, Eye, FileText, Pencil, Plus, Store, WandSparkles } from '@lucide/vue'
+import { Archive, ArchiveRestore, Crosshair, Eye, FileText, Pencil, Plus, Store, Users, WandSparkles } from '@lucide/vue'
 import type { Brand } from '~/types'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
@@ -9,6 +9,7 @@ const api = useApi()
 const notify = useNotify()
 const brands = useBrands()
 const showArchived = ref(false)
+const features = useFeatures()
 const q = useQuery(async () => { await brands.load(true); return brands.brands.value })
 const list = computed(() => (q.data.value ?? []).filter((b) => showArchived.value || !b.archivedAt))
 const busy = ref<string | null>(null)
@@ -44,6 +45,8 @@ function focus(b: Brand) {
       <NuxtLink to="/app/brands/new" class="btn-primary"><Plus class="size-4" />{{ t('brands.create') }}</NuxtLink>
     </UiPageHeader>
 
+    <TeamInvitationsBanner @changed="q.refresh({ silent: true })" />
+
     <UiErrorState v-if="q.error.value" :error="q.error.value" @retry="q.refresh()" />
     <UiSkeletonList v-else-if="!q.loaded.value" grid :rows="3" />
     <UiEmptyState v-else-if="!list.length" :icon="Store" :title="t('brands.emptyTitle')" :message="t('brands.emptyBody')">
@@ -73,6 +76,7 @@ function focus(b: Brand) {
             </span>
             <span class="mb-1 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-bold tabular-nums text-muted">
               <FileText class="size-3.5" />{{ t('brands.contentCount', { n: b.contentCount ?? 0 }) }}
+              <span class="mx-0.5 opacity-40">·</span>{{ t(`roles.${b.myRole}`) }}
             </span>
           </div>
 
@@ -88,13 +92,17 @@ function focus(b: Brand) {
 
           <!-- Actions sit above the full-card link (relative z-10) -->
           <div class="relative z-10 mt-auto flex items-center gap-2 pt-5">
-            <NuxtLink v-if="!b.archivedAt" :to="`/app/generate?brand=${b.id}`" class="btn-primary btn-sm flex-1"><WandSparkles class="size-4" />{{ t('nav.generate') }}</NuxtLink>
-            <NuxtLink :to="`/app/brands/${b.id}`" class="btn-secondary btn-sm flex-1"><Pencil class="size-3.5" />{{ t('common.edit') }}</NuxtLink>
+            <NuxtLink v-if="!b.archivedAt && features.aiGenerate" :to="`/app/generate?brand=${b.id}`" class="btn-primary btn-sm flex-1"><WandSparkles class="size-4" />{{ t('nav.generate') }}</NuxtLink>
+            <NuxtLink :to="`/app/brands/${b.id}`" class="btn-secondary btn-sm flex-1">
+              <template v-if="roleCan(b.myRole, 'brand.update')"><Pencil class="size-3.5" />{{ t('common.edit') }}</template>
+              <template v-else><Eye class="size-3.5" />{{ t('common.open') }}</template>
+            </NuxtLink>
+            <NuxtLink :to="`/app/brands/${b.id}/team`" class="btn-icon btn-secondary p-2" :aria-label="t('team.tab')" :title="t('team.tab')"><Users class="size-4" /></NuxtLink>
             <button v-if="!b.archivedAt" type="button" class="btn-icon btn-secondary p-2" :class="brands.scope.value === b.id && 'border-brand-400 text-brand-600 dark:text-brand-300'"
               :aria-label="t('brands.focus')" :title="t('brands.focus')" :aria-pressed="brands.scope.value === b.id" @click="focus(b)">
               <Crosshair class="size-4" />
             </button>
-            <button type="button" class="btn-icon btn-ghost p-2" :disabled="busy === b.id"
+            <button v-if="roleCan(b.myRole, 'brand.delete')" type="button" class="btn-icon btn-ghost p-2" :disabled="busy === b.id"
               :aria-label="b.archivedAt ? t('brands.restore') : t('brands.archive')" :title="b.archivedAt ? t('brands.restore') : t('brands.archive')" @click="toggleArchive(b)">
               <ArchiveRestore v-if="b.archivedAt" class="size-4" /><Archive v-else class="size-4" />
             </button>

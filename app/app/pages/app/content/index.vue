@@ -5,6 +5,7 @@ import { CONTENT_STATUSES, PLATFORMS } from '~/types'
 import { isApiError } from '~/services/api/contract'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
+const features = useFeatures()
 const { t } = useLocale()
 useSeoMeta({ title: () => t('nav.library') })
 const api = useApi()
@@ -48,8 +49,12 @@ const createOpen = ref(false)
 const createForm = ref<ContentFormModel>(emptyContentForm(undefined))
 const createErrors = ref<Record<string, string>>({})
 const creating = ref(false)
+// Team Workspace: create only in brands where the user's role allows it.
+const perms = usePerms()
+const creatableBrands = computed(() => perms.brandsWhere('content.create'))
 function openCreate() {
-  createForm.value = emptyContentForm(brands.currentBrand.value ?? brands.active.value[0])
+  const scoped = brands.currentBrand.value && creatableBrands.value.includes(brands.currentBrand.value) ? brands.currentBrand.value : creatableBrands.value[0]
+  createForm.value = emptyContentForm(scoped)
   createErrors.value = {}
   createOpen.value = true
 }
@@ -74,7 +79,7 @@ async function create() {
   <div>
     <UiPageHeader :title="t('nav.library')" :subtitle="t('content.subtitle')">
       <button type="button" class="btn-secondary" :disabled="exporting" @click="exportCsv"><Download class="size-4" />{{ exporting ? t('common.loading') : t('content.exportCsv') }}</button>
-      <button type="button" class="btn-primary" :disabled="!brands.active.value.length" @click="openCreate"><Plus class="size-4" />{{ t('content.newManual') }}</button>
+      <button type="button" class="btn-primary" :disabled="!creatableBrands.length" @click="openCreate"><Plus class="size-4" />{{ t('content.newManual') }}</button>
     </UiPageHeader>
 
     <div v-anim class="mb-5 sm:rounded-3xl sm:border sm:border-line sm:bg-surface sm:p-4 sm:shadow-soft">
@@ -103,13 +108,15 @@ async function create() {
     </div>
 
     <UiErrorState v-if="q.error.value" :error="q.error.value" @retry="q.refresh()" />
-    <UiSkeletonList v-else-if="!q.data.value" grid :rows="6" />
+    <!-- Skeleton while filters/page reload: cards mount once with fresh data (no stale cards dimming then swapping). -->
+    <UiSkeletonList v-else-if="!q.data.value || !q.ready.value" grid :rows="6" />
     <UiEmptyState v-else-if="!q.data.value.data.length" :icon="Library" :title="activeFilters ? t('content.noMatch') : t('content.emptyTitle')" :message="activeFilters ? t('content.noMatchBody') : t('content.emptyBody')">
       <button v-if="activeFilters" type="button" class="btn-secondary" @click="clearFilters">{{ t('content.clearFilters', { n: activeFilters }) }}</button>
-      <NuxtLink v-else to="/app/generate" class="btn-primary">{{ t('nav.generate') }}</NuxtLink>
+      <NuxtLink v-else-if="features.aiGenerate" to="/app/generate" class="btn-primary">{{ t('nav.generate') }}</NuxtLink>
+      <button v-else type="button" class="btn-primary" :disabled="!creatableBrands.length" @click="openCreate"><Plus class="size-4" />{{ t('content.newManual') }}</button>
     </UiEmptyState>
     <template v-else>
-      <div :class="{ 'opacity-60 transition-opacity': q.pending.value }">
+      <div>
         <div v-if="view === 'grid'" class="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           <ContentCard v-for="(c, i) in q.data.value.data" :key="c.id" v-anim="i" :content="c" />
         </div>
@@ -128,7 +135,7 @@ async function create() {
     </template>
 
     <SidePanel :open="createOpen" size="lg" :title="t('content.newManual')" :subtitle="t('content.newManualHint')" @close="createOpen = false">
-      <ContentForm v-model="createForm" :brands="brands.active.value" :errors="createErrors" compact />
+      <ContentForm v-model="createForm" :brands="creatableBrands" :errors="createErrors" compact />
       <template #footer="{ close }">
         <button type="button" class="btn-secondary" @click="close()">{{ t('common.cancel') }}</button>
         <button type="button" class="btn-primary" :disabled="creating" @click="create">{{ creating ? t('common.saving') : t('content.createFree') }}</button>

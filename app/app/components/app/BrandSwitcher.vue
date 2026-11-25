@@ -127,7 +127,7 @@ function onDragUp() {
               <span class="mx-auto block h-1.5 w-10 rounded-full bg-line" aria-hidden="true" />
               <p class="mt-3 font-display text-lg font-bold">{{ t('brands.scope') }}</p>
             </div>
-            <div role="listbox" class="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-2">
+            <div role="listbox" class="relative flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-2">
               <button data-sheet-item type="button" role="option" :aria-selected="scope === 'all'"
                 class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left font-semibold transition active:scale-[0.98]"
                 :class="scope === 'all' ? 'bg-brand-500/10 text-brand-600 dark:text-brand-300' : 'active:bg-surface-2'" @click="choose('all')">

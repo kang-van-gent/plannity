@@ -122,7 +122,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <button type="button" class="btn-primary mt-3 w-full" :disabled="creating !== null" @click="buy(custom)">{{ t('credits.buy') }}</button>
         </div>
       </div>
-      <p class="mt-3 flex items-center gap-2 text-xs text-muted"><FlaskConical class="size-3.5" />{{ t('credits.sandboxNote') }}</p>
+      <p v-anim class="mt-3 flex items-center gap-2 text-xs text-muted"><FlaskConical class="size-3.5" />{{ t('credits.sandboxNote') }}</p>
     </section>
 
     <div class="mt-8 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_1fr]">

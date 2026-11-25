@@ -5,7 +5,7 @@
     "singularName": "content",
     "pluralName": "contents",
     "displayName": "Content",
-    "description": "One planned content item; fields follow the AI output contract (spec §9–10)."
+    "description": "One planned content item; fields follow the AI output contract (spec \u00a79\u201310)."
   },
   "options": {
     "draftAndPublish": false
@@ -140,6 +140,21 @@
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user",
       "private": false
+    },
+    "images": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ],
+      "description": "Post images in display order. Changed only through /contents/:id/images endpoints."
+    },
+    "lastEditedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "description": "Attribution: the member who last edited (owner = creator)."
     }
   }
 }

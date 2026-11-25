@@ -3,13 +3,35 @@
 // Asia/Bangkok so the calendar always looks alive.
 
 import type {
-  Brand, Content, ContentFormat, GenerationItem, GenerationJob, Holiday, LedgerEntry, LedgerType,
+  ActivityEntry, Brand, BrandRole, Content, ContentFormat, GenerationItem, GenerationJob, Holiday, InvitationStatus, LedgerEntry, LedgerType,
   PaymentOrder, Platform, PromotionInquiry, User,
 } from '~/types'
 import { addDays, todayISO } from '~/utils/date'
 import { mockGenerate, rng } from './llm'
 
 export type Owned<T> = T & { ownerId: string }
+
+/** Stored brand: role/seat fields are computed per viewer, not stored. ownerId = creator. */
+export type MockBrand = Owned<Omit<Brand, 'myRole' | 'maxSeats'>> & { maxSeats?: number }
+
+export interface MockMembership {
+  id: string; brandId: string; userId: string; role: BrandRole; status: 'active' | 'removed'
+  joinedAt: string; createdAt: string; updatedAt: string; roleUpdatedAt: string | null
+}
+
+export interface MockInvitation {
+  id: string; brandId: string; email: string; role: BrandRole
+  /** SHA-256 of the token; the raw token is only ever shown once to the inviter. */
+  tokenHash: string
+  status: InvitationStatus; invitedByUserId: string; expiresAt: string
+  acceptedByUserId: string | null; acceptedAt: string | null; createdAt: string; updatedAt: string
+}
+
+/** Image metadata; the file itself lives in IndexedDB under the same id. */
+export interface MockContentImage {
+  id: string; contentId: string; filename: string; mimeType: string; size: number
+  width: number | null; height: number | null; sortOrder: number; uploadedBy: string; createdAt: string; updatedAt: string
+}
 
 export interface MockJob extends Owned<GenerationJob> {
   idempotencyKey: string
@@ -20,7 +42,11 @@ export interface MockJob extends Owned<GenerationJob> {
 export interface MockDB {
   version: 3
   users: (User & { password: string })[]
-  brands: Owned<Brand>[]
+  brands: MockBrand[]
+  memberships: MockMembership[]
+  invitations: MockInvitation[]
+  contentImages: MockContentImage[]
+  activity: ActivityEntry[]
   contents: Owned<Content>[]
   revisions: Owned<{ id: string; contentId: string; version: number; reason: 'edit' | 'regenerate' | 'create'; snapshot: Content; createdAt: string }>[]
   jobs: MockJob[]
@@ -58,7 +84,7 @@ const HOLIDAYS: Omit<Holiday, 'id'>[] = [
   { date: '2027-02-14', title: { th: 'วันวาเลนไทน์', en: "Valentine's Day" }, kind: 'observance', country: 'TH', source: 'Marketing calendar', year: 2027, verified: true },
 ]
 
-const BRANDS: Omit<Brand, 'createdAt' | 'updatedAt'>[] = [
+const BRANDS: Omit<Brand, 'createdAt' | 'updatedAt' | 'myRole' | 'maxSeats'>[] = [
   {
     id: 'b_doidee', name: 'บ้านกาแฟดอยดี', color: '#FFB23F', archivedAt: null,
     profile: {
@@ -105,11 +131,16 @@ const BRANDS: Omit<Brand, 'createdAt' | 'updatedAt'>[] = [
   },
 ]
 
+let memberSeq = 0
+export function membership(brandId: string, userId: string, role: BrandRole, when: string): MockMembership {
+  return { id: `m_${brandId}_${userId}_${++memberSeq}`, brandId, userId, role, status: 'active', joinedAt: when, createdAt: when, updatedAt: when, roleUpdatedAt: null }
+}
+
 export function buildSeed(): MockDB {
   const today = todayISO()
   const created = at(addDays(today, -32), 9)
   const db: MockDB = {
-    version: 3, users: [], brands: [], contents: [], revisions: [], jobs: [], wallets: {}, ledger: [], orders: [],
+    version: 3, users: [], brands: [], memberships: [], invitations: [], contentImages: [], activity: [], contents: [], revisions: [], jobs: [], wallets: {}, ledger: [], orders: [],
     paymentEvents: [], holidays: [], inquiries: [], feedback: [], idempotency: {}, loginAttempts: {}, seq: 1000,
   }
   const demo = 'u_demo'
@@ -124,6 +155,21 @@ export function buildSeed(): MockDB {
 
   for (const b of BRANDS) db.brands.push({ ...b, ownerId: demo, createdAt: created, updatedAt: created })
   db.brands.push({ ...BRANDS[0]!, id: 'b_other', name: 'Other Tenant Brand', ownerId: 'u_other', createdAt: created, updatedAt: created })
+
+  // ---- Team Workspace showcase ------------------------------------------
+  // Every brand's creator is its Owner. Nok (a designer) is an Editor on the
+  // demo user's coffee brand, and Nok has invited the demo user to her own
+  // studio brand (pending) so the accept flow can be tried right away.
+  db.users.push({ id: 'u_nok', email: 'nok@example.com', password: 'nok12345', name: 'Nok (Graphic)', verifiedAt: created, locale: 'th', timezone: 'Asia/Bangkok', createdAt: created })
+  db.wallets.u_nok = { available: 0, reserved: 0 }
+  db.brands.push({ ...BRANDS[2]!, id: 'b_nokstudio', name: 'Nok Design Studio', color: '#6C4CF5', ownerId: 'u_nok', createdAt: created, updatedAt: created })
+  for (const b of db.brands) db.memberships.push(membership(b.id, b.ownerId, 'owner', created))
+  db.memberships.push(membership('b_doidee', 'u_nok', 'editor', at(addDays(today, -20), 10)))
+  db.invitations.push({
+    id: 'inv_seed', brandId: 'b_nokstudio', email: DEMO_EMAIL, role: 'editor', tokenHash: 'seed-no-link',
+    status: 'pending', invitedByUserId: 'u_nok', expiresAt: at(addDays(today, 5), 10), acceptedByUserId: null, acceptedAt: null,
+    createdAt: at(addDays(today, -2), 10), updatedAt: at(addDays(today, -2), 10),
+  })
 
   // ---- ledger helper keeps availableAfter consistent -------------------
   const wallet = db.wallets[demo]!
