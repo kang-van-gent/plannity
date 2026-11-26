@@ -255,7 +255,7 @@ const th = {
 
   auth: {
     continueWith: 'ดำเนินการต่อด้วย {provider}', orEmail: 'หรือใช้อีเมล', redirecting: 'กำลังพาไป…',
-    socialTerms: 'การดำเนินการต่อด้วย Google, Facebook หรือ Apple ถือว่าคุณยอมรับ',
+    socialTerms: 'การดำเนินการต่อด้วย Google ถือว่าคุณยอมรับ',
     oauthFailed: 'เข้าสู่ระบบไม่สำเร็จ', oauthFailedBody: 'ไม่สามารถเข้าสู่ระบบด้วย {provider} ได้ ลองอีกครั้ง',
     oauthCancelled: 'ยกเลิกการเข้าสู่ระบบ', oauthCancelledBody: 'คุณปิดหน้าต่าง {provider} ก่อนทำรายการเสร็จ',
     oauthExists: 'อีเมลนี้มีบัญชีอยู่แล้ว', oauthExistsBody: 'กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่านแทน',

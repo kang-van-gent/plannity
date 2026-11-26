@@ -2,8 +2,10 @@
 import { LoaderCircle } from '@lucide/vue'
 import type { SocialProvider } from '~/types'
 
-// Google / Facebook / Apple sign-in. Same buttons for login and sign-up: a
-// social account that doesn't exist yet is created on first use.
+// Social sign-in. Same buttons for login and sign-up: a social account that
+// doesn't exist yet is created on first use. Only Google is offered for now;
+// Facebook and Apple come later — add them back to PROVIDERS (their styles and
+// icons are kept below) and to SOCIAL_PROVIDERS in server/utils/session.ts.
 const props = withDefaults(defineProps<{ next?: string }>(), { next: '/app' })
 const { t } = useLocale()
 const session = useSession()
@@ -12,8 +14,8 @@ const busy = ref<SocialProvider | null>(null)
 
 const PROVIDERS: { id: SocialProvider; label: string }[] = [
   { id: 'google', label: 'Google' },
-  { id: 'facebook', label: 'Facebook' },
-  { id: 'apple', label: 'Apple' },
+  // { id: 'facebook', label: 'Facebook' },
+  // { id: 'apple', label: 'Apple' },
 ]
 
 async function go(p: SocialProvider) {
@@ -32,7 +34,7 @@ async function go(p: SocialProvider) {
 </script>
 
 <template>
-  <div class="grid grid-cols-3 gap-2">
+  <div class="grid gap-2" :class="PROVIDERS.length > 1 ? 'grid-cols-3' : 'grid-cols-1'">
     <button v-for="p in PROVIDERS" :key="p.id" type="button" :disabled="!!busy"
       class="btn group relative h-12 border text-[15px] shadow-soft disabled:opacity-100"
       :class="{
@@ -58,7 +60,7 @@ async function go(p: SocialProvider) {
       <svg v-else viewBox="0 0 24 24" class="size-5 shrink-0 -translate-y-px" fill="currentColor" aria-hidden="true">
         <path d="M16.37 1.43c0 1.14-.42 2.2-1.24 3.08-.98 1.05-2.17 1.66-3.46 1.56-.02-.14-.03-.28-.03-.43 0-1.1.48-2.27 1.33-3.16.42-.45.96-.83 1.61-1.13.65-.3 1.26-.46 1.84-.49.02.19.04.38.04.57h-.09zm4.1 16.65c-.37.86-.81 1.65-1.32 2.37-.69.99-1.26 1.67-1.7 2.05-.68.62-1.4.94-2.18.96-.56 0-1.23-.16-2.02-.48-.79-.32-1.52-.48-2.19-.48-.7 0-1.45.16-2.25.48-.8.32-1.45.49-1.94.51-.75.03-1.5-.3-2.24-1-.48-.41-1.07-1.12-1.79-2.13-.77-1.07-1.4-2.32-1.9-3.74C.24 15.08 0 13.6 0 12.17c0-1.64.35-3.06 1.06-4.24a6.23 6.23 0 0 1 2.23-2.25 6 6 0 0 1 3.01-.85c.6 0 1.38.18 2.35.55.97.36 1.59.55 1.86.55.2 0 .89-.22 2.06-.65 1.1-.4 2.04-.56 2.8-.5 2.07.17 3.63.98 4.66 2.45-1.85 1.12-2.77 2.7-2.75 4.72.02 1.57.59 2.88 1.7 3.92.5.48 1.06.85 1.69 1.11-.14.39-.28.77-.44 1.14z" />
       </svg>
-      <span>{{ p.label }}</span>
+      <span>{{ PROVIDERS.length > 1 ? p.label : t('auth.continueWith', { provider: p.label }) }}</span>
     </button>
   </div>
 </template>

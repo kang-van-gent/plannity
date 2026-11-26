@@ -7,8 +7,11 @@
  *   app  /auth/connect/:provider            (Nuxt server route)
  *   →    STRAPI /api/connect/:provider       (grant → provider consent screen)
  *   →    STRAPI /api/connect/:provider/callback
- *   →    app  /auth/callback/:provider?access_token=…   (the "redirect URL" below)
- *   →    STRAPI /api/auth/:provider/callback  (server-to-server; returns { jwt, user })
+ *   →    app  /auth/callback/:provider   (the "redirect URL" below; Strapi keeps the
+ *                                           provider tokens in its koa.sess cookie)
+ *   →    STRAPI /api/auth/:provider/callback  (server-to-server with that cookie forwarded;
+ *                                           returns { jwt, user }). In production the
+ *                                           cookie is set on SESSION_COOKIE_DOMAIN so the app sees it.
  *   →    app sets the HttpOnly JWT cookie and redirects into /app.
  *
  * Google and Facebook are built into users-permissions; we only switch them on
@@ -134,7 +137,7 @@ function registerAppleProvider(strapi) {
       // /api/connect/apple/callback (see the users-permissions extension).
       custom_params: { response_mode: 'form_post' },
     },
-    // The app forwards every query param from the redirect, including id_token.
+    // `query` is the grant response Strapi kept in its session cookie (forwarded by the app).
     async authCallback({ query }) {
       const claims = await verifyAppleIdToken(query.id_token || (query.raw && query.raw.id_token));
       if (!claims.email) throw new Error('Apple did not share an email address');

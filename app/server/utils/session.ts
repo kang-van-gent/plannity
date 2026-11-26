@@ -95,9 +95,11 @@ export function rethrow(e: unknown): never {
 }
 
 /** Social sign-in providers the app offers (must match Strapi's provider names). */
-export const SOCIAL_PROVIDERS = ['google', 'facebook', 'apple'] as const
-export type SocialProvider = typeof SOCIAL_PROVIDERS[number]
-export const isSocialProvider = (p: unknown): p is SocialProvider => SOCIAL_PROVIDERS.includes(p as SocialProvider)
+// Facebook and Apple are switched off for now (later release); their Strapi
+// side stays in place, so re-adding them here turns the routes back on.
+export const SOCIAL_PROVIDERS = ['google'] as const
+export type SocialProvider = 'google' | 'facebook' | 'apple'
+export const isSocialProvider = (p: unknown): p is SocialProvider => (SOCIAL_PROVIDERS as readonly unknown[]).includes(p)
 
 /** Short-lived cookie remembering where to land after the provider round-trip. */
 export const OAUTH_NEXT_COOKIE = 'plannity_oauth_next'

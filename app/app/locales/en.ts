@@ -257,7 +257,7 @@ const en: Messages = {
 
   auth: {
     continueWith: 'Continue with {provider}', orEmail: 'or use your email', redirecting: 'Redirecting…',
-    socialTerms: 'By continuing with Google, Facebook or Apple you agree to our',
+    socialTerms: 'By continuing with Google you agree to our',
     oauthFailed: 'Sign-in didn’t work', oauthFailedBody: 'We couldn’t sign you in with {provider}. Please try again.',
     oauthCancelled: 'Sign-in cancelled', oauthCancelledBody: 'You closed the {provider} window before finishing.',
     oauthExists: 'This email already has an account', oauthExistsBody: 'Sign in with your email and password instead.',
