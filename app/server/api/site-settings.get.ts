@@ -5,7 +5,9 @@ import type { SiteSettings } from '#shared/types/site'
 // for a minute so every page view doesn't hit Strapi. Values are validated
 // before they reach the page, since they end up in <head>.
 
-const GA_ID = /^G-[A-Z0-9]{4,15}$/
+/** Google tag ID: GA4 measurement ID (G-…) or a combined Google tag (GT-…). */
+const GA_ID = /^(G|GT)-[A-Z0-9]{4,15}$/
+const GTM_ID = /^GTM-[A-Z0-9]{4,12}$/
 const TOKEN = /^[\w-]{10,100}$/
 
 /** Accepts the bare token or the whole `<meta name="google-site-verification" content="…">` tag. */
@@ -26,9 +28,11 @@ export default defineCachedEventHandler(async (event): Promise<SiteSettings> => 
     } catch { /* not created yet (404) or Strapi down: fall back to env */ }
   }
   const gaRaw = String(row?.googleAnalyticsId || config.googleAnalyticsId || '').trim().toUpperCase()
+  const gtmRaw = String(row?.googleTagManagerId || config.googleTagManagerId || '').trim().toUpperCase()
   const enabled = row ? row.analyticsEnabled !== false : true
   return {
     googleAnalyticsId: enabled && GA_ID.test(gaRaw) ? gaRaw : null,
+    googleTagManagerId: enabled && GTM_ID.test(gtmRaw) ? gtmRaw : null,
     requireCookieConsent: row ? row.requireCookieConsent !== false : true,
     googleSiteVerification: verificationToken(row?.googleSiteVerification || config.googleSiteVerification),
   }

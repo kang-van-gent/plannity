@@ -27,6 +27,7 @@ export default defineNuxtConfig({
     // SEO tools. Normally set in Strapi (Content Manager → Site settings); these
     // env values (NUXT_GOOGLE_ANALYTICS_ID / NUXT_GOOGLE_SITE_VERIFICATION) are only a fallback.
     googleAnalyticsId: '',
+    googleTagManagerId: '',
     googleSiteVerification: '',
     public: {
       /** 'mock' (default, in-browser demo data) or 'strapi' (BFF proxy to the Strapi API). */

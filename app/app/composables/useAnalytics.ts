@@ -9,8 +9,8 @@ export function useAnalytics() {
   const settings = useState<SiteSettings | null>('site-settings', () => null)
   const consent = useState<AnalyticsConsent>('analytics-consent', () => null)
   /** Analytics is set up in Strapi, needs consent, and the visitor hasn't chosen yet. */
-  const needsChoice = computed(() => !!settings.value?.googleAnalyticsId && settings.value.requireCookieConsent && consent.value === null)
-  const configured = computed(() => !!settings.value?.googleAnalyticsId)
+  const configured = computed(() => !!(settings.value?.googleAnalyticsId || settings.value?.googleTagManagerId))
+  const needsChoice = computed(() => configured.value && !!settings.value?.requireCookieConsent && consent.value === null)
 
   function restore() {
     try {

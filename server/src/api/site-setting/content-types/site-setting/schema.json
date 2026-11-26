@@ -5,7 +5,7 @@
     "singularName": "site-setting",
     "pluralName": "site-settings",
     "displayName": "Site settings",
-    "description": "SEO & analytics for the public website: Google Analytics and Google Search Console. Changes reach the site within a minute."
+    "description": "SEO & analytics for the public website: Google Analytics / Tag Manager and Google Search Console. Changes reach the site within a minute."
   },
   "options": {
     "draftAndPublish": false
@@ -14,8 +14,13 @@
   "attributes": {
     "googleAnalyticsId": {
       "type": "string",
-      "regex": "^G-[A-Z0-9]{4,15}$",
-      "description": "Google Analytics 4 Measurement ID, e.g. G-ABC123XYZ (Admin → Data streams → Web). Empty = no Analytics."
+      "regex": "^(G|GT)-[A-Z0-9]{4,15}$",
+      "description": "Google tag ID: the GA4 Measurement ID (G-ABC123XYZ, Admin → Data streams → Web) or a Google tag ID (GT-…). The site loads gtag.js itself — no snippet needed. Empty = off."
+    },
+    "googleTagManagerId": {
+      "type": "string",
+      "regex": "^GTM-[A-Z0-9]{4,12}$",
+      "description": "Google Tag Manager container ID, e.g. GTM-NZZ2KTHW. The site loads gtm.js itself (no snippet needed) and pushes a \"plannity_page_view\" event on every page — use it as the trigger for your GA4 tags in GTM. If GA4 runs inside GTM, leave googleAnalyticsId empty to avoid counting twice."
     },
     "analyticsEnabled": {
       "type": "boolean",
