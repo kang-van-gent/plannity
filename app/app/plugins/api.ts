@@ -17,6 +17,8 @@ export default defineNuxtPlugin(() => {
     ? import('~/services/api/strapi').then((m) => m.createStrapiSource({ mediaBaseUrl: String(config.public.mediaBaseUrl || '') }))
     : import('~/services/api/mock').then((m) => m.createMockSource(() => token.value, {
       maxBytes: Number(config.public.imageMaxMb) * 1024 * 1024, maxCount: Number(config.public.imageMaxCount),
+    }, {
+      promptpayId: String(config.public.promptpayId), name: String(config.public.promptpayName), ttlHours: 24, slipMaxBytes: 5 * 1024 * 1024,
     })))
 
   type Fn = (...args: unknown[]) => Promise<unknown>

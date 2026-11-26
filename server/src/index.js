@@ -2,6 +2,7 @@
 
 const holidays = require('./seed/holidays.json');
 const { configureBuiltInProviders, registerAppleProvider } = require('./auth/social-providers');
+const { grantPurchase } = require('./services/credits');
 
 /**
  * Actions the signed-in ("authenticated") role may call.
@@ -21,6 +22,8 @@ const AUTHENTICATED_ACTIONS = {
   'api::team.team': ['get', 'invite', 'resend', 'cancel', 'updateRole', 'removeMember', 'leave', 'mine', 'acceptMine', 'declineMine', 'accept', 'decline'],
   'api::content-image.content-image': ['upload', 'reorder', 'replace', 'remove', 'download'],
   'api::activity-log.activity-log': ['list'],
+  'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip'],
+  'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
 };
 
 async function grantAuthenticatedPermissions(strapi) {
@@ -74,5 +77,17 @@ module.exports = {
     await seedHolidays(strapi);
     await configureBuiltInProviders(strapi);
     await backfillOwnerMemberships(strapi);
+
+    // Credits are granted when an order becomes "paid" — by staff in the admin
+    // today, by the slip verifier later. Idempotent per order.
+    strapi.db.lifecycles.subscribe({
+      models: ['api::payment-order.payment-order'],
+      async afterUpdate(event) {
+        const r = event.result;
+        if (r && r.status === 'paid' && r.documentId) {
+          try { await grantPurchase(strapi, r.documentId); } catch (e) { strapi.log.error(`[credits] grant failed for ${r.documentId}: ${e.message}`); }
+        }
+      },
+    });
   },
 };

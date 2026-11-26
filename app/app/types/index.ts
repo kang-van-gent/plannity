@@ -300,7 +300,11 @@ export interface LedgerEntry {
   createdAt: ISODateTime
 }
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'refunded'
+/**
+ * pending = waiting for the transfer · awaiting_review = slip uploaded, being checked
+ * paid = verified, credits added · rejected = slip didn't match (upload a new one)
+ */
+export type PaymentStatus = 'pending' | 'awaiting_review' | 'paid' | 'rejected' | 'failed' | 'expired' | 'refunded'
 
 export interface PaymentOrder {
   id: string
@@ -308,8 +312,17 @@ export interface PaymentOrder {
   amountSatang: number
   currency: 'THB'
   status: PaymentStatus
-  provider: 'sandbox' | string
+  provider: 'promptpay' | 'sandbox' | string
   providerRef: string
+  /** Short code to put in the transfer note, e.g. PLN-7KQ3XZ. */
+  reference: string
+  /** Who to pay (from server config, never from the client). */
+  payee: { promptpayId: string; name: string } | null
+  slipUploadedAt: ISODateTime | null
+  /** Why a slip was rejected (shown to the user). */
+  reviewNote: string | null
+  /** Pending orders stop accepting payment after this. */
+  expiresAt: ISODateTime | null
   createdAt: ISODateTime
   paidAt: ISODateTime | null
 }

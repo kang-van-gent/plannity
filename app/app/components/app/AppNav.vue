@@ -8,15 +8,25 @@ const route = useRoute()
 const notify = useNotify()
 const features = useFeatures()
 const items = computed(() => ([
-  { to: '/app', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
-  { to: '/app/brands', label: t('nav.brands'), icon: Store },
-  { to: '/app/generate', label: t('nav.generate'), icon: WandSparkles, also: '/app/jobs' },
-  { to: '/app/content', label: t('nav.library'), icon: Library },
-  { to: '/app/calendar', label: t('nav.calendar'), icon: CalendarDays },
-  { to: '/app/promote', label: t('nav.promote'), icon: Megaphone },
-  { to: '/app/credits', label: t('nav.credits'), icon: Coins },
-  { to: '/app/settings', label: t('nav.settings'), icon: Settings },
-] as { to: string; label: string; icon: unknown; exact?: boolean; also?: string }[]).map((i) => ({ ...i, locked: isLockedPath(i.to, features) })))
+  { to: '/app', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true, section: 'workspace' },
+  { to: '/app/brands', label: t('nav.brands'), icon: Store, section: 'workspace' },
+  { to: '/app/generate', label: t('nav.generate'), icon: WandSparkles, also: '/app/jobs', section: 'content' },
+  { to: '/app/content', label: t('nav.library'), icon: Library, section: 'content' },
+  { to: '/app/calendar', label: t('nav.calendar'), icon: CalendarDays, section: 'content' },
+  { to: '/app/promote', label: t('nav.promote'), icon: Megaphone, section: 'content' },
+  { to: '/app/credits', label: t('nav.credits'), icon: Coins, section: 'account' },
+  { to: '/app/settings', label: t('nav.settings'), icon: Settings, section: 'account' },
+] as { to: string; label: string; icon: unknown; exact?: boolean; also?: string; section: string }[]).map((i) => ({ ...i, locked: isLockedPath(i.to, features) })))
+/** Items grouped under section labels, in menu order. */
+const sections = computed(() => {
+  const out: { key: string; items: typeof items.value }[] = []
+  for (const i of items.value) {
+    const last = out[out.length - 1]
+    if (last?.key === i.section) last.items.push(i)
+    else out.push({ key: i.section, items: [i] })
+  }
+  return out
+})
 function lockedTap() { notify.info(t('nav.lockedTitle'), t('nav.lockedBody')) }
 function isActive(i: { to: string; exact?: boolean; also?: string }) {
   if (i.exact) return route.path === i.to
@@ -26,7 +36,11 @@ function isActive(i: { to: string; exact?: boolean; also?: string }) {
 
 <template>
   <nav class="grid gap-1" :aria-label="t('nav.main')">
-    <template v-for="i in items" :key="i.to">
+    <template v-for="(sec, si) in sections" :key="sec.key">
+    <!-- Section label; collapsed sidebar shows a thin divider instead -->
+    <p v-if="!collapsed" :id="`nav-sec-${sec.key}`" class="px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted/70" :class="si === 0 ? 'pt-0' : 'pt-4'">{{ t(`nav.sections.${sec.key}`) }}</p>
+    <span v-else-if="si > 0" class="mx-auto my-2 block h-px w-8 bg-line" role="separator" :aria-label="t(`nav.sections.${sec.key}`)" />
+    <template v-for="i in sec.items" :key="i.to">
       <button v-if="i.locked" type="button" aria-disabled="true" :title="`${i.label} · ${t('nav.lockedTitle')}`"
         class="group relative flex w-full cursor-not-allowed items-center gap-3 whitespace-nowrap rounded-2xl py-2.5 text-sm font-semibold text-muted/60 transition hover:bg-surface-2/60"
         :class="collapsed ? 'justify-center px-0' : 'px-3.5'" :aria-label="collapsed ? `${i.label} (${t('nav.comingSoon')})` : undefined" @click="lockedTap">
@@ -50,6 +64,7 @@ function isActive(i: { to: string; exact?: boolean; also?: string }) {
           <Doodle v-if="isActive(i)" variant="spark" class="ml-auto size-3.5 text-sun" />
         </template>
       </NuxtLink>
+    </template>
     </template>
   </nav>
 </template>

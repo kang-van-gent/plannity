@@ -5,7 +5,7 @@
     "singularName": "payment-order",
     "pluralName": "payment-orders",
     "displayName": "Payment Order",
-    "description": "pending → paid/failed/expired/refunded. Money in satang."
+    "description": "PromptPay: pending \u2192 awaiting_review (slip uploaded) \u2192 paid / rejected; pending expires. Money in satang. Credits are granted once when status becomes paid."
   },
   "options": {
     "draftAndPublish": false
@@ -35,7 +35,9 @@
       "type": "enumeration",
       "enum": [
         "pending",
+        "awaiting_review",
         "paid",
+        "rejected",
         "failed",
         "expired",
         "refunded"
@@ -53,6 +55,42 @@
     },
     "paidAt": {
       "type": "datetime"
+    },
+    "reference": {
+      "type": "string",
+      "unique": true,
+      "maxLength": 20,
+      "description": "Short code shown to the payer, e.g. PLN-7KQ3XZ."
+    },
+    "expiresAt": {
+      "type": "datetime"
+    },
+    "slip": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images"
+      ],
+      "private": true
+    },
+    "slipUploadedAt": {
+      "type": "datetime"
+    },
+    "reviewNote": {
+      "type": "text",
+      "description": "Shown to the user when a slip is rejected."
+    },
+    "verifiedBy": {
+      "type": "enumeration",
+      "enum": [
+        "staff",
+        "slip2go"
+      ]
+    },
+    "verification": {
+      "type": "json",
+      "private": true,
+      "description": "Raw slip-verification result (Slip2Go) for audit."
     }
   }
 }

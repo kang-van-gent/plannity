@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDownLeft, ArrowUpRight, CircleDollarSign, Coins, CreditCard, FlaskConical, Gift, Lock, Receipt, RotateCcw, Wrench } from '@lucide/vue'
+import { ArrowDownLeft, ArrowUpRight, CircleDollarSign, Coins, CreditCard, Gift, Lock, QrCode, Receipt, RotateCcw, Wrench } from '@lucide/vue'
 import type { LedgerType, PaymentOrder, PaymentStatus } from '~/types'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
@@ -24,15 +24,18 @@ const TYPE_META: Record<LedgerType, { icon: typeof Coins; cls: string }> = {
   adjustment: { icon: Wrench, cls: 'bg-slate-500/10 text-muted' },
 }
 const ORDER_STYLE: Record<PaymentStatus, string> = {
-  pending: 'bg-sun/15 text-amber-700 dark:text-sun', paid: 'bg-success/12 text-success', failed: 'bg-danger/12 text-danger',
+  pending: 'bg-sun/15 text-amber-700 dark:text-sun', awaiting_review: 'bg-brand-500/12 text-brand-600 dark:text-brand-300',
+  paid: 'bg-success/12 text-success', rejected: 'bg-danger/12 text-danger', failed: 'bg-danger/12 text-danger',
   expired: 'bg-slate-500/10 text-muted', refunded: 'bg-sky/15 text-sky-700 dark:text-sky',
 }
 
-// --- sandbox checkout -------------------------------------------------------
+// --- PromptPay checkout --------------------------------------------------------
+// Pay by scanning the QR, then upload the slip. Credits are added only when the
+// server marks the order paid (staff review now, Slip2Go later); while a slip is
+// being checked the panel polls the order for the decision.
 const custom = ref(20)
 const creating = ref<number | null>(null)
 const order = ref<PaymentOrder | null>(null)
-const simulating = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 async function buy(credits: number) {
@@ -40,7 +43,7 @@ async function buy(credits: number) {
   creating.value = credits
   try {
     order.value = await api.credits.createOrder(credits)
-    pollOrder()
+    orders.refresh({ silent: true })
   } catch (e) {
     notify.fromError(e)
   } finally {
@@ -48,37 +51,30 @@ async function buy(credits: number) {
   }
 }
 
-// The UI learns about payment only from the server-side order status, never
-// from a client callback (spec §3).
-async function pollOrder() {
+function onOrderUpdate(o: PaymentOrder) {
+  const was = order.value?.status
+  order.value = o
+  if (was !== o.status) settle(o)
+  watchReview()
+}
+
+async function watchReview() {
   clearTimeout(pollTimer)
-  if (!order.value) return
-  try {
-    const o = await api.credits.getOrder(order.value.id)
-    const was = order.value.status
-    order.value = o
-    if (o.status !== 'pending') {
-      if (was === 'pending') settle(o)
-      return
-    }
-  } catch { /* transient; keep polling */ }
-  pollTimer = setTimeout(pollOrder, 1500)
+  if (order.value?.status !== 'awaiting_review') return
+  pollTimer = setTimeout(async () => {
+    if (!order.value) return
+    try { onOrderUpdate(await api.credits.getOrder(order.value.id)) } catch { watchReview() /* transient; keep watching */ }
+  }, 5000)
 }
 
 function settle(o: PaymentOrder) {
-  refreshWallet()
-  ledger.refresh({ silent: true })
   orders.refresh({ silent: true })
-  if (o.status === 'paid') notify.success(t('credits.paid', { n: o.credits }), t('credits.paidBody'))
-  else if (o.status === 'failed') notify.error(t('credits.payFailed'), t('credits.payFailedBody'))
+  if (o.status === 'paid') {
+    refreshWallet()
+    ledger.refresh({ silent: true })
+    notify.success(t('credits.paid', { n: o.credits }), t('credits.paidBody'))
+  } else if (o.status === 'rejected') notify.warning(t('pay.rejectedTitle'), o.reviewNote ?? undefined)
   else if (o.status === 'expired') notify.warning(t('credits.expired'))
-  setTimeout(() => { if (order.value?.id === o.id && o.status !== 'pending') order.value = null }, 1200)
-}
-
-async function simulate(outcome: 'paid' | 'failed') {
-  if (!order.value || !api.credits.simulateWebhook) return
-  simulating.value = true
-  try { await api.credits.simulateWebhook(order.value.id, outcome) } catch (e) { notify.fromError(e) } finally { simulating.value = false }
 }
 
 function closeCheckout() {
@@ -87,7 +83,15 @@ function closeCheckout() {
   order.value = null
   orders.refresh({ silent: true })
 }
-function resume(o: PaymentOrder) { order.value = o; pollOrder() }
+function restart() {
+  const credits = order.value?.credits
+  closeCheckout()
+  if (credits) buy(credits)
+}
+async function resume(o: PaymentOrder) {
+  order.value = o
+  try { onOrderUpdate(await api.credits.getOrder(o.id)) } catch { /* show what we have */ }
+}
 onBeforeUnmount(() => clearTimeout(pollTimer))
 </script>
 
@@ -122,7 +126,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <button type="button" class="btn-primary mt-3 w-full" :disabled="creating !== null" @click="buy(custom)">{{ t('credits.buy') }}</button>
         </div>
       </div>
-      <p v-anim class="mt-3 flex items-center gap-2 text-xs text-muted"><FlaskConical class="size-3.5" />{{ t('credits.sandboxNote') }}</p>
+      <p v-anim class="mt-3 flex items-center gap-2 text-xs text-muted"><QrCode class="size-3.5" />{{ t('pay.note') }}</p>
     </section>
 
     <div class="mt-8 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_1fr]">
@@ -180,38 +184,20 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <li v-for="o in orders.data.value" :key="o.id" class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-sm sm:flex-nowrap sm:px-5">
             <div class="min-w-0 flex-1">
               <p class="font-semibold">{{ t('credits.orderLine', { n: o.credits }) }} · {{ formatTHB(o.amountSatang, locale) }}</p>
-              <p class="truncate text-xs text-muted">{{ o.id }} · {{ formatDateTime(o.createdAt, locale) }}</p>
+              <p class="truncate text-xs text-muted">{{ o.reference || o.id }} · {{ formatDateTime(o.createdAt, locale) }}</p>
             </div>
-            <button v-if="o.status === 'pending'" type="button" class="btn-secondary btn-sm" @click="resume(o)">{{ t('credits.resume') }}</button>
+            <button v-if="o.status === 'pending' || o.status === 'rejected'" type="button" class="btn-secondary btn-sm" @click="resume(o)">{{ t('credits.resume') }}</button>
+            <button v-else-if="o.status === 'awaiting_review'" type="button" class="btn-ghost btn-sm" @click="resume(o)">{{ t('common.open') }}</button>
             <span class="chip" :class="ORDER_STYLE[o.status]">{{ t(`credits.orderStatus.${o.status}`) }}</span>
           </li>
         </ul>
       </section>
     </div>
 
-    <SidePanel :open="!!order" size="sm" :title="t('credits.checkout')" :subtitle="order ? `${order.id} · ${order.providerRef}` : ''" :close-on-backdrop="false" @close="closeCheckout">
-      <template v-if="order">
-        <div class="rounded-2xl border-2 border-dashed border-sun bg-sun/10 p-4 text-sm">
-          <p class="flex items-center gap-2 font-bold text-amber-700 dark:text-sun"><FlaskConical class="size-4" />{{ t('credits.testMode') }}</p>
-          <p class="mt-1 text-muted">{{ t('credits.testModeBody') }}</p>
-        </div>
-        <dl class="divide-y divide-line overflow-hidden rounded-2xl border border-line">
-          <div class="flex justify-between px-4 py-3"><dt class="text-muted">{{ t('credits.unit') }}</dt><dd class="font-semibold">{{ order.credits }}</dd></div>
-          <div class="flex justify-between px-4 py-3"><dt class="text-muted">{{ t('credits.total') }}</dt><dd class="font-display text-xl font-bold text-brand-600 dark:text-brand-300">{{ formatTHB(order.amountSatang, locale) }}</dd></div>
-          <div class="flex items-center justify-between px-4 py-3"><dt class="text-muted">{{ t('credits.status') }}</dt><dd><span class="chip" :class="ORDER_STYLE[order.status]">{{ t(`credits.orderStatus.${order.status}`) }}</span></dd></div>
-        </dl>
-        <div v-if="order.status === 'pending'" class="flex flex-col items-center gap-2 py-2 text-center text-sm text-muted">
-          <span class="relative flex size-3"><span class="absolute inline-flex size-full animate-ping rounded-full bg-brand-400 opacity-70" /><span class="relative inline-flex size-3 rounded-full bg-brand-500" /></span>
-          {{ t('credits.waitingWebhook') }}
-        </div>
-        <div v-else class="flex justify-center py-2"><ResultIcon :key="order.status" :type="order.status === 'paid' ? 'success' : order.status === 'failed' ? 'error' : 'warning'" :size="72" /></div>
-      </template>
+    <SidePanel :open="!!order" size="sm" :title="t('pay.title')" :subtitle="order ? t('pay.subtitle', { n: order.credits, ref: order.reference }) : ''" :close-on-backdrop="false" :guard="false" @close="closeCheckout">
+      <CreditsPromptPayCheckout v-if="order" :order="order" @update="onOrderUpdate" @restart="restart" />
       <template #footer>
-        <template v-if="order?.status === 'pending' && api.credits.simulateWebhook">
-          <button type="button" class="btn-secondary" :disabled="simulating" @click="simulate('failed')">{{ t('credits.simFail') }}</button>
-          <button type="button" class="btn-primary" :disabled="simulating" @click="simulate('paid')">{{ simulating ? t('common.loading') : t('credits.simPay') }}</button>
-        </template>
-        <button v-else type="button" class="btn-secondary" @click="closeCheckout">{{ t('common.close') }}</button>
+        <button type="button" class="btn-secondary" @click="closeCheckout">{{ t('common.close') }}</button>
       </template>
     </SidePanel>
   </div>

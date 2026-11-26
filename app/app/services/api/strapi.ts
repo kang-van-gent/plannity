@@ -203,8 +203,14 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       orders: () => many<PaymentOrder>(`${BFF}/payments/orders`),
       createOrder: (credits) => one<PaymentOrder>(`${BFF}/payments/orders`, { method: 'POST', body: { data: { credits } } }),
       getOrder: (id) => one<PaymentOrder>(`${BFF}/payments/orders/${id}`),
-      // Only available while the backend runs the sandbox payment provider.
-      simulateWebhook: (orderId, outcome) => call<void>(`${BFF}/payments/sandbox/${orderId}/${outcome}`, { method: 'POST' }),
+      async uploadSlip(orderId, file) {
+        const form = new FormData()
+        form.append('slip', file, file.name)
+        const res = await fetch(`${BFF}/payments/orders/${orderId}/slip`, { method: 'POST', body: form, headers: { 'X-Requested-With': 'plannity' }, credentials: 'same-origin' })
+        const body = await res.json().catch(() => ({})) as { data?: Row } & StrapiErrorBody
+        if (!res.ok) throw toApiError({ status: res.status, data: body })
+        return norm<PaymentOrder>(body.data)
+      },
     },
 
     promotions: {

@@ -183,12 +183,12 @@ export function buildSeed(): MockDB {
     })
   }
   const order = (id: string, credits: number, day: number) => {
-    db.orders.push({ id, ownerId: demo, credits, amountSatang: credits * 1000, currency: 'THB', status: 'paid', provider: 'sandbox', providerRef: `sbx_${id}`, createdAt: at(addDays(today, day), 11), paidAt: at(addDays(today, day), 11) })
+    db.orders.push({ id, ownerId: demo, credits, amountSatang: credits * 1000, currency: 'THB', status: 'paid', provider: 'sandbox', providerRef: `sbx_${id}`, reference: `PLN-${id.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-6)}`, payee: null, slipUploadedAt: null, reviewNote: null, expiresAt: null, createdAt: at(addDays(today, day), 11), paidAt: at(addDays(today, day), 11) })
     ledger('purchase', credits, 0, day, 'payment', id, `purchase:${id}`)
   }
 
   ledger('trial_grant', 3, 0, -31, null, null, `trial:${demo}`)
-  order('po_1001', 30, -29)
+  order('po_seed1', 30, -29)
 
   // ---- contents + jobs per brand ---------------------------------------
   const FORMATS: ContentFormat[] = ['carousel', 'static', 'short_video', 'text']
@@ -250,7 +250,7 @@ export function buildSeed(): MockDB {
         keyDates: [], platforms: b.profile.platforms, count: spec.requested, formats: FORMATS, pillarMix: null, notes: '',
       },
     })
-    if (b.id === 'b_glowlab') order('po_1002', 20, -10)
+    if (b.id === 'b_glowlab') order('po_seed2', 20, -10)
     ledger('reserve', -spec.requested, spec.requested, spec.day, 'job', spec.jobId, `reserve:${spec.jobId}`)
     for (const it of items) {
       if (it.status === 'succeeded') ledger('consume', 0, -1, spec.day, 'item', it.id, `consume:${it.id}`)

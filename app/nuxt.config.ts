@@ -39,6 +39,9 @@ export default defineNuxtConfig({
       imageMaxCount: 10,
       /** Where Strapi serves uploaded media (relative /uploads URLs are resolved against it). */
       mediaBaseUrl: '',
+      /** Demo-mode payee. With Strapi, the server's PROMPTPAY_ID / PROMPTPAY_NAME are used (sent on each order). */
+      promptpayId: '0968870831',
+      promptpayName: 'Supachai Van Gent',
     },
   },
 

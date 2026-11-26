@@ -129,7 +129,10 @@ function randomToken(): string {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-export function createMockSource(getToken: () => string | null | undefined, limits: ImageLimits = DEFAULT_IMAGE_LIMITS): DataSource {
+export interface PaymentConfig { promptpayId: string; name: string; ttlHours: number; slipMaxBytes: number }
+const DEFAULT_PAYMENT: PaymentConfig = { promptpayId: '0968870831', name: 'Supachai Van Gent', ttlHours: 24, slipMaxBytes: 5 * 1024 * 1024 }
+
+export function createMockSource(getToken: () => string | null | undefined, limits: ImageLimits = DEFAULT_IMAGE_LIMITS, payment: PaymentConfig = DEFAULT_PAYMENT): DataSource {
   // ---------------------------------------------------------------- helpers
   function currentUser(): MockDB['users'][number] {
     const token = getToken()
@@ -263,10 +266,19 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     return rest
   }
 
+  /** Pending PromptPay orders stop accepting payment after their window (slips already sent are still reviewed). */
   function expireOrders(userId: string) {
+    const now = nowISO()
     for (const o of load().orders) {
-      if (o.ownerId === userId && o.status === 'pending' && Date.now() - Date.parse(o.createdAt) > 30 * 60_000) o.status = 'expired'
+      if (o.ownerId !== userId || o.status !== 'pending') continue
+      const until = o.expiresAt ?? new Date(Date.parse(o.createdAt) + payment.ttlHours * 3600_000).toISOString()
+      if (until < now) o.status = 'expired'
     }
+  }
+  /** Normalises orders saved before PromptPay fields existed. */
+  function orderView(o: Owned<PaymentOrder>): PaymentOrder {
+    const v = strip(o) as PaymentOrder
+    return { ...v, reference: v.reference ?? `PLN-${o.id.slice(-6).toUpperCase()}`, payee: v.payee ?? null, slipUploadedAt: v.slipUploadedAt ?? null, reviewNote: v.reviewNote ?? null, expiresAt: v.expiresAt ?? null }
   }
 
   // ------------------------------------------------------------ the API
@@ -887,23 +899,68 @@ export function createMockSource(getToken: () => string | null | undefined, limi
       async orders() {
         await net()
         expireOrders(uidOf())
-        return load().orders.filter((o) => o.ownerId === uidOf()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(strip)
+        return load().orders.filter((o) => o.ownerId === uidOf()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(orderView)
       },
       async createOrder(credits) {
         await net()
         if (!Number.isInteger(credits) || credits < 1 || credits > 500) fieldError({ credits: 'invalid_credits' })
-        const id = `po_${nextSeq()}`
-        const order: Owned<PaymentOrder> = { id, ownerId: uidOf(), credits, amountSatang: credits * PRICE_SATANG, currency: 'THB', status: 'pending', provider: 'sandbox', providerRef: `sbx_${uid().slice(0, 8)}`, createdAt: nowISO(), paidAt: null }
+        // Never reuse an id (older demo data seeded po_1001/po_1002 while the counter started at 1000).
+        let id = `po_${nextSeq()}`
+        while (load().orders.some((o) => o.id === id)) id = `po_${nextSeq()}`
+        const now = Date.now()
+        // Short, unambiguous code (no 0/O/1/I) the payer can type into the transfer note.
+        const ref = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'[b % 32]).join('')
+        const order: Owned<PaymentOrder> = {
+          id, ownerId: uidOf(), credits, amountSatang: credits * PRICE_SATANG, currency: 'THB', status: 'pending',
+          provider: 'promptpay', providerRef: `pp_${ref.toLowerCase()}`, reference: `PLN-${ref}`,
+          payee: { promptpayId: payment.promptpayId, name: payment.name }, slipUploadedAt: null, reviewNote: null,
+          expiresAt: new Date(now + payment.ttlHours * 3600_000).toISOString(), createdAt: new Date(now).toISOString(), paidAt: null,
+        }
         load().orders.push(order)
         persist()
-        return strip(order)
+        return orderView(order)
       },
       async getOrder(id) {
         await net({ latency: 200 })
         expireOrders(uidOf())
         const o = load().orders.find((x) => x.id === id && x.ownerId === uidOf())
         if (!o) throw new ApiError(404, 'NOT_FOUND', 'Order not found')
-        return strip(o)
+        return orderView(o)
+      },
+      async uploadSlip(orderId, file) {
+        await net({ latency: 700 })
+        expireOrders(uidOf())
+        const o = load().orders.find((x) => x.id === orderId && x.ownerId === uidOf())
+        if (!o) throw new ApiError(404, 'NOT_FOUND', 'Order not found')
+        if (o.status === 'expired') throw new ApiError(409, 'CONFLICT', 'This payment request has expired. Start a new purchase.')
+        if (o.status !== 'pending' && o.status !== 'rejected') throw new ApiError(409, 'CONFLICT', 'A slip was already submitted for this order.')
+        const type = await sniffFile(file)
+        if (!type || type === 'image/gif') throw new ApiError(400, 'FILE_TYPE', `"${file.name}" isn't a JPG, PNG or WEBP image of the slip.`)
+        if (file.size > payment.slipMaxBytes) throw new ApiError(400, 'FILE_TOO_LARGE', `The slip must be under ${Math.round(payment.slipMaxBytes / 1048576)} MB.`)
+        try {
+          await idbDo('readwrite', (st) => st.put(file.slice(0, file.size, type), `slip_${o.id}`))
+        } catch {
+          throw new ApiError(507, 'STORAGE', 'Could not save the slip (browser storage is full or unavailable).')
+        }
+        Object.assign(o, { status: 'awaiting_review', slipUploadedAt: nowISO(), reviewNote: null })
+        persist()
+        return orderView(o)
+      },
+      async simulateReview(orderId, outcome) {
+        // Demo stand-in for the slip check (staff review now, Slip2Go later).
+        await net({ canFail: false, latency: 900 })
+        const d = load()
+        const o = d.orders.find((x) => x.id === orderId && x.ownerId === uidOf())
+        if (!o) throw new ApiError(404, 'NOT_FOUND', 'Order not found')
+        if (o.status !== 'awaiting_review') return
+        if (outcome === 'paid') {
+          o.status = 'paid'
+          o.paidAt = nowISO()
+          post(o.ownerId, 'purchase', o.credits, 0, 'payment', o.id, `purchase:${o.id}`) // idempotent: once per order
+        } else {
+          Object.assign(o, { status: 'rejected', reviewNote: 'The amount or receiver on the slip did not match this order.' })
+        }
+        persist()
       },
       async simulateWebhook(orderId, outcome) {
         // Stands in for the provider calling POST /payments/webhook. The UI

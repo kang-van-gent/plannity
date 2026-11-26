@@ -108,8 +108,12 @@ export interface DataSource {
     orders(): Promise<PaymentOrder[]>
     createOrder(credits: number): Promise<PaymentOrder>
     getOrder(id: string): Promise<PaymentOrder>
+    /** Attach the transfer slip to a PromptPay order → status awaiting_review. */
+    uploadSlip(orderId: string, file: File): Promise<PaymentOrder>
     /** Sandbox only: asks the backend to emit a signed provider webhook. */
     simulateWebhook?(orderId: string, outcome: 'paid' | 'failed'): Promise<void>
+    /** Demo only: stands in for the slip check (staff review today, Slip2Go later). */
+    simulateReview?(orderId: string, outcome: 'paid' | 'rejected'): Promise<void>
   }
 
   promotions: {
