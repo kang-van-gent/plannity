@@ -5,8 +5,8 @@
 // Strapi controllers listed in README → "Strapi endpoints".
 
 import type {
-  ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, GenerationJob, Holiday, InvitationPreview,
-  InviteResult, LedgerEntry, MyInvitation, PaymentOrder, PromotionInquiry, Session, TeamSummary, User, Wallet,
+  ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, Entitlements, GenerationJob, Holiday, InvitationPreview,
+  InviteResult, LedgerEntry, MyInvitation, PaymentOrder, PromotionInquiry, Session, Task, TeamSummary, User, Wallet,
 } from '~/types'
 import { ApiError, type ApiErrorCode, type DataSource } from './contract'
 
@@ -201,7 +201,7 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       balance: () => call<{ data: Wallet }>(`${BFF}/credits/balance`).then((r) => r.data),
       ledger: () => many<LedgerEntry>(`${BFF}/credits/ledger`),
       orders: () => many<PaymentOrder>(`${BFF}/payments/orders`),
-      createOrder: (credits) => one<PaymentOrder>(`${BFF}/payments/orders`, { method: 'POST', body: { data: { credits } } }),
+      createOrder: (input) => one<PaymentOrder>(`${BFF}/payments/orders`, { method: 'POST', body: { data: typeof input === 'number' ? { kind: 'credits', credits: input } : input } }),
       getOrder: (id) => one<PaymentOrder>(`${BFF}/payments/orders/${id}`),
       async uploadSlip(orderId, file) {
         const form = new FormData()
@@ -228,8 +228,22 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       resend: (brandId, id) => data<InviteResult>(`${BFF}/brands/${brandId}/invitations/${id}/resend`, { method: 'POST' }),
       cancel: (brandId, id) => data<void>(`${BFF}/brands/${brandId}/invitations/${id}`, { method: 'DELETE' }),
       updateRole: (brandId, memberId, role) => data<BrandMember>(`${BFF}/brands/${brandId}/members/${memberId}`, { method: 'PATCH', body: { data: { role } } }),
+      updatePositions: (brandId, memberId, positionKeys) => data<BrandMember>(`${BFF}/brands/${brandId}/members/${memberId}`, { method: 'PATCH', body: { data: { positionKeys } } }),
       remove: (brandId, memberId) => data<void>(`${BFF}/brands/${brandId}/members/${memberId}`, { method: 'DELETE' }),
       leave: (brandId) => data<void>(`${BFF}/brands/${brandId}/leave`, { method: 'POST' }),
+    },
+
+    billing: {
+      me: () => data<Entitlements>(`${BFF}/billing/me`),
+    },
+
+    tasks: {
+      forContent: (contentId) => data<Task[]>(`${BFF}/contents/${contentId}/tasks`),
+      mine: () => data<Task[]>(`${BFF}/tasks/my`),
+      forBrand: (brandId) => data<Task[]>(`${BFF}/brands/${brandId}/tasks`),
+      create: (contentId, input) => data<Task>(`${BFF}/contents/${contentId}/tasks`, { method: 'POST', body: { data: input } }),
+      updateAssignment: (taskId, input) => data<Task>(`${BFF}/tasks/${taskId}/assignment`, { method: 'PATCH', body: { data: input } }),
+      transition: (taskId, action, input) => data<Task>(`${BFF}/tasks/${taskId}/transition`, { method: 'POST', body: { data: { action, ...input } } }),
     },
 
     activity: {

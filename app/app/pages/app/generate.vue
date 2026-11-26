@@ -135,7 +135,7 @@ async function submit() {
     <UiPageHeader :title="t('generate.title')" :subtitle="t('generate.subtitle')" />
 
     <UiEmptyState v-if="brands.loaded.value && !brands.active.value.length" :icon="Store" :title="t('generate.noBrandTitle')" :message="t('generate.noBrandBody')">
-      <NuxtLink to="/app/brands/new?onboarding=1" class="btn-primary">{{ t('brands.create') }}</NuxtLink>
+      <BrandCreateButton onboarding />
     </UiEmptyState>
 
     <div v-else class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">

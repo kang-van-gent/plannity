@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Archive, ArchiveRestore, Crosshair, Eye, FileText, Pencil, Plus, Store, Users, WandSparkles } from '@lucide/vue'
+import { Archive, ArchiveRestore, Crosshair, Eye, FileText, Lock, Pencil, Plus, Store, Users, WandSparkles } from '@lucide/vue'
 import type { Brand } from '~/types'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
-const { t } = useLocale()
+const { t, locale } = useLocale()
 useSeoMeta({ title: () => t('nav.brands') })
 const api = useApi()
 const notify = useNotify()
@@ -42,15 +42,16 @@ function focus(b: Brand) {
   <div>
     <UiPageHeader :title="t('nav.brands')" :subtitle="t('brands.subtitle')">
       <label class="flex cursor-pointer items-center justify-between gap-2 text-sm font-semibold text-muted max-sm:min-h-11 max-sm:rounded-2xl max-sm:border max-sm:border-line max-sm:bg-surface max-sm:px-3">{{ t('brands.showArchived') }}<input v-model="showArchived" type="checkbox" class="switch"></label>
-      <NuxtLink to="/app/brands/new" class="btn-primary"><Plus class="size-4" />{{ t('brands.create') }}</NuxtLink>
+      <BrandCreateButton show-usage />
     </UiPageHeader>
 
     <TeamInvitationsBanner @changed="q.refresh({ silent: true })" />
+    <BillingRenewNotice class="mb-5" />
 
     <UiErrorState v-if="q.error.value" :error="q.error.value" @retry="q.refresh()" />
     <UiSkeletonList v-else-if="!q.loaded.value" grid :rows="3" />
     <UiEmptyState v-else-if="!list.length" :icon="Store" :title="t('brands.emptyTitle')" :message="t('brands.emptyBody')">
-      <NuxtLink to="/app/brands/new?onboarding=1" class="btn-primary"><Plus class="size-4" />{{ t('brands.create') }}</NuxtLink>
+      <BrandCreateButton onboarding />
     </UiEmptyState>
     <div v-else class="grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
       <article v-for="(b, i) in list" :key="b.id" v-anim="i"
@@ -63,6 +64,8 @@ function focus(b: Brand) {
           <Doodle variant="petal" class="absolute -right-8 -top-10 size-36 text-white/25 transition duration-700 group-hover:rotate-45 group-hover:scale-110" />
           <Doodle variant="spark" class="absolute right-28 top-5 size-5 text-white/80 transition duration-500 group-hover:rotate-90" />
           <div class="absolute right-3 top-3 flex gap-1.5">
+            <span v-if="b.locked" class="chip bg-danger text-white shadow-sm"><Lock class="size-3" />{{ t('brands.locked') }}</span>
+            <span v-else-if="b.isBillingOwner && b.coverKind === 'slot' && b.coveredUntil" class="chip bg-white/90 text-ink shadow-sm">{{ t('brands.paidUntil', { date: formatDate(b.coveredUntil.slice(0, 10), locale, { day: 'numeric', month: 'short' }) }) }}</span>
             <span v-if="b.archivedAt" class="chip bg-white/90 text-slate-600 shadow-sm"><Archive class="size-3" />{{ t('brands.archivedChip') }}</span>
             <span v-else-if="brands.scope.value === b.id" class="chip bg-white/90 text-ink shadow-sm"><Eye class="size-3" />{{ t('brands.inScope') }}</span>
           </div>

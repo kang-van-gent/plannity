@@ -44,6 +44,8 @@ export default defineNuxtConfig({
       /** Demo-mode payee. With Strapi, the server's PROMPTPAY_ID / PROMPTPAY_NAME are used (sent on each order). */
       promptpayId: '0968870831',
       promptpayName: 'Supachai Van Gent',
+      /** Terms of Service effective date (YYYY-MM-DD). Empty = still a draft: labelled as such and not indexed. */
+      legalTermsEffectiveDate: '',
     },
   },
 

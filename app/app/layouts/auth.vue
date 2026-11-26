@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ArrowLeft } from '@lucide/vue'
 const { t } = useLocale()
 </script>
 
@@ -23,7 +22,7 @@ const { t } = useLocale()
     </aside>
     <div class="flex min-h-dvh flex-col">
       <div class="flex items-center justify-between gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:p-6">
-        <NuxtLink to="/" class="btn-ghost -ml-2 sm:ml-0"><ArrowLeft class="size-4" /><span class="hidden min-[380px]:inline">{{ t('auth.backHome') }}</span></NuxtLink>
+        <UiBackButton fallback="/" class="sm:ml-0" />
         <div class="flex items-center gap-2"><LocaleSwitch /><ThemeToggle /></div>
       </div>
       <main class="flex flex-1 items-center justify-center px-5 pb-[max(3rem,env(safe-area-inset-bottom))]">

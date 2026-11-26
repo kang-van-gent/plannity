@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tasks",
+  "info": {
+    "singularName": "task",
+    "pluralName": "tasks",
+    "displayName": "Task",
+    "description": "Design work assigned on a post (Team/Studio brands). Separate from the post's own status; history is kept, never deleted."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "brand": { "type": "relation", "relation": "manyToOne", "target": "api::brand.brand" },
+    "content": { "type": "relation", "relation": "manyToOne", "target": "api::content.content" },
+    "type": { "type": "enumeration", "enum": ["design"], "default": "design", "required": true },
+    "positionKey": { "type": "string", "required": true, "maxLength": 40 },
+    "assignee": { "type": "relation", "relation": "manyToOne", "target": "api::brand-membership.brand-membership" },
+    "assignedBy": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "dueDate": { "type": "date" },
+    "priority": { "type": "enumeration", "enum": ["normal", "high"], "default": "normal", "required": true },
+    "note": { "type": "text", "maxLength": 1000 },
+    "status": { "type": "enumeration", "enum": ["todo", "in_progress", "in_review", "changes_requested", "completed", "cancelled"], "default": "todo", "required": true },
+    "reviewNote": { "type": "text", "maxLength": 1000 },
+    "completedAt": { "type": "datetime" },
+    "briefVersion": { "type": "integer", "description": "Post version when assigned (the brief the assignee was given)." },
+    "briefSnapshot": { "type": "text", "description": "Visual brief at assignment, to show what changed since." },
+    "version": { "type": "integer", "default": 1, "required": true },
+    "activeKey": { "type": "string", "unique": true, "private": true, "description": "contentDocumentId:design while open, empty once completed/cancelled — one open design task per post." }
+  }
+}

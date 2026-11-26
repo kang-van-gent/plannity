@@ -3,6 +3,7 @@ import type {
   FeedbackInput, GenerationInput, GenerationJob, Holiday, ISODate, LedgerEntry, Paginated, PaymentOrder,
   PromotionInput, PromotionInquiry, RegisterInput, Session, SocialProvider, User, Wallet,
   BrandRole, ContentImage, InvitationPreview, InviteResult, MyInvitation, TeamSummary, BrandMember, ActivityEntityType, ActivityEntry,
+  Entitlements, OrderInput, PositionKey, Task, TaskAction, TaskInput,
 } from '~/types'
 
 /**
@@ -32,10 +33,12 @@ export interface DataSource {
   /** Team Workspace: brand-scoped members and invitations. Backend enforces every rule. */
   team: {
     get(brandId: string): Promise<TeamSummary>
-    invite(brandId: string, input: { email: string; role: BrandRole }): Promise<InviteResult>
+    invite(brandId: string, input: { email: string; role: BrandRole; positionKeys?: PositionKey[] }): Promise<InviteResult>
     resend(brandId: string, invitationId: string): Promise<InviteResult>
     cancel(brandId: string, invitationId: string): Promise<void>
     updateRole(brandId: string, memberId: string, role: BrandRole): Promise<BrandMember>
+    /** Position tags only — never changes the role, seats or assignments. */
+    updatePositions(brandId: string, memberId: string, positionKeys: PositionKey[]): Promise<BrandMember>
     remove(brandId: string, memberId: string): Promise<void>
     leave(brandId: string): Promise<void>
   }
@@ -106,7 +109,8 @@ export interface DataSource {
     balance(): Promise<Wallet>
     ledger(): Promise<LedgerEntry[]>
     orders(): Promise<PaymentOrder[]>
-    createOrder(credits: number): Promise<PaymentOrder>
+    /** A number buys AI credits (back-compat); plans and brand add-ons pass an OrderInput. */
+    createOrder(input: number | OrderInput): Promise<PaymentOrder>
     getOrder(id: string): Promise<PaymentOrder>
     /** Attach the transfer slip to a PromptPay order → status awaiting_review. */
     uploadSlip(orderId: string, file: File): Promise<PaymentOrder>
@@ -114,6 +118,24 @@ export interface DataSource {
     simulateWebhook?(orderId: string, outcome: 'paid' | 'failed'): Promise<void>
     /** Demo only: stands in for the slip check (staff review today, Slip2Go later). */
     simulateReview?(orderId: string, outcome: 'paid' | 'rejected'): Promise<void>
+  }
+
+  /** Plans & brand add-ons (pricing.md). Purchases use credits.createOrder / uploadSlip like credit top-ups. */
+  billing: {
+    me(): Promise<Entitlements>
+    /** Demo only: stands in for a plan period ending (to try the downgrade/suspension behaviour). */
+    simulateExpire?(): Promise<void>
+  }
+
+  /** Task assignment & My Tasks. Every call re-checks membership, role and the brand owner's plan. */
+  tasks: {
+    forContent(contentId: string): Promise<Task[]>
+    mine(): Promise<Task[]>
+    forBrand(brandId: string): Promise<Task[]>
+    create(contentId: string, input: TaskInput): Promise<Task>
+    /** Reassign (restarts at To do) or change due date / priority / note. */
+    updateAssignment(taskId: string, input: Partial<TaskInput> & { version: number }): Promise<Task>
+    transition(taskId: string, action: TaskAction, input: { version: number; note?: string }): Promise<Task>
   }
 
   promotions: {
@@ -130,7 +152,7 @@ export type ApiErrorCode =
   | 'INVALID_INPUT' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT'
   | 'INSUFFICIENT_CREDITS' | 'VERSION_CONFLICT' | 'RATE_LIMITED' | 'PROVIDER_UNAVAILABLE' | 'NETWORK' | 'UNKNOWN'
   // Team Workspace
-  | 'SEAT_LIMIT' | 'ALREADY_MEMBER' | 'DUPLICATE_INVITE' | 'INVITE_EXPIRED' | 'INVITE_INVALID' | 'EMAIL_MISMATCH' | 'LAST_OWNER'
+  | 'SEAT_LIMIT' | 'PLAN_REQUIRED' | 'BRAND_LIMIT' | 'ALREADY_MEMBER' | 'DUPLICATE_INVITE' | 'INVITE_EXPIRED' | 'INVITE_INVALID' | 'EMAIL_MISMATCH' | 'LAST_OWNER'
   // Post images
   | 'FILE_TYPE' | 'FILE_TOO_LARGE' | 'TOO_MANY_IMAGES' | 'STORAGE'
 

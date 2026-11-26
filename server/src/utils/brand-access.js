@@ -13,6 +13,7 @@
 const { factories } = require('@strapi/strapi');
 const { roleCan } = require('./permissions');
 const { record } = require('../services/activity');
+const { brandFeatures, brandCreateError, lockAccount, invalidate } = require('../services/entitlements');
 
 const MEMBERSHIP = 'api::brand-membership.brand-membership';
 
@@ -22,24 +23,41 @@ function nest(path, leaf) {
 }
 const memberLeaf = (userId) => ({ memberships: { user: { id: userId }, status: 'active' } });
 
+/**
+ * Effective role. When the paying account behind a brand has no collaboration
+ * entitlement (e.g. its Team plan lapsed), collaborators keep read access but
+ * their changes are suspended (pricing.md §6, §8) — nothing is deleted, and
+ * the account owner keeps full access.
+ */
+async function effectiveRole(strapi, brandDocumentId, userId, role) {
+  if (!role || role === 'viewer') return role;
+  const { ownerId, features, locked } = await brandFeatures(strapi, brandDocumentId);
+  if (locked) return 'viewer'; // no cover (slot/Studio lapsed): read-only for everyone until renewed
+  return ownerId === userId || features.collaboration ? role : 'viewer';
+}
+
 async function roleFor(strapi, brandDocumentId, userId) {
   if (!brandDocumentId || !userId) return null;
   const m = await strapi.documents(MEMBERSHIP).findFirst({
     filters: { brand: { documentId: brandDocumentId }, user: { id: userId }, status: 'active' },
     fields: ['role'],
   });
-  return m ? m.role : null;
+  return m ? effectiveRole(strapi, brandDocumentId, userId, m.role) : null;
 }
 
-/** brandDocumentId → role, for every brand the user belongs to. */
+/** brandDocumentId → { role (effective), storedRole, positionKeys }, for every brand the user belongs to. */
 async function rolesFor(strapi, userId) {
   const rows = await strapi.documents(MEMBERSHIP).findMany({
     filters: { user: { id: userId }, status: 'active' },
-    fields: ['role'],
+    fields: ['role', 'positionKeys'],
     populate: { brand: { fields: ['documentId'] } },
     limit: 1000,
   });
-  return new Map(rows.filter((r) => r.brand).map((r) => [r.brand.documentId, r.role]));
+  const out = new Map();
+  for (const r of rows.filter((x) => x.brand)) {
+    out.set(r.brand.documentId, { role: await effectiveRole(strapi, r.brand.documentId, userId, r.role), storedRole: r.role, positionKeys: Array.isArray(r.positionKeys) ? r.positionKeys : [] });
+  }
+  return out;
 }
 
 function fail(ctx, status, code, message, fieldErrors = {}) {
@@ -101,6 +119,7 @@ function relationRefs(value) {
  *   versioned?: boolean,                  // optimistic concurrency on `version`
  *   validate?: (next, existing, data) => Record<string, string> | null,
  *   onCreate?: (entity, user) => Promise<void>,
+ *   guardCreate?: (user, trx) => Promise<{ status, code, message } | null>,  // checked inside the create transaction
  *   audit?: {                             // activity log: who did what, when
  *     entityType: 'brand' | 'content',
  *     title: (row) => string,
@@ -109,7 +128,7 @@ function relationRefs(value) {
  *   },
  * }} opts
  */
-function brandScopedController(uid, { brandPath, perms, protectedFields = [], versioned = false, validate, onCreate, audit }) {
+function brandScopedController(uid, { brandPath, perms, protectedFields = [], versioned = false, validate, onCreate, guardCreate, audit }) {
   return factories.createCoreController(uid, ({ strapi }) => {
     const brandOf = (row) => (brandPath ? brandPath.split('.').reduce((acc, k) => acc?.[k], row) : row);
     // nest('content.brand', x) is { content: { brand: x } }; Strapi wants { content: { populate: { brand: x } } }.
@@ -137,12 +156,22 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
     }
 
     async function decorate(ctx, body) {
-      // Brands carry the viewer's role and the effective seat limit.
+      // Brands carry the viewer's (effective) role, positions, and what the
+      // paying account's plan allows there — so the UI can explain gates.
       if (uid !== 'api::brand.brand' || !body?.data) return body;
-      const roles = await rolesFor(strapi, ctx.state.user.id);
-      const seats = Number(process.env.TEAM_DEFAULT_SEATS || 5);
-      const add = (b) => ({ ...b, myRole: roles.get(b.documentId) ?? null, maxSeats: b.maxSeats ?? seats });
-      body.data = Array.isArray(body.data) ? body.data.map(add) : add(body.data);
+      const me = ctx.state.user.id;
+      const roles = await rolesFor(strapi, me);
+      const add = async (b) => {
+        const r = roles.get(b.documentId);
+        const f = await brandFeatures(strapi, b.documentId);
+        const { maxSeats: _deprecated, ...rest } = b;
+        return {
+          ...rest, myRole: r?.role ?? null, myPositionKeys: r?.positionKeys ?? [], planKey: f.planKey, features: f.features,
+          isBillingOwner: f.ownerId === me, locked: f.locked, coveredUntil: f.cover?.until ?? null, coverKind: f.cover?.kind ?? 'included',
+          suspended: !!r && r.role !== r.storedRole && !f.locked,
+        };
+      };
+      body.data = Array.isArray(body.data) ? await Promise.all(body.data.map(add)) : await add(body.data);
       return body;
     }
 
@@ -186,7 +215,12 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
         if (versioned) data.version = 1;
         await this.validateInput(data, ctx);
         const sanitized = await this.sanitizeInput(data, ctx);
-        const entity = await strapi.db.transaction(async () => {
+        let blocked = null;
+        const entity = await strapi.db.transaction(async ({ trx }) => {
+          if (guardCreate) {
+            blocked = await guardCreate(user, trx);
+            if (blocked) return null;
+          }
           const created = await strapi.documents(uid).create({ data: { ...sanitized, owner: user.id } });
           if (onCreate) await onCreate(created, user);
           if (audit) {
@@ -197,6 +231,7 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
           }
           return created;
         });
+        if (blocked) return fail(ctx, blocked.status, blocked.code, blocked.message);
         const out = await this.sanitizeOutput(entity, ctx);
         return decorate(ctx, this.transformResponse(out));
       },
@@ -254,4 +289,4 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
   });
 }
 
-module.exports = { brandScopedController, requireBrand, requireContent, roleFor, rolesFor, relationRefs, fail, nest, MEMBERSHIP };
+module.exports = { brandScopedController, requireBrand, requireContent, roleFor, rolesFor, effectiveRole, relationRefs, fail, nest, MEMBERSHIP, brandCreateError, lockAccount, invalidate };

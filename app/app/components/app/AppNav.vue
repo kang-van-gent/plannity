@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarDays, Coins, LayoutDashboard, Library, Lock, Megaphone, Settings, Store, WandSparkles } from '@lucide/vue'
+import { CalendarDays, ClipboardList, Coins, Gem, LayoutDashboard, Library, Lock, Megaphone, Settings, Store, WandSparkles } from '@lucide/vue'
 
 defineProps<{ collapsed?: boolean }>()
 const emit = defineEmits<{ navigate: [] }>()
@@ -7,16 +7,20 @@ const { t } = useLocale()
 const route = useRoute()
 const notify = useNotify()
 const features = useFeatures()
+const myTasks = useMyTasks()
+onMounted(() => { myTasks.load() })
 const items = computed(() => ([
   { to: '/app', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true, section: 'workspace' },
   { to: '/app/brands', label: t('nav.brands'), icon: Store, section: 'workspace' },
+  ...(myTasks.visible.value ? [{ to: '/app/tasks', label: t('nav.myTasks'), icon: ClipboardList, section: 'workspace', badge: myTasks.count.value ?? 0 }] : []),
   { to: '/app/generate', label: t('nav.generate'), icon: WandSparkles, also: '/app/jobs', section: 'content' },
   { to: '/app/content', label: t('nav.library'), icon: Library, section: 'content' },
   { to: '/app/calendar', label: t('nav.calendar'), icon: CalendarDays, section: 'content' },
   { to: '/app/promote', label: t('nav.promote'), icon: Megaphone, section: 'content' },
+  { to: '/app/plan', label: t('nav.plan'), icon: Gem, section: 'account' },
   { to: '/app/credits', label: t('nav.credits'), icon: Coins, section: 'account' },
   { to: '/app/settings', label: t('nav.settings'), icon: Settings, section: 'account' },
-] as { to: string; label: string; icon: unknown; exact?: boolean; also?: string; section: string }[]).map((i) => ({ ...i, locked: isLockedPath(i.to, features) })))
+] as { to: string; label: string; icon: unknown; exact?: boolean; also?: string; section: string; badge?: number }[]).map((i) => ({ ...i, locked: isLockedPath(i.to, features) })))
 /** Items grouped under section labels, in menu order. */
 const sections = computed(() => {
   const out: { key: string; items: typeof items.value }[] = []
@@ -61,7 +65,8 @@ function isActive(i: { to: string; exact?: boolean; also?: string }) {
         <component :is="i.icon" class="size-[18px] shrink-0 transition-transform group-hover:scale-110 group-hover:-rotate-6" />
         <template v-if="!collapsed">
           {{ i.label }}
-          <Doodle v-if="isActive(i)" variant="spark" class="ml-auto size-3.5 text-sun" />
+          <span v-if="i.badge" class="ml-auto rounded-full px-1.5 text-[11px] font-bold" :class="isActive(i) ? 'bg-white/25' : 'bg-pink/15 text-pink'">{{ i.badge }}</span>
+          <Doodle v-else-if="isActive(i)" variant="spark" class="ml-auto size-3.5 text-sun" />
         </template>
       </NuxtLink>
     </template>

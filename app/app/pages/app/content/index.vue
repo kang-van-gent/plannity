@@ -53,6 +53,13 @@ const creating = ref(false)
 const perms = usePerms()
 const creatableBrands = computed(() => perms.brandsWhere('content.create'))
 function openCreate() {
+  // A locked brand is in scope: say so instead of quietly creating the post in another brand.
+  const scopedLocked = brands.currentBrand.value?.locked ? brands.currentBrand.value : null
+  if (scopedLocked) {
+    notify.warning(t('brands.lockedTitle'), `${scopedLocked.name} · ${scopedLocked.isBillingOwner ? t('brands.lockedOwner') : t('brands.lockedMember')}`,
+      scopedLocked.isBillingOwner ? { action: { label: t('brands.renewBrand'), handler: () => navigateTo('/app/plan#brands') } } : undefined)
+    return
+  }
   const scoped = brands.currentBrand.value && creatableBrands.value.includes(brands.currentBrand.value) ? brands.currentBrand.value : creatableBrands.value[0]
   createForm.value = emptyContentForm(scoped)
   createErrors.value = {}

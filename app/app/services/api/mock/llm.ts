@@ -146,7 +146,7 @@ function pick<T>(arr: readonly T[], r: () => number): T {
 }
 
 export interface GenerateArgs {
-  brand: Omit<Brand, 'myRole' | 'maxSeats'>
+  brand: Omit<Brand, 'myRole' | 'myPositionKeys' | 'planKey' | 'features' | 'isBillingOwner' | 'suspended' | 'locked' | 'coverKind' | 'coveredUntil'>
   ordinal: number
   pillar: string
   objective: Objective

@@ -10,6 +10,7 @@ const route = useRoute()
     <LandingBackdrop v-if="route.path === '/'" />
     <LandingHeader />
     <main id="main">
+      <div v-if="route.path !== '/'" class="mx-auto max-w-7xl px-5 pt-4 sm:px-8 sm:pt-6"><UiBackButton /></div>
       <slot />
     </main>
     <LandingFooter />

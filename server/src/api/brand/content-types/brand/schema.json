@@ -5,7 +5,7 @@
     "singularName": "brand",
     "pluralName": "brands",
     "displayName": "Brand",
-    "description": "A brand profile owned by a user (spec \u00a78)."
+    "description": "A brand profile owned by a user (spec §8)."
   },
   "options": {
     "draftAndPublish": false
@@ -44,7 +44,7 @@
     "maxSeats": {
       "type": "integer",
       "min": 1,
-      "description": "Seat limit (active members + pending invitations). Empty = TEAM_DEFAULT_SEATS. Set by plan/billing, never by members."
+      "description": "Deprecated (pricing v0.2): seats are now an account-wide pool from the owner's plan. Not read anymore."
     },
     "memberships": {
       "type": "relation",

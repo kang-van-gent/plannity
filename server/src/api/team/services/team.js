@@ -1,15 +1,24 @@
 'use strict';
 
 /**
- * Team Workspace rules (plannity-context-team-feature.md). Every mutation runs
- * in a transaction holding a per-brand advisory lock (PostgreSQL), so two
- * admins inviting at once, or an invite racing an acceptance, can't overshoot
- * the seat limit. Unique keys on memberships/invitations back this up at the
- * database level.
+ * Team Workspace rules (plannity-context-team-feature.md + pricing.md v0.2).
+ *
+ * Seats are one pool per paying account (the brand owner): unique people
+ * across all of its brands, owner included, pending invitations reserved.
+ * Collaboration needs a Team/Studio plan on that account. Every mutation runs
+ * in a transaction holding PostgreSQL advisory locks (per brand, and per
+ * account for anything that uses seats), so concurrent invites/accepts can't
+ * overshoot the pool. Unique keys on memberships/invitations back this up.
+ *
+ * Position tags (plannity-context-member-positions.md) are labels only: they
+ * never change roles, permissions or seat counts.
  */
 const crypto = require('node:crypto');
 const { roleChangeError, removeError, leaveError, inviteError, seatsUsed } = require('../../../utils/permissions');
 const { sendInvitation } = require('../../../services/notifier');
+const { normalizePositions } = require('../../../utils/positions');
+const P = require('../../../utils/pricing');
+const { brandFeatures, seatUsage, lockAccount, invalidate } = require('../../../services/entitlements');
 const { record } = require('../../../services/activity');
 
 const MEMBERSHIP = 'api::brand-membership.brand-membership';
@@ -25,7 +34,6 @@ class TeamError extends Error {
 }
 
 const ttlDays = () => Number(process.env.INVITE_TTL_DAYS || 7);
-const defaultSeats = () => Number(process.env.TEAM_DEFAULT_SEATS || 5);
 const frontendUrl = () => String(process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 const hashToken = (t) => crypto.createHash('sha256').update(String(t)).digest('hex');
 const newToken = () => crypto.randomBytes(32).toString('base64url');
@@ -44,14 +52,30 @@ module.exports = ({ strapi }) => {
   const log = (brandId, actor, action, entityId, entityTitle, changes = []) =>
     record(strapi, { brandId, actor, action, entityType: 'member', entityId, entityTitle, changes });
 
-  /** Runs fn in a transaction; on PostgreSQL also serializes per brand. */
-  async function locked(brandDocumentId, fn) {
+  /** Runs fn in a transaction; on PostgreSQL also serializes per brand (and per paying account when seats are involved). */
+  async function locked(brandDocumentId, fn, ownerId = null) {
     return strapi.db.transaction(async ({ trx }) => {
       if (strapi.db.config.connection.client === 'postgres' && trx) {
+        if (ownerId) await lockAccount(strapi, trx, ownerId, 'seats');
         await trx.raw('select pg_advisory_xact_lock(?)', [lockKey(`team:${brandDocumentId}`)]);
       }
       return fn();
     });
+  }
+  /** The paying account behind a brand, its plan and seat usage. */
+  async function account(brand) {
+    const f = await brandFeatures(strapi, brand.documentId);
+    const usage = f.ownerId ? await seatUsage(strapi, f.ownerId) : { members: [], pendingEmails: [] };
+    return { ...f, usage, seatLimit: P.pricing().plans[f.planKey].maxMembers, seatsUsed: P.seatCount(usage) };
+  }
+  function planFail(code) {
+    if (code === 'plan_required') throw new TeamError(402, 'PLAN_REQUIRED', 'Inviting teammates needs a Team or Studio plan on the brand owner\'s account.');
+    if (code === 'seat_limit') throw new TeamError(409, 'SEAT_LIMIT', 'All seats on this plan are in use.');
+  }
+  function positionsOrFail(value) {
+    const { keys, error } = normalizePositions(value);
+    if (error) throw new TeamError(400, 'INVALID_INPUT', 'Unknown position', { positionKeys: 'invalid_position' });
+    return keys;
   }
 
   async function expireStale(brandDocumentId) {
@@ -77,14 +101,13 @@ module.exports = ({ strapi }) => {
     });
   }
   const ownerCount = (members) => members.filter((m) => m.role === 'owner').length;
-  const maxSeatsOf = (brand) => brand.maxSeats ?? defaultSeats();
   const displayName = (u) => (u ? u.name || u.username || u.email : '—');
 
   function memberView(m, userId) {
-    return { id: m.documentId, userId: String(m.user?.id ?? ''), name: displayName(m.user), email: m.user?.email ?? '', role: m.role, joinedAt: m.joinedAt ?? m.createdAt, isYou: m.user?.id === userId };
+    return { id: m.documentId, userId: String(m.user?.id ?? ''), name: displayName(m.user), email: m.user?.email ?? '', role: m.role, positionKeys: Array.isArray(m.positionKeys) ? m.positionKeys : [], joinedAt: m.joinedAt ?? m.createdAt, isYou: m.user?.id === userId };
   }
   function inviteView(i) {
-    return { id: i.documentId, email: i.email, role: i.role, status: i.status, invitedByName: displayName(i.invitedBy), createdAt: i.createdAt, expiresAt: i.expiresAt };
+    return { id: i.documentId, email: i.email, role: i.role, positionKeys: Array.isArray(i.positionKeys) ? i.positionKeys : [], status: i.status, invitedByName: displayName(i.invitedBy), createdAt: i.createdAt, expiresAt: i.expiresAt };
   }
   function fail(code) {
     if (!code) return;
@@ -98,7 +121,12 @@ module.exports = ({ strapi }) => {
     const members = (await activeMembers(brand.documentId)).map((m) => memberView(m, userId))
       .sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || String(a.joinedAt).localeCompare(String(b.joinedAt)));
     const invitations = (await pendingInvites(brand.documentId)).map(inviteView);
-    return { brandId: brand.documentId, maxSeats: maxSeatsOf(brand), seatsUsed: seatsUsed(members.length, invitations.length), members, invitations };
+    const acc = await account(brand);
+    return {
+      brandId: brand.documentId, members, invitations,
+      // Seats are the owner's account-wide pool, not this brand's headcount.
+      seatLimit: acc.seatLimit, seatsUsed: acc.seatsUsed, planKey: acc.planKey, features: acc.features, isBillingOwner: acc.ownerId === userId,
+    };
   }
 
   async function notify(brand, inviter, invitation, token) {
@@ -111,7 +139,9 @@ module.exports = ({ strapi }) => {
     fail(inviteError(actorRole, input?.role));
     const email = normEmail(input?.email);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new TeamError(400, 'INVALID_INPUT', 'Invalid email', { email: 'invalid_email' });
+    const positionKeys = positionsOrFail(input?.positionKeys);
     const token = newToken();
+    const { ownerId } = await brandFeatures(strapi, brand.documentId);
     const invitation = await locked(brand.documentId, async () => {
       await expireStale(brand.documentId);
       const user = await strapi.db.query('plugin::users-permissions.user').findOne({ where: { email } });
@@ -121,17 +151,18 @@ module.exports = ({ strapi }) => {
       }
       const dup = await docs(INVITATION).findFirst({ filters: { brand: { documentId: brand.documentId }, email, status: 'pending' } });
       if (dup) throw new TeamError(409, 'DUPLICATE_INVITE', 'An invitation has already been sent.');
-      const [members, pending] = await Promise.all([activeMembers(brand.documentId), pendingInvites(brand.documentId)]);
-      if (seatsUsed(members.length, pending.length) >= maxSeatsOf(brand)) throw new TeamError(409, 'SEAT_LIMIT', 'Your team has reached its seat limit.');
+      invalidate(ownerId);
+      const acc = await account(brand);
+      planFail(P.seatError(acc.planKey, acc.usage, email));
       const created = await docs(INVITATION).create({
         data: {
-          brand: brand.documentId, email, role: input.role, tokenHash: hashToken(token), status: 'pending', invitedBy: actor.id,
+          brand: brand.documentId, email, role: input.role, positionKeys, tokenHash: hashToken(token), status: 'pending', invitedBy: actor.id,
           expiresAt: new Date(Date.now() + ttlDays() * 864e5).toISOString(), pendingKey: `${brand.documentId}:${email}`,
         },
       });
-      await log(brand.documentId, actor, 'member.invited', created.documentId, email, [{ field: 'role', from: null, to: input.role }]);
+      await log(brand.documentId, actor, 'member.invited', created.documentId, email, [{ field: 'role', from: null, to: input.role }, ...(positionKeys.length ? [{ field: 'positions', from: null, to: positionKeys }] : [])]);
       return created;
-    });
+    }, ownerId);
     return notify(brand, actor, invitation, token);
   }
 
@@ -167,16 +198,36 @@ module.exports = ({ strapi }) => {
     return m;
   }
 
-  async function updateRole(brand, actor, actorRole, memberId, role) {
+  /** PATCH a member: `role` and/or `positionKeys`. Changing positions never touches the role, seats or assignments. */
+  async function updateMember(brand, actor, actorRole, memberId, input = {}) {
+    const wantsRole = input.role !== undefined;
+    const wantsPositions = input.positionKeys !== undefined;
+    if (!wantsRole && !wantsPositions) throw new TeamError(400, 'INVALID_INPUT', 'Nothing to update');
+    const positionKeys = wantsPositions ? positionsOrFail(input.positionKeys) : null;
+    if (wantsPositions && !(await brandFeatures(strapi, brand.documentId)).features.memberPositions) planFail('plan_required');
     return locked(brand.documentId, async () => {
       const m = await memberIn(brand, memberId);
-      fail(roleChangeError(actorRole, m.role, role, ownerCount(await activeMembers(brand.documentId))));
+      const owners = ownerCount(await activeMembers(brand.documentId));
+      const data = {};
       const now = new Date().toISOString();
-      const updated = await docs(MEMBERSHIP).update({ documentId: m.documentId, data: { role, roleUpdatedAt: now }, populate: { user: { fields: ['id', 'email', 'username', 'name'] } } });
-      if (role !== m.role) await log(brand.documentId, actor, 'member.role_changed', m.documentId, displayName(m.user), [{ field: 'role', from: m.role, to: role }]);
+      if (wantsRole) {
+        fail(roleChangeError(actorRole, m.role, input.role, owners));
+        data.role = input.role;
+        data.roleUpdatedAt = now;
+      }
+      if (wantsPositions) {
+        // Same rule as roles: managers only, and only an Owner may edit an Owner's membership.
+        fail(roleChangeError(actorRole, m.role, m.role, owners));
+        data.positionKeys = positionKeys;
+      }
+      const updated = await docs(MEMBERSHIP).update({ documentId: m.documentId, data, populate: { user: { fields: ['id', 'email', 'username', 'name'] } } });
+      if (wantsRole && input.role !== m.role) await log(brand.documentId, actor, 'member.role_changed', m.documentId, displayName(m.user), [{ field: 'role', from: m.role, to: input.role }]);
+      const before = Array.isArray(m.positionKeys) ? m.positionKeys : [];
+      if (wantsPositions && before.join() !== positionKeys.join()) await log(brand.documentId, actor, 'member.positions_changed', m.documentId, displayName(m.user), [{ field: 'positions', from: before, to: positionKeys }]);
       return memberView(updated, actor.id);
     });
   }
+  const updateRole = (brand, actor, actorRole, memberId, role) => updateMember(brand, actor, actorRole, memberId, { role });
 
   async function removeMember(brand, actor, actorRole, memberId) {
     return locked(brand.documentId, async () => {
@@ -202,7 +253,7 @@ module.exports = ({ strapi }) => {
   async function byToken(token) {
     const inv = await docs(INVITATION).findFirst({
       filters: { tokenHash: hashToken(token) },
-      populate: { brand: { fields: ['name', 'color', 'maxSeats'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
+      populate: { brand: { fields: ['name', 'color'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
     });
     if (!inv) throw new TeamError(404, 'INVITE_INVALID', 'This invitation link is not valid.');
     return inv;
@@ -210,7 +261,7 @@ module.exports = ({ strapi }) => {
   async function mineById(user, id) {
     const inv = await docs(INVITATION).findFirst({
       filters: { documentId: id, email: normEmail(user.email) },
-      populate: { brand: { fields: ['name', 'color', 'maxSeats'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
+      populate: { brand: { fields: ['name', 'color'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
     });
     if (!inv) throw new TeamError(404, 'INVITE_INVALID', 'This invitation is no longer available.');
     return inv;
@@ -227,21 +278,25 @@ module.exports = ({ strapi }) => {
   async function accept(inv, user) {
     if (!inv.brand) throw new TeamError(404, 'NOT_FOUND', 'Brand not found');
     const brandId = inv.brand.documentId;
+    const { ownerId } = await brandFeatures(strapi, brandId);
     return locked(brandId, async () => {
       // Re-read inside the lock so two accepts (or accept + cancel) can't both win.
       const fresh = await docs(INVITATION).findOne({ documentId: inv.documentId });
       checkPending({ ...inv, ...fresh }, user);
-      const [members, pending] = await Promise.all([activeMembers(brandId), pendingInvites(brandId)]);
-      // This invitation already holds a seat, so accepting doesn't add one — unless the limit was lowered.
-      if (seatsUsed(members.length, pending.length) > maxSeatsOf(inv.brand)) throw new TeamError(409, 'SEAT_LIMIT', 'This team has reached its seat limit.');
+      invalidate(ownerId);
+      // This invitation already reserves a seat, so accepting adds none — unless the plan changed since.
+      const acc = await account(inv.brand);
+      if (!acc.features.collaboration) planFail('plan_required');
+      if (acc.seatsUsed > acc.seatLimit) planFail('seat_limit');
       const now = new Date().toISOString();
+      const positionKeys = normalizePositions(fresh?.positionKeys ?? inv.positionKeys).keys; // persisted atomically with the membership
       const prev = await docs(MEMBERSHIP).findFirst({ filters: { brand: { documentId: brandId }, user: { id: user.id } } });
-      if (prev) await docs(MEMBERSHIP).update({ documentId: prev.documentId, data: { role: inv.role, status: 'active', joinedAt: now, roleUpdatedAt: now } });
-      else await docs(MEMBERSHIP).create({ data: { brand: brandId, user: user.id, role: inv.role, status: 'active', joinedAt: now, memberKey: `${brandId}:${user.id}` } });
+      if (prev) await docs(MEMBERSHIP).update({ documentId: prev.documentId, data: { role: inv.role, positionKeys, status: 'active', joinedAt: now, roleUpdatedAt: now } });
+      else await docs(MEMBERSHIP).create({ data: { brand: brandId, user: user.id, role: inv.role, positionKeys, status: 'active', joinedAt: now, memberKey: `${brandId}:${user.id}` } });
       await docs(INVITATION).update({ documentId: inv.documentId, data: { status: 'accepted', acceptedBy: user.id, acceptedAt: now, pendingKey: null } });
       await log(brandId, user, 'member.joined', inv.documentId, displayName(user), [{ field: 'role', from: null, to: inv.role }]);
       return { brandId };
-    });
+    }, ownerId);
   }
 
   async function decline(inv, user) {
@@ -254,7 +309,7 @@ module.exports = ({ strapi }) => {
     const expired = inv.status === 'pending' && new Date(inv.expiresAt) < new Date();
     return {
       status: expired ? 'expired' : inv.status, brandName: inv.brand?.name ?? '—', brandColor: inv.brand?.color ?? '#6C4CF5',
-      inviterName: displayName(inv.invitedBy), email: inv.email, role: inv.role, expiresAt: inv.expiresAt,
+      inviterName: displayName(inv.invitedBy), email: inv.email, role: inv.role, positionKeys: Array.isArray(inv.positionKeys) ? inv.positionKeys : [], expiresAt: inv.expiresAt,
     };
   }
 
@@ -271,5 +326,5 @@ module.exports = ({ strapi }) => {
     }));
   }
 
-  return { TeamError, summary, invite, resend, cancel, updateRole, removeMember, leave, byToken, mineById, accept, decline, preview, mine, BRAND };
+  return { TeamError, summary, invite, resend, cancel, updateRole, updateMember, removeMember, leave, byToken, mineById, accept, decline, preview, mine, BRAND };
 };

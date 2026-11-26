@@ -16,6 +16,15 @@ const payee = computed(() => props.order.payee ?? { promptpayId: String(config.p
 const amountBaht = computed(() => props.order.amountSatang / 100)
 // Our encoder only emits rect/path markup for a payload we build from server data.
 const qr = computed(() => qrSvg(promptPayPayload(payee.value.promptpayId, amountBaht.value)))
+/** What this order buys: credits, a month of a plan, or brand add-ons. */
+const orderLabel = useOrderLabel()
+const item = computed(() => orderLabel(props.order))
+const paidTitle = computed(() => {
+  const o = props.order
+  if (o.kind === 'plan' && o.planKey) return t('plan.activated', { plan: t(`plan.names.${o.planKey}`) })
+  if (o.kind === 'brand_addon' || o.kind === 'renewal') return t('plan.addonActivated')
+  return t('pay.paidTitle', { n: o.credits })
+})
 const expiresIn = computed(() => (props.order.expiresAt ? formatDateTime(props.order.expiresAt, locale.value) : ''))
 
 async function copy(text: string, label: string) {
@@ -94,8 +103,8 @@ onBeforeUnmount(clearSlip)
     <!-- Paid -->
     <div v-if="order.status === 'paid'" class="flex flex-col items-center py-4 text-center">
       <ResultIcon type="success" :size="84" />
-      <p class="mt-4 font-display text-2xl font-bold">{{ t('pay.paidTitle', { n: order.credits }) }}</p>
-      <p class="mt-1 text-sm text-muted">{{ t('pay.paidBody') }}</p>
+      <p class="mt-4 font-display text-2xl font-bold">{{ paidTitle }}</p>
+      <p class="mt-1 text-sm text-muted">{{ order.kind === 'credits' || !order.kind ? t('pay.paidBody') : t('plan.activatedBody') }}</p>
     </div>
 
     <!-- Expired / failed -->
@@ -159,7 +168,7 @@ onBeforeUnmount(clearSlip)
             </dd>
           </div>
           <div class="flex items-center justify-between gap-3 px-4 py-2.5">
-            <dt class="text-muted">{{ t('pay.credits') }}</dt><dd class="font-semibold">{{ order.credits }}</dd>
+            <dt class="text-muted">{{ order.kind === 'credits' || !order.kind ? t('pay.credits') : t('plan.title') }}</dt><dd class="text-right font-semibold">{{ order.kind === 'credits' || !order.kind ? order.credits : item }}</dd>
           </div>
         </dl>
         <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">

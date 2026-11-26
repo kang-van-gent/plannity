@@ -5,7 +5,7 @@
     "singularName": "payment-order",
     "pluralName": "payment-orders",
     "displayName": "Payment Order",
-    "description": "PromptPay: pending \u2192 awaiting_review (slip uploaded) \u2192 paid / rejected; pending expires. Money in satang. Credits are granted once when status becomes paid."
+    "description": "PromptPay: pending → awaiting_review (slip uploaded) → paid / rejected; pending expires. Money in satang. When paid: credits are added, or a month of the plan / brand add-on starts — exactly once per order."
   },
   "options": {
     "draftAndPublish": false
@@ -19,8 +19,9 @@
     },
     "credits": {
       "type": "integer",
-      "required": true,
-      "min": 1
+      "min": 0,
+      "default": 0,
+      "description": "Credits bought (kind = credits)."
     },
     "amountSatang": {
       "type": "biginteger",
@@ -91,6 +92,34 @@
       "type": "json",
       "private": true,
       "description": "Raw slip-verification result (Slip2Go) for audit."
+    },
+    "kind": {
+      "type": "enumeration",
+      "enum": [
+        "credits",
+        "plan",
+        "brand_addon",
+        "renewal"
+      ],
+      "default": "credits",
+      "required": true
+    },
+    "planKey": {
+      "type": "enumeration",
+      "enum": [
+        "team",
+        "studio"
+      ],
+      "description": "kind = plan / renewal: one month of this plan."
+    },
+    "quantity": {
+      "type": "integer",
+      "min": 1,
+      "description": "kind = brand_addon: brands added for one month."
+    },
+    "brandIds": {
+      "type": "json",
+      "description": "kind = renewal: brands (documentIds) renewed for one month each."
     }
   }
 }

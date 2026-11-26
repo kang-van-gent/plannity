@@ -6,8 +6,11 @@
 
 import type {
   ActivityChange, Brand, BrandInput, BrandInvitation, BrandMember, BrandRole, Content, ContentDraft, ContentImage, ContentQuery, DashboardSummary, GenerationInput, GenerationJob,
-  Holiday, ItemStatus, LedgerEntry, LedgerType, Paginated, PaymentOrder, PromotionInquiry, User, Wallet,
+  Holiday, ItemStatus, LedgerEntry, LedgerType, OrderInput, Paginated, PaymentOrder, PlanKey, PositionKey, PromotionInquiry, Task, TaskAction, User, Wallet,
 } from '~/types'
+import { DEFAULT_PRICING, activePlan, addBillingMonths, brandCoverage, brandCreateErrorFor, featureFlags, nextPeriod, renewalStart, seatCount, slotAssignments } from '~/utils/pricing'
+import { normalizePositions } from '~/utils/positions'
+import { TASK_TRANSITIONS, OPEN_TASK_STATUSES, actorCapabilities, assigneeError, isOverdue, transitionError } from '~/utils/tasks'
 import { inviteError, leaveError, removeError, roleCan, roleChangeError, type Permission } from '~/utils/permissions'
 import { DEFAULT_IMAGE_LIMITS, IMAGE_MIME_TYPES, sniffFile, type ImageLimits } from '~/utils/images'
 import { CONTENT_AUDIT_FIELDS, classifyBrand, classifyContent, diffBrand, diffFields } from '~/utils/activity'
@@ -16,15 +19,13 @@ import { addDays, diffDays, isValidISODate, nowISO, todayISO } from '~/utils/dat
 import { normalizeTitle, uid } from '~/utils/format'
 import { buildContentCsv } from '~/utils/csv'
 import { ApiError, type DataSource } from '../contract'
-import { buildSeed, membership, type MockBrand, type MockContentImage, type MockDB, type MockInvitation, type MockJob, type Owned } from './seed'
+import { buildSeed, membership, seedPlans, type MockBrand, type MockContentImage, type MockDB, type MockInvitation, type MockJob, type MockTask, type Owned } from './seed'
 import { hashString, mockGenerate, validateDraft } from './llm'
 
 const DB_KEY = 'plannity-mock-db-v3'
 const CFG_KEY = 'plannity-mock-config'
 const PRICE_SATANG = 1000
 const TRIAL_CREDITS = 3
-/** Default seats per brand (active members + pending invitations) until plans exist. */
-const DEFAULT_SEATS = 5
 const INVITE_TTL_DAYS = 7
 
 export interface MockConfig {
@@ -59,6 +60,18 @@ function load(): MockDB {
   }
   db.contentImages ??= []
   db.activity ??= []
+  // Pricing v0.2 / positions / tasks: older demo data gets the demo plans and empty tags.
+  if (!db.subscriptions) {
+    db.subscriptions = []
+    db.addons = []
+    if (db.users.some((u) => u.id === 'u_demo')) seedPlans(db, todayISO())
+    persist()
+  }
+  db.tasks ??= []
+  db.taskEvents ??= []
+  for (const m of db.memberships) m.positionKeys ??= []
+  for (const i of db.invitations) i.positionKeys ??= []
+  for (const a of db.addons) a.brandId ??= null
   return db
 }
 
@@ -146,8 +159,65 @@ export function createMockSource(getToken: () => string | null | undefined, limi
   function activeMember(brandId: string, userId: string) {
     return load().memberships.find((m) => m.brandId === brandId && m.userId === userId && m.status === 'active')
   }
-  function roleIn(brandId: string): BrandRole | null {
+  // ---- Plans & entitlements (pricing.md v0.2) — the paying account is brand.ownerId.
+  function planOf(ownerId: string) {
+    const d = load()
+    const now = nowISO()
+    const subs = d.subscriptions.filter((s) => s.ownerId === ownerId)
+    const active = activePlan(subs, now)
+    const owned = d.brands.filter((b) => b.ownerId === ownerId)
+    const slots = () => d.addons.filter((a) => a.ownerId === ownerId)
+    // Unused paid slots go to locked brands (oldest first) — e.g. after buying slots, or when Studio ends.
+    if (active.planKey !== 'studio') {
+      for (const { slotId, brandId } of slotAssignments(brandCoverage(owned, active.planKey, active.periodEnd, slots(), now), slots(), now)) {
+        const row = d.addons.find((a) => a.id === slotId)!
+        if (row.quantity > 1) {
+          row.quantity--
+          d.addons.push({ ...row, id: `add_${nextSeq()}`, brandId, quantity: 1, orderKey: null })
+        } else row.brandId = brandId
+      }
+    }
+    const coverage = brandCoverage(owned, active.planKey, active.periodEnd, slots(), now)
+    const last = subs.filter((x) => x.status === 'active').sort((a, b) => b.periodEnd.localeCompare(a.periodEnd) || (a.planKey === 'studio' ? -1 : 1) - (b.planKey === 'studio' ? -1 : 1))[0]
+    return {
+      planKey: active.planKey, periodEnd: active.periodEnd, subs, coverage, lastPlanKey: last?.planKey ?? null, lastPlanEnd: last?.periodEnd ?? null,
+      addonUnits: coverage.brands.filter((b) => b.kind === 'slot').length + coverage.freeSlots,
+    }
+  }
+  function brandPlan(brandId: string) {
+    const b = load().brands.find((x) => x.id === brandId)
+    const plan = b ? planOf(b.ownerId) : null
+    const cover = plan?.coverage.brands.find((x) => x.id === brandId) ?? null
+    const planKey: PlanKey = plan?.planKey ?? 'solo'
+    return { ownerId: b?.ownerId ?? null, planKey, features: featureFlags(planKey), locked: !!cover?.locked, cover }
+  }
+  /** Unique people across every brand the account owns (owner always counted); pending invites reserve a seat. */
+  function seatUsage(ownerId: string) {
+    const d = load()
+    expireInvites()
+    const owned = new Set(d.brands.filter((b) => b.ownerId === ownerId).map((b) => b.id))
+    const members = d.memberships.filter((m) => owned.has(m.brandId) && m.status === 'active').map((m) => ({ userId: m.userId, email: d.users.find((u) => u.id === m.userId)?.email ?? null }))
+    if (!members.some((m) => m.userId === ownerId)) members.push({ userId: ownerId, email: d.users.find((u) => u.id === ownerId)?.email ?? null })
+    const pendingEmails = d.invitations.filter((i) => owned.has(i.brandId) && i.status === 'pending').map((i) => i.email)
+    return { members, pendingEmails, used: seatCount(members, pendingEmails) }
+  }
+  function storedRole(brandId: string): BrandRole | null {
     return activeMember(brandId, uidOf())?.role ?? null
+  }
+  /**
+   * Effective role. Locked brands (no slot / Studio cover) are read-only for
+   * everyone until renewed; collaborators are read-only while the owner's plan
+   * lacks collaboration. Nothing is ever deleted.
+   */
+  function roleIn(brandId: string): BrandRole | null {
+    const role = storedRole(brandId)
+    if (!role || role === 'viewer') return role
+    const { ownerId, features, locked } = brandPlan(brandId)
+    if (locked) return 'viewer'
+    return ownerId === uidOf() || features.collaboration ? role : 'viewer'
+  }
+  function planRequired(what: string): never {
+    throw new ApiError(402, 'PLAN_REQUIRED', `${what} needs a Team or Studio plan on the brand owner's account.`)
   }
   /** Brands the current user is an active member of. */
   function myBrandIds(): Set<string> {
@@ -170,8 +240,15 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     return c
   }
   function brandView(b: MockBrand): Brand {
-    const { ownerId: _o, maxSeats, ...rest } = clone(b)
-    return { ...rest, myRole: roleIn(b.id) ?? 'viewer', maxSeats: maxSeats ?? DEFAULT_SEATS }
+    const { ownerId, ...rest } = clone(b) as MockBrand & { maxSeats?: number }
+    delete rest.maxSeats // pre-v0.2 demo data
+    const plan = brandPlan(b.id)
+    const role = roleIn(b.id)
+    return {
+      ...rest, myRole: role ?? 'viewer', myPositionKeys: activeMember(b.id, uidOf())?.positionKeys ?? [], planKey: plan.planKey, features: plan.features,
+      isBillingOwner: ownerId === uidOf(), suspended: !!role && role !== storedRole(b.id) && !plan.locked,
+      locked: plan.locked, coverKind: plan.cover?.kind ?? 'included', coveredUntil: plan.cover?.until ?? null,
+    }
   }
   function imagesOf(contentId: string): MockContentImage[] {
     return load().contentImages.filter((i) => i.contentId === contentId).sort((a, b) => a.sortOrder - b.sortOrder)
@@ -278,7 +355,41 @@ export function createMockSource(getToken: () => string | null | undefined, limi
   /** Normalises orders saved before PromptPay fields existed. */
   function orderView(o: Owned<PaymentOrder>): PaymentOrder {
     const v = strip(o) as PaymentOrder
-    return { ...v, reference: v.reference ?? `PLN-${o.id.slice(-6).toUpperCase()}`, payee: v.payee ?? null, slipUploadedAt: v.slipUploadedAt ?? null, reviewNote: v.reviewNote ?? null, expiresAt: v.expiresAt ?? null }
+    return {
+      ...v, kind: v.kind ?? 'credits', planKey: v.planKey ?? null, quantity: v.quantity ?? null,
+      reference: v.reference ?? `PLN-${o.id.slice(-6).toUpperCase()}`, payee: v.payee ?? null, slipUploadedAt: v.slipUploadedAt ?? null, reviewNote: v.reviewNote ?? null, expiresAt: v.expiresAt ?? null,
+    }
+  }
+  /** Delivers what a paid order bought — exactly once per order (unique ledger / orderKey). */
+  function fulfill(o: Owned<PaymentOrder>) {
+    const d = load()
+    const kind = o.kind ?? 'credits'
+    const orderKey = `order:${o.id}`
+    if (kind === 'credits') { post(o.ownerId, 'purchase', o.credits, 0, 'payment', o.id, `purchase:${o.id}`); return }
+    const now = nowISO()
+    if (kind === 'plan' && o.planKey && !d.subscriptions.some((x) => x.orderKey === orderKey)) {
+      const period = nextPeriod(o.planKey, d.subscriptions.filter((x) => x.ownerId === o.ownerId), now)
+      d.subscriptions.push({ id: `sub_${nextSeq()}`, ownerId: o.ownerId, planKey: o.planKey, status: 'active', ...period, orderKey })
+    }
+    if (kind === 'brand_addon' && o.quantity && !d.addons.some((x) => x.orderKey === orderKey)) {
+      // Unused slots: given to locked brands first, otherwise waiting for a new brand.
+      d.addons.push({ id: `add_${nextSeq()}`, ownerId: o.ownerId, brandId: null, quantity: o.quantity, status: 'active', periodStart: now, periodEnd: addBillingMonths(now, 1), orderKey })
+    }
+    if (kind === 'renewal' && !d.addons.some((x) => x.orderKey?.startsWith(`${orderKey}:`)) && !d.subscriptions.some((x) => x.orderKey === orderKey)) {
+      const before = planOf(o.ownerId)
+      if (o.planKey) {
+        const period = nextPeriod(o.planKey, d.subscriptions.filter((x) => x.ownerId === o.ownerId), now)
+        d.subscriptions.push({ id: `sub_${nextSeq()}`, ownerId: o.ownerId, planKey: o.planKey, status: 'active', ...period, orderKey })
+      }
+      // Each brand continues from where its own cover ends (or from now if it lapsed).
+      for (const brandId of o.brandIds ?? []) {
+        const cover = before.coverage.brands.find((b) => b.id === brandId)
+        if (!cover || cover.kind === 'included') continue
+        const start = renewalStart(cover.paidUntil, now)
+        d.addons.push({ id: `add_${nextSeq()}`, ownerId: o.ownerId, brandId, quantity: 1, status: 'active', periodStart: start, periodEnd: addBillingMonths(start, 1), orderKey: `${orderKey}:${brandId}` })
+      }
+      d.addons.push({ id: `add_${nextSeq()}`, ownerId: o.ownerId, brandId: null, quantity: 1, status: 'cancelled', periodStart: now, periodEnd: now, orderKey: `${orderKey}:done` })
+    }
   }
 
   // ------------------------------------------------------------ the API
@@ -412,6 +523,11 @@ export function createMockSource(getToken: () => string | null | undefined, limi
       async create(input) {
         await net()
         validateBrand(input)
+        // 2 brands free; more need Studio or a free paid slot. Archived brands still count.
+        const plan = planOf(uidOf())
+        if (brandCreateErrorFor(plan.coverage, plan.planKey)) {
+          throw new ApiError(402, 'BRAND_LIMIT', 'Your plan has no free brand slot. Add a brand (฿99/month) or upgrade to Studio.')
+        }
         const now = nowISO()
         const b: MockBrand = { id: `b_${nextSeq()}`, ownerId: uidOf(), name: input.name.trim(), color: input.color, profile: clone(input.profile), archivedAt: null, createdAt: now, updatedAt: now }
         load().brands.push(b)
@@ -434,7 +550,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
       async archive(id) {
         await net()
         const b = brandAccess(id, 'brand.delete') // archiving is the owner-only "delete"
-        b.archivedAt = nowISO() // history is retained, nothing is deleted
+        b.archivedAt = nowISO() // history is retained, nothing is deleted (it still uses its slot)
         logActivity(b.id, 'brand.archived', 'brand', b.id, b.name)
         persist()
         return brandView(b)
@@ -574,12 +690,16 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const members: BrandMember[] = d.memberships.filter((m) => m.brandId === b.id && m.status === 'active')
           .map((m) => {
             const u = d.users.find((x) => x.id === m.userId)
-            return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, joinedAt: m.joinedAt, isYou: m.userId === me }
+            return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, positionKeys: [...m.positionKeys], joinedAt: m.joinedAt, isYou: m.userId === me }
           })
           .sort((x, y) => ROLE_ORDER[x.role] - ROLE_ORDER[y.role] || x.joinedAt.localeCompare(y.joinedAt))
         const invitations = d.invitations.filter((i) => i.brandId === b.id && i.status === 'pending').map(inviteView)
           .sort((x, y) => y.createdAt.localeCompare(x.createdAt))
-        return { brandId: b.id, maxSeats: b.maxSeats ?? DEFAULT_SEATS, seatsUsed: members.length + invitations.length, members, invitations }
+        const plan = brandPlan(b.id)
+        return {
+          brandId: b.id, members, invitations, seatLimit: DEFAULT_PRICING.plans[plan.planKey].maxMembers, seatsUsed: seatUsage(b.ownerId).used,
+          planKey: plan.planKey, features: plan.features, isBillingOwner: b.ownerId === me,
+        }
       },
       async invite(brandId, input) {
         await net()
@@ -597,16 +717,23 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         if (d.invitations.some((i) => i.brandId === b.id && i.email === email && i.status === 'pending')) {
           throw new ApiError(409, 'DUPLICATE_INVITE', 'An invitation has already been sent.')
         }
-        if (seatsUsedIn(b.id) >= (b.maxSeats ?? DEFAULT_SEATS)) throw new ApiError(409, 'SEAT_LIMIT', 'Your team has reached its seat limit.')
+        const pos = normalizePositions(input.positionKeys)
+        if (pos.error) fieldError({ positionKeys: 'invalid_position' })
+        // Seats: one pool across all of the owner's brands; someone already counted uses no new seat.
+        const plan = brandPlan(b.id)
+        if (!plan.features.collaboration) planRequired('Inviting teammates')
+        const usage = seatUsage(b.ownerId)
+        const counted = usage.members.some((m) => m.email === email) || usage.pendingEmails.includes(email)
+        if (!counted && usage.used + 1 > DEFAULT_PRICING.plans[plan.planKey].maxMembers) throw new ApiError(409, 'SEAT_LIMIT', 'All seats on this plan are in use.')
         const token = randomToken()
         const now = nowISO()
         const inv: MockInvitation = {
-          id: `inv_${nextSeq()}`, brandId: b.id, email, role: input.role, tokenHash: await sha256(token), status: 'pending',
+          id: `inv_${nextSeq()}`, brandId: b.id, email, role: input.role, positionKeys: pos.keys, tokenHash: await sha256(token), status: 'pending',
           invitedByUserId: uidOf(), expiresAt: new Date(Date.now() + INVITE_TTL_DAYS * 864e5).toISOString(),
           acceptedByUserId: null, acceptedAt: null, createdAt: now, updatedAt: now,
         }
         d.invitations.push(inv)
-        logActivity(b.id, 'member.invited', 'member', inv.id, email, [{ field: 'role', from: null, to: input.role }])
+        logActivity(b.id, 'member.invited', 'member', inv.id, email, [{ field: 'role', from: null, to: input.role }, ...(pos.keys.length ? [{ field: 'positions', from: null, to: pos.keys }] : [])])
         persist()
         return { invitation: inviteView(inv), inviteUrl: inviteUrl(token), emailSent: false }
       },
@@ -643,8 +770,24 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         if (m.role !== role) logActivity(b.id, 'member.role_changed', 'member', m.id, load().users.find((x) => x.id === m.userId)?.name ?? null, [{ field: 'role', from: m.role, to: role }])
         Object.assign(m, { role, roleUpdatedAt: nowISO(), updatedAt: nowISO() })
         persist()
-        const u = load().users.find((x) => x.id === m.userId)
-        return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, joinedAt: m.joinedAt, isYou: m.userId === uidOf() }
+        return memberView(m)
+      },
+      async updatePositions(brandId, memberId, positionKeys) {
+        await net()
+        const b = brandAccess(brandId, 'brand.read')
+        const m = load().memberships.find((x) => x.id === memberId && x.brandId === b.id && x.status === 'active')
+        if (!m) throw new ApiError(404, 'NOT_FOUND', 'Member not found')
+        const pos = normalizePositions(positionKeys)
+        if (pos.error) fieldError({ positionKeys: 'invalid_position' })
+        if (!brandPlan(b.id).features.memberPositions) planRequired('Position tags')
+        // Same rule as roles: managers only; only an Owner edits an Owner's membership. Role/seats/tasks untouched.
+        throwMemberError(roleChangeError(roleIn(b.id)!, m.role, m.role, ownerCount(b.id)))
+        if (m.positionKeys.join() !== pos.keys.join()) {
+          logActivity(b.id, 'member.positions_changed', 'member', m.id, load().users.find((x) => x.id === m.userId)?.name ?? null, [{ field: 'positions', from: m.positionKeys, to: pos.keys }])
+        }
+        Object.assign(m, { positionKeys: pos.keys, updatedAt: nowISO() })
+        persist()
+        return memberView(m)
       },
       async remove(brandId, memberId) {
         await net()
@@ -677,7 +820,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const b = d.brands.find((x) => x.id === inv.brandId)
         return {
           status: inv.status, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5',
-          inviterName: d.users.find((u) => u.id === inv.invitedByUserId)?.name ?? '—', email: inv.email, role: inv.role, expiresAt: inv.expiresAt,
+          inviterName: d.users.find((u) => u.id === inv.invitedByUserId)?.name ?? '—', email: inv.email, role: inv.role, positionKeys: inv.positionKeys, expiresAt: inv.expiresAt,
         }
       },
       async accept(token) {
@@ -901,9 +1044,34 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         expireOrders(uidOf())
         return load().orders.filter((o) => o.ownerId === uidOf()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(orderView)
       },
-      async createOrder(credits) {
+      async createOrder(raw) {
         await net()
-        if (!Number.isInteger(credits) || credits < 1 || credits > 500) fieldError({ credits: 'invalid_credits' })
+        const input: OrderInput = typeof raw === 'number' ? { kind: 'credits', credits: raw } : raw
+        // The amount always comes from the price list, never from the page.
+        let amountSatang = 0
+        let credits = 0
+        if (input.kind === 'credits') {
+          credits = input.credits
+          if (!Number.isInteger(credits) || credits < 1 || credits > 500) fieldError({ credits: 'invalid_credits' })
+          amountSatang = credits * PRICE_SATANG
+        } else if (input.kind === 'plan') {
+          if (input.planKey !== 'team' && input.planKey !== 'studio') fieldError({ planKey: 'invalid' })
+          amountSatang = DEFAULT_PRICING.plans[input.planKey].monthlySatang
+        } else if (input.kind === 'renewal') {
+          // One payment for everything: an optional plan month + a month for each listed extra brand.
+          const plan = planOf(uidOf())
+          const extra = new Set(plan.coverage.brands.filter((b) => b.kind !== 'included').map((b) => b.id))
+          const ids = input.brandIds ?? []
+          if (ids.some((x) => !extra.has(x)) || new Set(ids).size !== ids.length) fieldError({ brandIds: 'invalid' })
+          if (input.planKey && input.planKey !== 'team' && input.planKey !== 'studio') fieldError({ planKey: 'invalid' })
+          if (input.planKey === 'studio' && ids.length) fieldError({ brandIds: 'invalid' }) // Studio covers every brand
+          if (!input.planKey && !ids.length) fieldError({ brandIds: 'required' })
+          amountSatang = (input.planKey ? DEFAULT_PRICING.plans[input.planKey].monthlySatang : 0) + ids.length * DEFAULT_PRICING.additionalBrandMonthlySatang
+        } else {
+          if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 20) fieldError({ quantity: 'invalid' })
+          if (planOf(uidOf()).planKey === 'studio') throw new ApiError(409, 'CONFLICT', 'Studio already includes unlimited brands.')
+          amountSatang = DEFAULT_PRICING.additionalBrandMonthlySatang * input.quantity
+        }
         // Never reuse an id (older demo data seeded po_1001/po_1002 while the counter started at 1000).
         let id = `po_${nextSeq()}`
         while (load().orders.some((o) => o.id === id)) id = `po_${nextSeq()}`
@@ -911,7 +1079,10 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         // Short, unambiguous code (no 0/O/1/I) the payer can type into the transfer note.
         const ref = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'[b % 32]).join('')
         const order: Owned<PaymentOrder> = {
-          id, ownerId: uidOf(), credits, amountSatang: credits * PRICE_SATANG, currency: 'THB', status: 'pending',
+          id, ownerId: uidOf(), kind: input.kind, credits, planKey: input.kind === 'plan' || input.kind === 'renewal' ? input.planKey : null,
+          quantity: input.kind === 'brand_addon' ? input.quantity : input.kind === 'renewal' ? input.brandIds.length : null,
+          brandIds: input.kind === 'renewal' ? [...input.brandIds] : undefined,
+          amountSatang, currency: 'THB', status: 'pending',
           provider: 'promptpay', providerRef: `pp_${ref.toLowerCase()}`, reference: `PLN-${ref}`,
           payee: { promptpayId: payment.promptpayId, name: payment.name }, slipUploadedAt: null, reviewNote: null,
           expiresAt: new Date(now + payment.ttlHours * 3600_000).toISOString(), createdAt: new Date(now).toISOString(), paidAt: null,
@@ -956,7 +1127,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         if (outcome === 'paid') {
           o.status = 'paid'
           o.paidAt = nowISO()
-          post(o.ownerId, 'purchase', o.credits, 0, 'payment', o.id, `purchase:${o.id}`) // idempotent: once per order
+          fulfill(o) // idempotent: once per order
         } else {
           Object.assign(o, { status: 'rejected', reviewNote: 'The amount or receiver on the slip did not match this order.' })
         }
@@ -980,6 +1151,134 @@ export function createMockSource(getToken: () => string | null | undefined, limi
           o.status = 'failed'
         }
         persist()
+      },
+    },
+
+    billing: {
+      async me() {
+        await net({ latency: 200 })
+        const me = uidOf()
+        const plan = planOf(me)
+        const now = nowISO()
+        const owned = load().brands.filter((b) => b.ownerId === me)
+        persist() // planOf may have given free slots to locked brands
+        return {
+          planKey: plan.planKey, periodEnd: plan.periodEnd, lastPlanKey: plan.lastPlanKey, lastPlanEnd: plan.lastPlanEnd,
+          brandAddons: plan.planKey === 'studio' ? 0 : plan.addonUnits, freeSlots: plan.coverage.freeSlots,
+          brandLimit: plan.planKey === 'studio' ? null : plan.coverage.brands.filter((b) => !b.locked).length + plan.coverage.freeSlots,
+          brandsOwned: owned.length,
+          brands: plan.coverage.brands.map((c) => {
+            const b = owned.find((x) => x.id === c.id)!
+            return { ...c, name: b.name, color: b.color, archivedAt: b.archivedAt, createdAt: b.createdAt }
+          }),
+          seatLimit: DEFAULT_PRICING.plans[plan.planKey].maxMembers, seatsUsed: seatUsage(me).used, features: featureFlags(plan.planKey),
+          upcoming: plan.subs.filter((x) => x.status === 'active' && x.periodStart > now).map((x) => ({ planKey: x.planKey, periodStart: x.periodStart, periodEnd: x.periodEnd })),
+          pricing: clone(DEFAULT_PRICING),
+        }
+      },
+      async simulateExpire() {
+        // Demo: end the current plan and add-ons now, to see what a lapsed plan does (nothing is deleted).
+        await net({ canFail: false })
+        const d = load()
+        const me = uidOf()
+        const now = nowISO()
+        for (const r of [...d.subscriptions, ...d.addons]) if (r.ownerId === me && r.periodEnd > now) r.periodEnd = now
+        persist()
+      },
+    },
+
+    tasks: {
+      async forContent(contentId) {
+        await net({ latency: 200 })
+        const c = contentAccess(contentId, 'content.read')
+        return load().tasks.filter((t) => t.contentId === c.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((t) => taskView(t, true))
+      },
+      async mine() {
+        await net()
+        const d = load()
+        const me = uidOf()
+        const myMembers = new Set(d.memberships.filter((m) => m.userId === me && m.status === 'active').map((m) => m.id))
+        const today = todayISO()
+        return d.tasks.filter((t) => t.assigneeMemberId && myMembers.has(t.assigneeMemberId) && roleIn(t.brandId)).map((t) => taskView(t))
+          .sort((a, b) => Number(isOverdue(b, today)) - Number(isOverdue(a, today)) || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'))
+      },
+      async forBrand(brandId) {
+        await net()
+        const b = brandAccess(brandId, 'brand.read')
+        return load().tasks.filter((t) => t.brandId === b.id).sort((a, c) => c.updatedAt.localeCompare(a.updatedAt)).map((t) => taskView(t))
+      },
+      async create(contentId, input) {
+        await net()
+        const d = load()
+        const c = contentAccess(contentId, 'content.read')
+        if (!brandPlan(c.brandId).features.taskAssignment) planRequired('Task assignment')
+        if (!actorCapabilities(roleIn(c.brandId), false, false).assign) throw new ApiError(403, 'FORBIDDEN', 'Your role does not allow this.')
+        checkTaskFields(input)
+        const member = d.memberships.find((m) => m.id === input.assigneeId && m.brandId === c.brandId)
+        taskFail(assigneeError(input.positionKey, member))
+        if (d.tasks.some((t) => t.activeKey === `${c.id}:design`)) throw new ApiError(409, 'CONFLICT', 'This post already has an open design task. Reassign or finish it first.')
+        const now = nowISO()
+        const t: MockTask = {
+          id: `t_${nextSeq()}`, brandId: c.brandId, contentId: c.id, type: 'design', positionKey: input.positionKey, assigneeMemberId: member!.id, assignedByUserId: uidOf(),
+          dueDate: input.dueDate || null, priority: input.priority || 'normal', note: input.note?.trim() || null, status: 'todo', reviewNote: null, completedAt: null,
+          briefVersion: c.version, briefSnapshot: c.visualBrief, version: 1, createdAt: now, updatedAt: now, activeKey: `${c.id}:design`,
+        }
+        d.tasks.push(t)
+        taskEvent(t, 'assigned', null, 'todo', t.note)
+        logContent(c, 'task.assigned', [{ field: 'assignee', from: null, to: memberName(member!.id) }, { field: 'dueDate', from: null, to: t.dueDate }])
+        persist()
+        return taskView(t, true)
+      },
+      async updateAssignment(taskId, input) {
+        await net()
+        const d = load()
+        const t = taskAccess(taskId)
+        if (!brandPlan(t.brandId).features.taskAssignment) planRequired('Task assignment')
+        const caps = actorCapabilities(roleIn(t.brandId), isAssignee(t), t.assignedByUserId === uidOf())
+        if (!caps.manager) throw new ApiError(403, 'FORBIDDEN', 'Your role does not allow this.')
+        if (!OPEN_TASK_STATUSES.includes(t.status)) throw new ApiError(409, 'CONFLICT', 'This task is already finished.')
+        if (input.version !== t.version) throw new ApiError(409, 'VERSION_CONFLICT', 'Someone else changed this task. Reload and try again.')
+        checkTaskFields(input)
+        const reassign = input.assigneeId !== undefined && input.assigneeId !== t.assigneeMemberId
+        const positionKey = input.positionKey ?? t.positionKey
+        if (reassign || input.positionKey) taskFail(assigneeError(positionKey, d.memberships.find((m) => m.id === (input.assigneeId ?? t.assigneeMemberId) && m.brandId === t.brandId)))
+        const from = t.status
+        const before = t.assigneeMemberId
+        Object.assign(t, { positionKey, version: t.version + 1, updatedAt: nowISO() })
+        if (input.dueDate !== undefined) t.dueDate = input.dueDate || null
+        if (input.priority !== undefined) t.priority = input.priority
+        if (input.note !== undefined) t.note = input.note?.trim() || null
+        if (reassign) {
+          Object.assign(t, { assigneeMemberId: input.assigneeId, status: 'todo', reviewNote: null })
+          taskEvent(t, 'reassigned', from, 'todo', input.note?.trim() || null)
+          const c = d.contents.find((x) => x.id === t.contentId)
+          if (c) logContent(c, 'task.reassigned', [{ field: 'assignee', from: before ? memberName(before) : null, to: memberName(input.assigneeId!) }])
+        } else {
+          taskEvent(t, 'updated', from, from, null)
+        }
+        persist()
+        return taskView(t, true)
+      },
+      async transition(taskId, action, input) {
+        await net()
+        const d = load()
+        const t = taskAccess(taskId)
+        if (!brandPlan(t.brandId).features.taskAssignment) planRequired('Task assignment')
+        if (input.version !== t.version) throw new ApiError(409, 'VERSION_CONFLICT', 'Someone else changed this task. Reload and try again.')
+        const caps = actorCapabilities(roleIn(t.brandId), isAssignee(t), t.assignedByUserId === uidOf())
+        taskFail(transitionError(action, t.status, caps, imagesOf(t.contentId).length, input.note ?? ''))
+        const from = t.status
+        const to = TASK_TRANSITIONS[action].to
+        Object.assign(t, { status: to, version: t.version + 1, updatedAt: nowISO() })
+        if (action === 'request_changes') t.reviewNote = input.note!.trim().slice(0, 1000)
+        if (to === 'completed') t.completedAt = nowISO()
+        if (to === 'completed' || to === 'cancelled') t.activeKey = null
+        taskEvent(t, action, from, to, input.note?.trim() || null)
+        const c = d.contents.find((x) => x.id === t.contentId)
+        const verb: Record<TaskAction, string> = { start: 'started', submit: 'submitted', approve: 'approved', request_changes: 'changes_requested', cancel: 'cancelled' }
+        if (c) logContent(c, `task.${verb[action]}`, [{ field: 'taskStatus', from, to }])
+        persist()
+        return taskView(t, true)
       },
     },
 
@@ -1109,15 +1408,13 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     const now = nowISO()
     for (const i of load().invitations) if (i.status === 'pending' && i.expiresAt < now) Object.assign(i, { status: 'expired', updatedAt: now })
   }
-  /** Seats = active members + pending invitations (cancelled/declined/expired don't count). */
-  function seatsUsedIn(brandId: string) {
-    const d = load()
-    return d.memberships.filter((m) => m.brandId === brandId && m.status === 'active').length
-      + d.invitations.filter((i) => i.brandId === brandId && i.status === 'pending').length
+  function memberView(m: MockDB['memberships'][number]): BrandMember {
+    const u = load().users.find((x) => x.id === m.userId)
+    return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, positionKeys: [...m.positionKeys], joinedAt: m.joinedAt, isYou: m.userId === uidOf() }
   }
   function inviteView(i: MockInvitation): BrandInvitation {
     const by = load().users.find((u) => u.id === i.invitedByUserId)
-    return { id: i.id, email: i.email, role: i.role, status: i.status, invitedByName: by?.name ?? '—', createdAt: i.createdAt, expiresAt: i.expiresAt }
+    return { id: i.id, email: i.email, role: i.role, positionKeys: [...i.positionKeys], status: i.status, invitedByName: by?.name ?? '—', createdAt: i.createdAt, expiresAt: i.expiresAt }
   }
   function inviteUrl(token: string) {
     return `${typeof location !== 'undefined' ? location.origin : ''}/invite/${token}`
@@ -1151,13 +1448,16 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     const d = load()
     const b = d.brands.find((x) => x.id === inv.brandId)
     if (!b) throw new ApiError(404, 'NOT_FOUND', 'Brand not found')
-    // Re-check seats at acceptance (this invitation is already counted in seatsUsedIn).
-    if (seatsUsedIn(b.id) > (b.maxSeats ?? DEFAULT_SEATS)) throw new ApiError(409, 'SEAT_LIMIT', 'This team has reached its seat limit.')
+    // Re-check the owner's plan at acceptance (this invitation already reserves its seat).
+    const plan = brandPlan(b.id)
+    if (!plan.features.collaboration) planRequired('Joining this team')
+    if (seatUsage(b.ownerId).used > DEFAULT_PRICING.plans[plan.planKey].maxMembers) throw new ApiError(409, 'SEAT_LIMIT', 'All seats on this plan are in use.')
     const me = uidOf()
     const now = nowISO()
     const prev = d.memberships.find((m) => m.brandId === b.id && m.userId === me) // one row per brand+user
-    if (prev) Object.assign(prev, { role: inv.role, status: 'active', joinedAt: now, updatedAt: now, roleUpdatedAt: now })
-    else d.memberships.push(membership(b.id, me, inv.role, now))
+    // Positions are saved together with the membership.
+    if (prev) Object.assign(prev, { role: inv.role, positionKeys: [...inv.positionKeys], status: 'active', joinedAt: now, updatedAt: now, roleUpdatedAt: now })
+    else d.memberships.push(membership(b.id, me, inv.role, now, [...inv.positionKeys]))
     Object.assign(inv, { status: 'accepted', acceptedByUserId: me, acceptedAt: now, updatedAt: now })
     logActivity(b.id, 'member.joined', 'member', inv.id, currentUser().name, [{ field: 'role', from: null, to: inv.role }])
     persist()
@@ -1168,6 +1468,68 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     Object.assign(inv, { status: 'declined', updatedAt: nowISO() })
     logActivity(inv.brandId, 'member.invite_declined', 'member', inv.id, inv.email)
     persist()
+  }
+
+  // ---- task helpers -------------------------------------------------------------
+  function memberName(memberId: string) {
+    const d = load()
+    const m = d.memberships.find((x) => x.id === memberId)
+    return d.users.find((u) => u.id === m?.userId)?.name ?? '—'
+  }
+  function isAssignee(t: MockTask) {
+    const m = load().memberships.find((x) => x.id === t.assigneeMemberId)
+    return !!m && m.status === 'active' && m.userId === uidOf()
+  }
+  /** Re-checks the caller's current membership; same 404 for "missing" and "not yours". */
+  function taskAccess(id: string): MockTask {
+    const t = load().tasks.find((x) => x.id === id)
+    if (!t || !roleIn(t.brandId)) throw new ApiError(404, 'NOT_FOUND', 'Task not found')
+    return t
+  }
+  const TASK_ERRORS: Record<string, [number, 'FORBIDDEN' | 'CONFLICT' | 'INVALID_INPUT', string, Record<string, string>?]> = {
+    forbidden: [403, 'FORBIDDEN', 'Your role does not allow this.'],
+    invalid_transition: [409, 'CONFLICT', 'This task has moved on. Reload to see its current status.'],
+    needs_image: [400, 'INVALID_INPUT', 'Attach at least one final image to the post before submitting.', { images: 'needs_image' }],
+    note_required: [400, 'INVALID_INPUT', 'Say what needs to change.', { note: 'required' }],
+    invalid_position: [400, 'INVALID_INPUT', 'Pick a design position.', { positionKey: 'invalid_position' }],
+    invalid_assignee: [400, 'INVALID_INPUT', 'That person is not an active member of this brand.', { assigneeId: 'invalid_assignee' }],
+    assignee_cannot_edit: [400, 'INVALID_INPUT', "Viewers can't take tasks — they can't edit posts.", { assigneeId: 'assignee_cannot_edit' }],
+    position_mismatch: [400, 'INVALID_INPUT', "That member doesn't have this position in this brand.", { assigneeId: 'position_mismatch' }],
+  }
+  function taskFail(code: string | null) {
+    if (!code) return
+    const [status, c, msg, fields] = TASK_ERRORS[code] ?? [400, 'INVALID_INPUT', code]
+    throw new ApiError(status, c, msg, fields ?? {})
+  }
+  function checkTaskFields(i: { dueDate?: string | null; priority?: string; note?: string }) {
+    const e: Record<string, string> = {}
+    if (i.dueDate && !isValidISODate(i.dueDate)) e.dueDate = 'invalid_date'
+    if (i.priority !== undefined && i.priority !== 'normal' && i.priority !== 'high') e.priority = 'invalid'
+    if (i.note && i.note.length > 1000) e.note = 'too_long'
+    if (Object.keys(e).length) fieldError(e)
+  }
+  function taskEvent(t: MockTask, action: string, fromStatus: Task['status'] | null, toStatus: Task['status'] | null, note: string | null) {
+    const u = currentUser()
+    load().taskEvents.push({ id: `te_${nextSeq()}`, taskId: t.id, actorId: u.id, actorName: u.name, action: action as never, fromStatus, toStatus, note, createdAt: nowISO() })
+  }
+  function taskView(t: MockTask, withEvents = false): Task {
+    const d = load()
+    const b = d.brands.find((x) => x.id === t.brandId)
+    const c = d.contents.find((x) => x.id === t.contentId)
+    const m = d.memberships.find((x) => x.id === t.assigneeMemberId)
+    const u = d.users.find((x) => x.id === m?.userId)
+    const { assigneeMemberId: _a, assignedByUserId, activeKey: _k, ...rest } = clone(t)
+    return {
+      ...rest, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5', contentTitle: c?.title ?? '—', contentScheduledDate: c?.scheduledDate ?? null,
+      imageCount: imagesOf(t.contentId).length,
+      assignee: m ? { memberId: m.id, userId: m.userId, name: u?.name ?? '—', positionKeys: [...m.positionKeys], active: m.status === 'active' } : null,
+      assignedByName: d.users.find((x) => x.id === assignedByUserId)?.name ?? '—',
+      briefChanged: t.briefSnapshot !== null && !!c && c.visualBrief !== t.briefSnapshot,
+      isMine: !!m && m.status === 'active' && m.userId === uidOf(), suspended: !brandPlan(t.brandId).features.taskAssignment,
+      caps: (({ assignee, reviewer, manager }) => brandPlan(t.brandId).features.taskAssignment ? { assignee, reviewer, manager } : { assignee: false, reviewer: false, manager: false })(
+        actorCapabilities(roleIn(t.brandId), !!m && m.status === 'active' && m.userId === uidOf(), assignedByUserId === uidOf())),
+      events: withEvents ? d.taskEvents.filter((e) => e.taskId === t.id).map(({ taskId: _t, actorId: _x, ...e }) => clone(e)) : undefined,
+    }
   }
 
   // ---- post image helpers -------------------------------------------------

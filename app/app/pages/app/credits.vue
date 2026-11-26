@@ -10,7 +10,8 @@ const notify = useNotify()
 const { wallet, refresh: refreshWallet } = useWallet()
 
 const ledger = useQuery(() => api.credits.ledger())
-const orders = useQuery(() => api.credits.orders())
+// Credit top-ups only; plan and brand add-on payments live on the plan page.
+const orders = useQuery(() => api.credits.orders().then((list) => list.filter((o) => (o.kind ?? 'credits') === 'credits')))
 onMounted(refreshWallet)
 const price = computed(() => wallet.value?.creditPriceSatang ?? 1000)
 const ledgerLimit = ref(15)

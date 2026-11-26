@@ -2,7 +2,8 @@
 
 const holidays = require('./seed/holidays.json');
 const { configureBuiltInProviders, registerAppleProvider } = require('./auth/social-providers');
-const { grantPurchase } = require('./services/credits');
+const { fulfillOrder } = require('./services/billing');
+const { invalidate } = require('./services/entitlements');
 
 /**
  * Actions the signed-in ("authenticated") role may call.
@@ -24,6 +25,8 @@ const AUTHENTICATED_ACTIONS = {
   'api::activity-log.activity-log': ['list'],
   'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip'],
   'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
+  'api::subscription.subscription': ['me'],
+  'api::task.task': ['forContent', 'create', 'mine', 'forBrand', 'updateAssignment', 'transition'],
 };
 
 /** Actions anyone may call without signing in (the public blog). */
@@ -84,16 +87,24 @@ module.exports = {
     await configureBuiltInProviders(strapi);
     await backfillOwnerMemberships(strapi);
 
-    // Credits are granted when an order becomes "paid" — by staff in the admin
-    // today, by the slip verifier later. Idempotent per order.
+    // An order becomes "paid" — by staff in the admin today, by the slip
+    // verifier later — and what it bought is delivered: credits, a plan month
+    // or brand add-ons. Idempotent per order.
     strapi.db.lifecycles.subscribe({
       models: ['api::payment-order.payment-order'],
       async afterUpdate(event) {
         const r = event.result;
         if (r && r.status === 'paid' && r.documentId) {
-          try { await grantPurchase(strapi, r.documentId); } catch (e) { strapi.log.error(`[credits] grant failed for ${r.documentId}: ${e.message}`); }
+          try { await fulfillOrder(strapi, r.documentId); } catch (e) { strapi.log.error(`[billing] fulfilment failed for ${r.documentId}: ${e.message}`); }
         }
       },
+    });
+    // Staff can also grant, extend or cancel plans/add-ons in the admin; entitlements follow at once.
+    strapi.db.lifecycles.subscribe({
+      models: ['api::subscription.subscription', 'api::subscription-add-on.subscription-add-on', 'api::brand.brand'],
+      afterCreate: () => invalidate(),
+      afterUpdate: () => invalidate(),
+      afterDelete: () => invalidate(),
     });
   },
 };

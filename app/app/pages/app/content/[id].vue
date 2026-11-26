@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, Archive, ArrowLeft, CalendarX2, Check, Copy, CopyPlus, Download, Eye, History, Megaphone, MessageSquareHeart, RefreshCw, Rocket, Save, Sparkles } from '@lucide/vue'
+import { Activity, Archive, CalendarX2, Check, Copy, CopyPlus, Download, Eye, History, Megaphone, MessageSquareHeart, RefreshCw, Rocket, Save, Sparkles } from '@lucide/vue'
 import { gsap } from 'gsap'
 import type { Content, ContentFormModel, ContentImage, ContentRevision, ContentStatus } from '~/types'
 import { CONTENT_STATUSES } from '~/types'
@@ -183,6 +183,10 @@ function restore(r: ContentRevision) {
 }
 
 const feedbackOpen = ref(false)
+const imagesEl = ref<{ $el?: HTMLElement } | null>(null)
+function focusImages() { imagesEl.value?.$el?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' }) }
+// "Upload design" from My Tasks lands here with #images.
+watch(() => q.ready.value, (ready) => { if (ready && route.hash === '#images') nextTick(() => setTimeout(focusImages, 300)) }, { immediate: true })
 onBeforeRouteLeave(async () => {
   if (!dirty.value) return true
   return await notify.confirm({ title: t('content.leaveConfirm'), message: t('content.leaveConfirmBody'), confirmLabel: t('content.leave'), tone: 'warning', notifyOnCancel: false })
@@ -191,7 +195,6 @@ onBeforeRouteLeave(async () => {
 
 <template>
   <div>
-    <NuxtLink to="/app/content" class="btn-ghost btn-sm mb-4 -ml-2"><ArrowLeft class="size-4" />{{ t('nav.library') }}</NuxtLink>
     <UiErrorState v-if="q.error.value && !content" :error="q.error.value" @retry="q.refresh()" />
     <UiSkeletonList v-else-if="!content || !form" :rows="3" />
     <template v-else>
@@ -214,7 +217,8 @@ onBeforeRouteLeave(async () => {
         </div>
       </div>
 
-      <p v-if="!canEdit" class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('content.viewOnly') }}</p>
+      <BrandLockBanner :brand="brand" />
+      <p v-if="!canEdit && !brand?.locked" class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('content.viewOnly') }}</p>
 
       <!-- Ready to post: caption + image(s) → copy, download, publish manually -->
       <section v-if="readyToPost" v-anim class="mb-5 flex flex-wrap items-center gap-3 rounded-[1.5rem] bg-gradient-to-r from-success/15 to-sky/15 p-4">
@@ -253,9 +257,13 @@ onBeforeRouteLeave(async () => {
               <ContentForm v-model="form" :brands="brands.active.value" :errors="errors" brand-locked />
             </fieldset>
           </div>
-          <ContentPostImages v-model="images" v-anim :content-id="content.id" :can-edit="canEdit" :title="content.title" />
+          <ContentPostImages ref="imagesEl" v-model="images" v-anim class="scroll-mt-24" :content-id="content.id" :can-edit="canEdit" :title="content.title" />
+          <!-- Approximate Facebook / Instagram / TikTok preview of the current (even unsaved) caption and images -->
+          <ContentPostPreview v-anim :caption="form.caption" :images="images" :brand-name="brand?.name ?? ''" :brand-color="brand?.color"
+            :platform="form.platform" :format="form.format" :unsaved="form.caption !== (content.caption ?? '')" />
         </div>
         <aside class="space-y-4">
+          <TaskCard v-anim :content="content" :brand="brand" :image-count="images.length" @upload-images="focusImages" />
           <section v-anim class="card card-pad">
             <h2 class="font-display text-lg font-bold">{{ t('content.schedule') }}</h2>
             <p class="mt-2 text-sm">

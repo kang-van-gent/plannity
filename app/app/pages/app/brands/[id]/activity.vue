@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ArrowLeft } from '@lucide/vue'
 import type { ActivityEntityType } from '~/types'
 
 // Brand activity log: who did what, when — brand details, content, team.
@@ -17,7 +16,6 @@ const filter = ref<ActivityEntityType | 'all'>('all')
 
 <template>
   <div class="mx-auto max-w-4xl">
-    <NuxtLink to="/app/brands" class="btn-ghost btn-sm mb-4 -ml-2"><ArrowLeft class="size-4" />{{ t('nav.brands') }}</NuxtLink>
     <UiErrorState v-if="brandQ.error.value" :error="brandQ.error.value" @retry="brandQ.refresh()" />
     <UiSkeletonList v-else-if="!brandQ.data.value || !brandQ.ready.value" :rows="3" />
     <template v-else>
@@ -29,6 +27,7 @@ const filter = ref<ActivityEntityType | 'all'>('all')
         </div>
       </div>
       <BrandTabs :brand-id="brandQ.data.value.id" active="activity" />
+      <BrandLockBanner :brand="brandQ.data.value" />
 
       <section v-anim class="card card-pad">
         <div class="segmented mb-4 w-full sm:w-auto" role="group" :aria-label="t('activity.title')">

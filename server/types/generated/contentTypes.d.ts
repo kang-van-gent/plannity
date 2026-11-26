@@ -622,6 +622,7 @@ export interface ApiBrandInvitationBrandInvitation
     pendingKey: Schema.Attribute.String &
       Schema.Attribute.Private &
       Schema.Attribute.Unique;
+    positionKeys: Schema.Attribute.JSON;
     publishedAt: Schema.Attribute.DateTime;
     role: Schema.Attribute.Enumeration<['admin', 'editor', 'viewer']> &
       Schema.Attribute.Required;
@@ -668,6 +669,7 @@ export interface ApiBrandMembershipBrandMembership
       Schema.Attribute.Required &
       Schema.Attribute.Private &
       Schema.Attribute.Unique;
+    positionKeys: Schema.Attribute.JSON;
     publishedAt: Schema.Attribute.DateTime;
     role: Schema.Attribute.Enumeration<['owner', 'admin', 'editor', 'viewer']> &
       Schema.Attribute.Required;
@@ -1214,7 +1216,7 @@ export interface ApiPaymentOrderPaymentOrder
   extends Struct.CollectionTypeSchema {
   collectionName: 'payment_orders';
   info: {
-    description: 'PromptPay: pending \u2192 awaiting_review (slip uploaded) \u2192 paid / rejected; pending expires. Money in satang. Credits are granted once when status becomes paid.';
+    description: 'PromptPay: pending \u2192 awaiting_review (slip uploaded) \u2192 paid / rejected; pending expires. Money in satang. When paid: credits are added, or a month of the plan / brand add-on starts \u2014 exactly once per order.';
     displayName: 'Payment Order';
     pluralName: 'payment-orders';
     singularName: 'payment-order';
@@ -1224,23 +1226,29 @@ export interface ApiPaymentOrderPaymentOrder
   };
   attributes: {
     amountSatang: Schema.Attribute.BigInteger & Schema.Attribute.Required;
+    brandIds: Schema.Attribute.JSON;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     credits: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
         {
-          min: 1;
+          min: 0;
         },
         number
-      >;
+      > &
+      Schema.Attribute.DefaultTo<0>;
     currency: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 3;
       }> &
       Schema.Attribute.DefaultTo<'THB'>;
     expiresAt: Schema.Attribute.DateTime;
+    kind: Schema.Attribute.Enumeration<
+      ['credits', 'plan', 'brand_addon', 'renewal']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'credits'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1248,9 +1256,17 @@ export interface ApiPaymentOrderPaymentOrder
     > &
       Schema.Attribute.Private;
     paidAt: Schema.Attribute.DateTime;
+    planKey: Schema.Attribute.Enumeration<['team', 'studio']>;
     provider: Schema.Attribute.String & Schema.Attribute.Required;
     providerRef: Schema.Attribute.String & Schema.Attribute.Unique;
     publishedAt: Schema.Attribute.DateTime;
+    quantity: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
     reference: Schema.Attribute.String &
       Schema.Attribute.Unique &
       Schema.Attribute.SetMinMaxLength<{
@@ -1342,6 +1358,240 @@ export interface ApiPromotionInquiryPromotionInquiry
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+  };
+}
+
+export interface ApiSubscriptionAddOnSubscriptionAddOn
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'subscription_add_ons';
+  info: {
+    description: 'One month of cover for one extra owned brand (\u0E3F99) \u2014 or an unused slot waiting for a new brand (brand empty). Renewals start where the previous month ends. Brands without cover are locked (read-only), never deleted.';
+    displayName: 'Brand Slot';
+    pluralName: 'subscription-add-ons';
+    singularName: 'subscription-add-on';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    brand: Schema.Attribute.Relation<'manyToOne', 'api::brand.brand'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::subscription-add-on.subscription-add-on'
+    > &
+      Schema.Attribute.Private;
+    orderKey: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    owner: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    periodEnd: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    periodStart: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    providerReference: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    quantity: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    status: Schema.Attribute.Enumeration<['active', 'cancelled']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'active'>;
+    type: Schema.Attribute.Enumeration<['brand']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'brand'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiSubscriptionSubscription
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'subscriptions';
+  info: {
+    description: "One paid month of a plan for an account (pricing.md). Created when a plan order is marked paid; the account's plan = the highest active period covering now. Set status to cancelled to revoke.";
+    displayName: 'Subscription';
+    pluralName: 'subscriptions';
+    singularName: 'subscription';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::subscription.subscription'
+    > &
+      Schema.Attribute.Private;
+    orderKey: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    owner: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    periodEnd: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    periodStart: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    planKey: Schema.Attribute.Enumeration<['team', 'studio']> &
+      Schema.Attribute.Required;
+    providerReference: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<['active', 'cancelled']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'active'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiTaskEventTaskEvent extends Struct.CollectionTypeSchema {
+  collectionName: 'task_events';
+  info: {
+    description: 'Append-only history of a task: who moved it, from what, to what, when.';
+    displayName: 'Task Event';
+    pluralName: 'task-events';
+    singularName: 'task-event';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    action: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+    actor: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    actorName: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fromStatus: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 30;
+      }>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::task-event.task-event'
+    > &
+      Schema.Attribute.Private;
+    note: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 1000;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    task: Schema.Attribute.Relation<'manyToOne', 'api::task.task'>;
+    toStatus: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 30;
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiTaskTask extends Struct.CollectionTypeSchema {
+  collectionName: 'tasks';
+  info: {
+    description: "Design work assigned on a post (Team/Studio brands). Separate from the post's own status; history is kept, never deleted.";
+    displayName: 'Task';
+    pluralName: 'tasks';
+    singularName: 'task';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    activeKey: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    assignedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    assignee: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::brand-membership.brand-membership'
+    >;
+    brand: Schema.Attribute.Relation<'manyToOne', 'api::brand.brand'>;
+    briefSnapshot: Schema.Attribute.Text;
+    briefVersion: Schema.Attribute.Integer;
+    completedAt: Schema.Attribute.DateTime;
+    content: Schema.Attribute.Relation<'manyToOne', 'api::content.content'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dueDate: Schema.Attribute.Date;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::task.task'> &
+      Schema.Attribute.Private;
+    note: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 1000;
+      }>;
+    positionKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+    priority: Schema.Attribute.Enumeration<['normal', 'high']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'normal'>;
+    publishedAt: Schema.Attribute.DateTime;
+    reviewNote: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 1000;
+      }>;
+    status: Schema.Attribute.Enumeration<
+      [
+        'todo',
+        'in_progress',
+        'in_review',
+        'changes_requested',
+        'completed',
+        'cancelled',
+      ]
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'todo'>;
+    type: Schema.Attribute.Enumeration<['design']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'design'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    version: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<1>;
   };
 }
 
@@ -1896,6 +2146,10 @@ declare module '@strapi/strapi' {
       'api::payment-event.payment-event': ApiPaymentEventPaymentEvent;
       'api::payment-order.payment-order': ApiPaymentOrderPaymentOrder;
       'api::promotion-inquiry.promotion-inquiry': ApiPromotionInquiryPromotionInquiry;
+      'api::subscription-add-on.subscription-add-on': ApiSubscriptionAddOnSubscriptionAddOn;
+      'api::subscription.subscription': ApiSubscriptionSubscription;
+      'api::task-event.task-event': ApiTaskEventTaskEvent;
+      'api::task.task': ApiTaskTask;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

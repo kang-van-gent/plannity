@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   ArrowRight, CalendarDays, Check, ChevronDown, EyeOff, FileDown, History, Images, Layers, ListChecks,
-  MessagesSquare, PenLine, Puzzle, ShieldCheck, Store, UserCog, Users, WandSparkles,
+  MessagesSquare, PenLine, Puzzle, Store, UserCog, Users,
 } from '@lucide/vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -33,8 +33,7 @@ const features = [
   { icon: CalendarDays, key: 'calendar' }, { icon: ListChecks, key: 'workflow' }, { icon: UserCog, key: 'roles' },
   { icon: History, key: 'activity' }, { icon: Images, key: 'images' }, { icon: Store, key: 'brands' }, { icon: FileDown, key: 'export' },
 ]
-// FAQ answers are plain strings from tm(), so the seat count is filled in here.
-const faqs = computed(() => tm<{ q: string; a: string }[]>('landing.faq.items').map((f) => ({ q: f.q, a: f.a.replace('{n}', String(seats)) })))
+const faqs = computed(() => tm<{ q: string; a: string }[]>('landing.faq.items'))
 const openFaq = ref<number | null>(0)
 const ctaWords = computed(() => t('landing.final.title').split(' '))
 const marquee = computed(() => features.map((d) => t(`landing.features.items.${d.key}.title`)))
@@ -121,9 +120,6 @@ onMounted(() => {
       const field = q(`[data-field="${(el as HTMLElement).dataset.deliverItem}"]`)
       if (field.length) tl.fromTo(field, { backgroundColor: 'rgba(108,76,245,0)' }, { backgroundColor: 'rgba(108,76,245,0.12)', duration: 0.5, yoyo: true, repeat: 1 }, i)
     })
-
-    // Pricing: the middle card rises above its neighbours.
-    gsap.fromTo(q('[data-price-hero]'), { y: 40, scale: 0.96 }, { y: -12, scale: 1.03, ease: 'none', scrollTrigger: { trigger: q('[data-pricing]')[0], start: 'top 90%', end: 'center 50%', scrub: true } })
 
     // Final CTA: words fill in as you scroll.
     gsap.fromTo(q('[data-word]'), { opacity: 0.12, y: 20 }, { opacity: 1, y: 0, stagger: 0.25, ease: 'none', scrollTrigger: { trigger: q('[data-final]')[0], start: 'top 80%', end: 'top 30%', scrub: true } })
@@ -297,38 +293,17 @@ onBeforeUnmount(() => {
       </ul>
     </section>
 
-    <!-- PRICING -->
-    <section id="pricing" data-pricing class="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 sm:px-8">
+    <!-- PRICING: Solo / Team / Studio (pricing.md) -->
+    <section id="pricing" class="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 sm:px-8">
       <div class="mx-auto max-w-2xl text-center">
         <span v-anim class="eyebrow">{{ t('landing.plans.eyebrow') }}</span>
         <h2 v-anim="1" class="section-title mt-4">{{ t('landing.plans.title') }}</h2>
+        <p v-anim="2" class="mt-4 text-lg text-muted">{{ t('landing.plans.subtitle') }}</p>
       </div>
-      <div class="mt-12 grid items-center gap-5 md:grid-cols-3">
-        <article v-anim="0" class="card card-pad">
-          <CalendarDays class="size-8 text-sky" />
-          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.plans.planning.title') }}</p>
-          <p class="mt-1 font-display text-4xl font-bold">{{ t('landing.plans.free') }}</p>
-          <p class="mt-3 text-sm text-muted">{{ t('landing.plans.planning.body') }}</p>
-        </article>
-        <article data-price-hero class="relative overflow-hidden rounded-3xl bg-ink p-6 text-white shadow-pop sm:p-8">
-          <Doodle variant="burst" class="absolute right-5 top-4 size-10 text-sun" />
-          <Users class="size-8 text-sun" />
-          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.plans.team.title') }}</p>
-          <p class="mt-1 font-display text-5xl font-bold">{{ t('landing.plans.free') }}</p>
-          <p class="mt-2 inline-flex rounded-full bg-white/10 px-3 py-1 text-sm font-bold text-sun">{{ t('landing.plans.team.value', { n: seats }) }}</p>
-          <p class="mt-3 text-sm text-white/70">{{ t('landing.plans.team.body') }}</p>
-          <NuxtLink to="/register" class="mt-6 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-ink">{{ t('landing.hero.cta') }}<ArrowRight class="size-4" /></NuxtLink>
-        </article>
-        <article v-anim="2" class="card card-pad border-dashed">
-          <WandSparkles class="size-8 text-pink" />
-          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.plans.ai.title') }}</p>
-          <p class="mt-1 font-display text-4xl font-bold text-muted">{{ t('landing.plans.ai.soon') }}</p>
-          <p class="mt-3 text-sm text-muted">{{ t('landing.plans.ai.body') }}</p>
-        </article>
+      <div class="mt-12"><BillingPlanCards /></div>
+      <div v-anim class="mt-8 text-center">
+        <NuxtLink to="/pricing" class="btn-secondary">{{ t('landing.plans.details') }}<ArrowRight class="size-4" /></NuxtLink>
       </div>
-      <ul v-anim class="mx-auto mt-8 grid max-w-4xl gap-2 text-sm text-muted sm:grid-cols-2">
-        <li v-for="(c, i) in tm<string[]>('landing.plans.points')" :key="i" class="flex gap-2"><ShieldCheck class="mt-0.5 size-4 shrink-0 text-success" />{{ c }}</li>
-      </ul>
     </section>
 
     <!-- FAQ -->

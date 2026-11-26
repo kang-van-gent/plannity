@@ -50,6 +50,8 @@ function fmt(field: string, v: unknown): string {
   const s = String(v)
   if (field === 'status') return t(`status.${s}`)
   if (field === 'role') return t(`roles.${s}`)
+  if (field === 'positions') return t(`positions.${s}`)
+  if (field === 'taskStatus') return t(`tasks.status.${s}`)
   if (field === 'objective') return t(`objectives.${s}`)
   if (field === 'format') return t(`formats.${s}`)
   if (field === 'platform' || field === 'profile.platforms') return PLATFORM_META[s as keyof typeof PLATFORM_META]?.label ?? s

@@ -31,5 +31,23 @@ export function useBrands() {
 
   const byId = (id: string | null | undefined) => brands.value.find((b) => b.id === id)
 
-  return { brands, active, loaded, scope, currentBrandId, currentBrand, setScope, load, byId }
+  /**
+   * A brand whose paid cover runs out while the app is open must lock right
+   * away, not at the next reload: mark it read-only locally the moment its end
+   * date passes, then reload so the server's view (the authority) replaces it.
+   */
+  function expireLapsed(): boolean {
+    const now = new Date().toISOString()
+    let changed = false
+    for (const b of brands.value) {
+      if (!b.locked && (b.coverKind === 'slot' || b.coverKind === 'plan') && b.coveredUntil && b.coveredUntil <= now) {
+        Object.assign(b, { locked: true, myRole: 'viewer' })
+        changed = true
+      }
+    }
+    if (changed) load(true).catch(() => {})
+    return changed
+  }
+
+  return { brands, active, loaded, scope, currentBrandId, currentBrand, setScope, load, byId, expireLapsed }
 }

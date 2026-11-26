@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, ChevronDown, Layers, Settings2 } from '@lucide/vue'
+import { Check, ChevronDown, Layers, Lock, Settings2 } from '@lucide/vue'
 import { gsap } from 'gsap'
 
 // Phones: an app-style title button that opens a bottom sheet.
@@ -24,7 +24,10 @@ function choose(id: string) {
   const changed = id !== scope.value
   setScope(id)
   close()
-  if (changed) notify.info(t('brands.switched'), id === 'all' ? t('brands.allBrands') : active.value.find((b) => b.id === id)?.name)
+  const b = active.value.find((x) => x.id === id)
+  // Locked brands can still be opened to view and download — but not edited.
+  if (changed && b?.locked) notify.warning(t('brands.lockedTitle'), b.isBillingOwner ? t('brands.lockedOwner') : t('brands.lockedMember'), b.isBillingOwner ? { action: { label: t('brands.renewBrand'), handler: () => navigateTo('/app/plan#brands') } } : undefined)
+  else if (changed) notify.info(t('brands.switched'), id === 'all' ? t('brands.allBrands') : b?.name)
 }
 function onDoc(e: MouseEvent) { if (root.value && !root.value.contains(e.target as Node)) open.value = false }
 watch(open, async (v) => {
@@ -89,6 +92,7 @@ function onDragUp() {
         <span class="block text-[11px] font-medium leading-tight text-muted sm:text-[10px] sm:font-semibold sm:uppercase sm:tracking-wider">{{ t('brands.scope') }}</span>
         <span class="flex min-w-0 items-center gap-1 font-display text-[17px] font-bold leading-tight sm:font-sans sm:text-sm sm:font-semibold">
           <span class="truncate">{{ currentBrand?.name ?? t('brands.allBrands') }}</span>
+          <Lock v-if="currentBrand?.locked" class="size-3.5 shrink-0 text-danger" :aria-label="t('brands.locked')" />
           <ChevronDown class="size-4 shrink-0 text-muted transition sm:hidden" :class="sheet ? 'rotate-180' : ''" />
         </span>
       </span>
@@ -106,7 +110,8 @@ function onDragUp() {
       <button v-for="b in active" :key="b.id" type="button" role="option" :aria-selected="scope === b.id"
         class="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold hover:bg-surface-2" @click="choose(b.id)">
         <UiBrandDot :name="b.name" :color="b.color" :size="28" />
-        <span class="min-w-0 flex-1 truncate">{{ b.name }}</span>
+        <span class="min-w-0 flex-1 truncate" :class="b.locked && 'text-muted'">{{ b.name }}</span>
+        <span v-if="b.locked" class="chip shrink-0 bg-danger/12 py-0.5 text-[11px] text-danger"><Lock class="size-3" />{{ t('brands.locked') }}</span>
         <Check v-if="scope === b.id" class="size-4 text-brand-500" />
       </button>
       <p v-if="!active.length" class="px-3 py-2 text-sm text-muted">{{ t('brands.none') }}</p>
@@ -139,7 +144,8 @@ function onDragUp() {
                 class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left font-semibold transition active:scale-[0.98]"
                 :class="scope === b.id ? 'bg-brand-500/10 text-brand-600 dark:text-brand-300' : 'active:bg-surface-2'" @click="choose(b.id)">
                 <UiBrandDot :name="b.name" :color="b.color" :size="40" />
-                <span class="min-w-0 flex-1 truncate">{{ b.name }}</span>
+                <span class="min-w-0 flex-1 truncate" :class="b.locked && 'text-muted'">{{ b.name }}</span>
+                <span v-if="b.locked" class="chip shrink-0 bg-danger/12 py-0.5 text-xs text-danger"><Lock class="size-3" />{{ t('brands.locked') }}</span>
                 <span class="grid size-6 place-items-center rounded-full" :class="scope === b.id ? 'bg-brand-500 text-white' : 'border-2 border-line'"><Check v-if="scope === b.id" class="size-3.5" /></span>
               </button>
               <p v-if="!active.length" class="px-3 py-2 text-sm text-muted">{{ t('brands.none') }}</p>

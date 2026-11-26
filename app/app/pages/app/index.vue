@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRight, CalendarClock, CheckCircle2, Coins, FilePen, Hourglass, Plus, Rocket, Send, Store, WandSparkles } from '@lucide/vue'
+import { ArrowRight, CalendarClock, CheckCircle2, Coins, FilePen, Hourglass, Plus, Send, Store, WandSparkles } from '@lucide/vue'
 import { gsap } from 'gsap'
 import type { ContentStatus } from '~/types'
 import { CONTENT_STATUSES } from '~/types'
@@ -39,9 +39,10 @@ const brandOf = (id: string) => brands.byId(id)
     </UiPageHeader>
 
     <TeamInvitationsBanner @changed="q.refresh({ silent: true })" />
+    <BillingRenewNotice class="mb-5" />
 
     <UiEmptyState v-if="noBrands" :icon="Store" :title="t('dashboard.emptyTitle')" :message="t('dashboard.emptyBody', { n: wallet?.available ?? 0 })">
-      <NuxtLink to="/app/brands/new?onboarding=1" class="btn-primary"><Rocket class="size-4" />{{ t('brands.create') }}</NuxtLink>
+      <BrandCreateButton onboarding />
     </UiEmptyState>
 
     <template v-else>

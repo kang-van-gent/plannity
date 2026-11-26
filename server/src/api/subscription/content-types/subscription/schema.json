@@ -1,0 +1,21 @@
+{
+  "kind": "collectionType",
+  "collectionName": "subscriptions",
+  "info": {
+    "singularName": "subscription",
+    "pluralName": "subscriptions",
+    "displayName": "Subscription",
+    "description": "One paid month of a plan for an account (pricing.md). Created when a plan order is marked paid; the account's plan = the highest active period covering now. Set status to cancelled to revoke."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "owner": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "planKey": { "type": "enumeration", "enum": ["team", "studio"], "required": true },
+    "status": { "type": "enumeration", "enum": ["active", "cancelled"], "default": "active", "required": true },
+    "periodStart": { "type": "datetime", "required": true },
+    "periodEnd": { "type": "datetime", "required": true },
+    "providerReference": { "type": "string", "maxLength": 40, "description": "Payment order reference, e.g. PLN-7KQ3XZ (empty when granted by staff)." },
+    "orderKey": { "type": "string", "unique": true, "private": true, "description": "order:<documentId> — guarantees one period per paid order." }
+  }
+}

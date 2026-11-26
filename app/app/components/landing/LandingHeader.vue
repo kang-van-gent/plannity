@@ -8,7 +8,7 @@ const menuOpen = ref(false)
 const links = computed(() => [
   { to: '/#how', label: t('nav.howItWorks') },
   { to: '/#features', label: t('nav.features') },
-  { to: '/#pricing', label: t('nav.pricing') },
+  { to: '/pricing', label: t('nav.pricing') },
   { to: '/blog', label: t('nav.blog') },
   { to: '/#faq', label: t('nav.faq') },
 ])

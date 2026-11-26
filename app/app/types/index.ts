@@ -57,11 +57,133 @@ export interface Brand {
   createdAt: ISODateTime
   updatedAt: ISODateTime
   contentCount?: number
-  /** The current user's role in this brand (Team Workspace). */
+  /** The current user's role in this brand (Team Workspace) — effective: read-only while collaboration is suspended. */
   myRole: BrandRole
-  /** Seat limit: active members + pending invitations. */
-  maxSeats: number
+  /** The current user's position tags in this brand (labels only). */
+  myPositionKeys: PositionKey[]
+  /** Plan of the account that owns (pays for) this brand, and what it allows here. */
+  planKey: PlanKey
+  features: FeatureFlags
+  /** True when the current user is the paying owner of this brand. */
+  isBillingOwner: boolean
+  /** The owner's plan no longer includes collaboration, so this member is read-only for now. */
+  suspended: boolean
+  /** No cover (its brand slot or Studio lapsed): read-only for everyone until renewed. */
+  locked: boolean
+  /** How the brand is paid for, and until when (null = free / no end). */
+  coverKind: BrandCoverKind
+  coveredUntil: ISODateTime | null
 }
+
+/** included = one of the 2 free brands · plan = covered by Studio · slot = its own monthly slot · none = locked */
+export type BrandCoverKind = 'included' | 'plan' | 'slot' | 'none'
+export interface BrandCover {
+  id: string
+  name: string
+  color: string
+  archivedAt: ISODateTime | null
+  createdAt: ISODateTime | null
+  kind: BrandCoverKind
+  /** When cover ends (Studio end or the slot's paid-until; null for free brands). */
+  until: ISODateTime | null
+  /** The brand's own slot cover — keeps counting after Studio ends. */
+  paidUntil: ISODateTime | null
+  locked: boolean
+}
+
+// ---- Plans & entitlements (pricing.md v0.2) ---------------------------------
+export type PlanKey = 'solo' | 'team' | 'studio'
+export interface FeatureFlags {
+  collaboration: boolean
+  memberPositions: boolean
+  taskAssignment: boolean
+  taskReview: boolean
+  postPreview: boolean
+  creativeBrief: boolean
+}
+export interface PlanConfig { key: PlanKey; monthlySatang: number; includedBrands: number | null; maxMembers: number; collaboration: boolean }
+export interface PricingConfig {
+  currency: 'THB'
+  plans: Record<PlanKey, PlanConfig>
+  additionalBrandMonthlySatang: number
+  aiContentCreditSatang: number
+  aiBriefCreditSatang: number
+}
+/** The signed-in account's plan, limits and usage. */
+export interface Entitlements {
+  planKey: PlanKey
+  /** End of the paid plan's current coverage (null on Solo). */
+  periodEnd: ISODateTime | null
+  brandAddons: number
+  /** Owned-brand capacity; null = unlimited (Studio). */
+  brandLimit: number | null
+  brandsOwned: number
+  seatLimit: number
+  seatsUsed: number
+  features: FeatureFlags
+  /** Last paid plan and its end (offered as "renew" after it lapses). */
+  lastPlanKey: Exclude<PlanKey, 'solo'> | null
+  lastPlanEnd: ISODateTime | null
+  /** Paid slots not yet used by a brand. */
+  freeSlots: number
+  /** Every owned brand and its cover, oldest first. */
+  brands: BrandCover[]
+  /** Paid months that start later (renewals / downgrades at period end). */
+  upcoming: { planKey: PlanKey; periodStart: ISODateTime; periodEnd: ISODateTime }[]
+  pricing: PricingConfig
+}
+
+// ---- Member positions --------------------------------------------------------
+export const POSITION_KEYS = [
+  'content_creator', 'graphic_designer', 'video_editor', 'marketing_manager', 'project_manager',
+  'stock_manager', 'social_media', 'photographer', 'client',
+] as const
+export type PositionKey = (typeof POSITION_KEYS)[number]
+
+// ---- Tasks -------------------------------------------------------------------
+export const TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'changes_requested', 'completed', 'cancelled'] as const
+export type TaskStatus = (typeof TASK_STATUSES)[number]
+export type TaskAction = 'start' | 'submit' | 'approve' | 'request_changes' | 'cancel'
+export type TaskPriority = 'normal' | 'high'
+export interface TaskEvent { id: string; action: TaskAction | 'assigned' | 'reassigned' | 'updated'; fromStatus: TaskStatus | null; toStatus: TaskStatus | null; actorName: string; note: string | null; createdAt: ISODateTime }
+export interface Task {
+  id: string
+  brandId: string
+  brandName: string
+  brandColor: string
+  contentId: string
+  contentTitle: string
+  contentScheduledDate: ISODate | null
+  /** Images on the post (the assignee's final artwork lives there). */
+  imageCount: number
+  type: 'design'
+  positionKey: PositionKey
+  /** null when nobody is assigned; `active: false` when they were removed from the brand (needs reassignment). */
+  assignee: { memberId: string; userId: string; name: string; positionKeys: PositionKey[]; active: boolean } | null
+  assignedByName: string
+  dueDate: ISODate | null
+  priority: TaskPriority
+  note: string | null
+  status: TaskStatus
+  reviewNote: string | null
+  completedAt: ISODateTime | null
+  /** Post version and visual brief when assigned. */
+  briefVersion: number | null
+  briefSnapshot: string | null
+  /** The brief was edited after assignment. */
+  briefChanged: boolean
+  version: number
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+  isMine: boolean
+  /** What the current viewer may do (UX; the server re-checks): work on it, review it, or reassign/cancel it. */
+  caps: { assignee: boolean; reviewer: boolean; manager: boolean }
+  /** The brand owner's plan no longer includes tasks: read-only. */
+  suspended: boolean
+  /** History — on the per-post endpoint only. */
+  events?: TaskEvent[]
+}
+export interface TaskInput { positionKey: PositionKey; assigneeId: string; dueDate: ISODate | null; priority: TaskPriority; note: string }
 
 // ---- Team Workspace --------------------------------------------------------
 export type BrandRole = 'owner' | 'admin' | 'editor' | 'viewer'
@@ -73,6 +195,7 @@ export interface BrandMember {
   name: string
   email: string
   role: BrandRole
+  positionKeys: PositionKey[]
   joinedAt: ISODateTime
   isYou: boolean
 }
@@ -81,6 +204,7 @@ export interface BrandInvitation {
   id: string
   email: string
   role: BrandRole
+  positionKeys: PositionKey[]
   status: InvitationStatus
   invitedByName: string
   createdAt: ISODateTime
@@ -89,8 +213,13 @@ export interface BrandInvitation {
 
 export interface TeamSummary {
   brandId: string
-  maxSeats: number
+  /** The paying account's seat pool (unique people across all its brands, owner included). */
+  seatLimit: number
   seatsUsed: number
+  planKey: PlanKey
+  features: FeatureFlags
+  /** The current user pays for this brand (can upgrade). */
+  isBillingOwner: boolean
   members: BrandMember[]
   /** Pending invitations only. */
   invitations: BrandInvitation[]
@@ -111,6 +240,7 @@ export interface InvitationPreview {
   inviterName: string
   email: string
   role: BrandRole
+  positionKeys?: PositionKey[]
   expiresAt: ISODateTime
 }
 
@@ -306,9 +436,19 @@ export interface LedgerEntry {
  */
 export type PaymentStatus = 'pending' | 'awaiting_review' | 'paid' | 'rejected' | 'failed' | 'expired' | 'refunded'
 
+export type OrderKind = 'credits' | 'plan' | 'brand_addon' | 'renewal'
+/** What to buy: AI credits, a plan month, new brand slots, or a renewal (plan month + a month for each listed brand) in one payment. */
+export type OrderInput = { kind: 'credits'; credits: number } | { kind: 'plan'; planKey: Exclude<PlanKey, 'solo'> } | { kind: 'brand_addon'; quantity: number }
+  | { kind: 'renewal'; planKey: Exclude<PlanKey, 'solo'> | null; brandIds: string[] }
+
 export interface PaymentOrder {
   id: string
+  kind: OrderKind
   credits: number
+  planKey: Exclude<PlanKey, 'solo'> | null
+  quantity: number | null
+  /** kind = renewal: brands renewed for a month each. */
+  brandIds?: string[]
   amountSatang: number
   currency: 'THB'
   status: PaymentStatus

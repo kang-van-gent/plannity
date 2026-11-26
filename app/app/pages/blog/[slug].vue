@@ -75,7 +75,6 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
     <template v-else-if="post">
       <article ref="article">
         <header class="mx-auto max-w-3xl">
-          <NuxtLink v-anim to="/blog" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition hover:text-fg"><ArrowLeft class="size-4" />{{ t('blog.allPosts') }}</NuxtLink>
           <p v-if="data?.sample" class="mt-4 flex items-start gap-2 rounded-2xl border border-dashed border-sun bg-sun/10 px-4 py-3 text-sm">
             <Info class="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-sun" /><span>{{ t('blog.sampleNote') }}</span>
           </p>

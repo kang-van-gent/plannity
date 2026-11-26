@@ -4,23 +4,36 @@
 
 import type {
   ActivityEntry, Brand, BrandRole, Content, ContentFormat, GenerationItem, GenerationJob, Holiday, InvitationStatus, LedgerEntry, LedgerType,
-  PaymentOrder, Platform, PromotionInquiry, User,
+  PaymentOrder, PlanKey, Platform, PositionKey, PromotionInquiry, Task, TaskEvent, User,
 } from '~/types'
 import { addDays, todayISO } from '~/utils/date'
 import { mockGenerate, rng } from './llm'
 
 export type Owned<T> = T & { ownerId: string }
 
-/** Stored brand: role/seat fields are computed per viewer, not stored. ownerId = creator. */
-export type MockBrand = Owned<Omit<Brand, 'myRole' | 'maxSeats'>> & { maxSeats?: number }
+/** Stored brand: role/plan fields are computed per viewer, not stored. ownerId = creator = paying account. */
+export type MockBrand = Owned<Omit<Brand, 'myRole' | 'myPositionKeys' | 'planKey' | 'features' | 'isBillingOwner' | 'suspended' | 'locked' | 'coverKind' | 'coveredUntil'>>
 
 export interface MockMembership {
   id: string; brandId: string; userId: string; role: BrandRole; status: 'active' | 'removed'
+  positionKeys: PositionKey[]
   joinedAt: string; createdAt: string; updatedAt: string; roleUpdatedAt: string | null
 }
 
+/** One paid month of a plan / brand add-ons for an account (pricing.md). */
+export interface MockSubscription { id: string; ownerId: string; planKey: Exclude<PlanKey, 'solo'>; status: 'active' | 'cancelled'; periodStart: string; periodEnd: string; orderKey: string | null }
+/** A brand slot: one month of cover for `brandId`, or unused slots (brandId null) waiting for a brand. */
+export interface MockAddon { id: string; ownerId: string; brandId: string | null; quantity: number; status: 'active' | 'cancelled'; periodStart: string; periodEnd: string; orderKey: string | null }
+
+/** Stored task: views are built per viewer (names, image count, brief change). */
+export type MockTask = Omit<Task, 'brandName' | 'brandColor' | 'contentTitle' | 'contentScheduledDate' | 'imageCount' | 'assignee' | 'assignedByName' | 'briefChanged' | 'isMine' | 'caps' | 'suspended' | 'events'> & {
+  assigneeMemberId: string | null; assignedByUserId: string; activeKey: string | null
+}
+export type MockTaskEvent = TaskEvent & { taskId: string; actorId: string }
+
 export interface MockInvitation {
   id: string; brandId: string; email: string; role: BrandRole
+  positionKeys: PositionKey[]
   /** SHA-256 of the token; the raw token is only ever shown once to the inviter. */
   tokenHash: string
   status: InvitationStatus; invitedByUserId: string; expiresAt: string
@@ -47,6 +60,10 @@ export interface MockDB {
   invitations: MockInvitation[]
   contentImages: MockContentImage[]
   activity: ActivityEntry[]
+  subscriptions: MockSubscription[]
+  addons: MockAddon[]
+  tasks: MockTask[]
+  taskEvents: MockTaskEvent[]
   contents: Owned<Content>[]
   revisions: Owned<{ id: string; contentId: string; version: number; reason: 'edit' | 'regenerate' | 'create'; snapshot: Content; createdAt: string }>[]
   jobs: MockJob[]
@@ -84,7 +101,7 @@ const HOLIDAYS: Omit<Holiday, 'id'>[] = [
   { date: '2027-02-14', title: { th: 'วันวาเลนไทน์', en: "Valentine's Day" }, kind: 'observance', country: 'TH', source: 'Marketing calendar', year: 2027, verified: true },
 ]
 
-const BRANDS: Omit<Brand, 'createdAt' | 'updatedAt' | 'myRole' | 'maxSeats'>[] = [
+const BRANDS: Omit<Brand, 'createdAt' | 'updatedAt' | 'myRole' | 'myPositionKeys' | 'planKey' | 'features' | 'isBillingOwner' | 'suspended' | 'locked' | 'coverKind' | 'coveredUntil'>[] = [
   {
     id: 'b_doidee', name: 'บ้านกาแฟดอยดี', color: '#FFB23F', archivedAt: null,
     profile: {
@@ -132,15 +149,34 @@ const BRANDS: Omit<Brand, 'createdAt' | 'updatedAt' | 'myRole' | 'maxSeats'>[] =
 ]
 
 let memberSeq = 0
-export function membership(brandId: string, userId: string, role: BrandRole, when: string): MockMembership {
-  return { id: `m_${brandId}_${userId}_${++memberSeq}`, brandId, userId, role, status: 'active', joinedAt: when, createdAt: when, updatedAt: when, roleUpdatedAt: null }
+export function membership(brandId: string, userId: string, role: BrandRole, when: string, positionKeys: PositionKey[] = []): MockMembership {
+  return { id: `m_${brandId}_${userId}_${++memberSeq}`, brandId, userId, role, status: 'active', positionKeys, joinedAt: when, createdAt: when, updatedAt: when, roleUpdatedAt: null }
+}
+
+/**
+ * Demo plans: the demo account is on Team with 2 extra brands (it owns 4,
+ * archived included), and Nok runs her studio on Team too — so collaboration,
+ * positions and tasks all work out of the box. Also used to migrate older demo data.
+ */
+export function seedPlans(db: Pick<MockDB, 'subscriptions' | 'addons'>, today: string) {
+  const start = at(addDays(today, -12), 9)
+  const end = at(addDays(today, 18), 9)
+  db.subscriptions.push(
+    { id: 'sub_demo', ownerId: 'u_demo', planKey: 'team', status: 'active', periodStart: start, periodEnd: end, orderKey: null },
+    { id: 'sub_nok', ownerId: 'u_nok', planKey: 'team', status: 'active', periodStart: start, periodEnd: end, orderKey: null },
+  )
+  // The demo account's 2 extra brands each have their own slot — one runs out in 3 days, to show renewing.
+  db.addons.push(
+    { id: 'add_glow', ownerId: 'u_demo', brandId: 'b_glowlab', quantity: 1, status: 'active', periodStart: at(addDays(today, -27), 9), periodEnd: at(addDays(today, 3), 9), orderKey: null },
+    { id: 'add_popup', ownerId: 'u_demo', brandId: 'b_popup', quantity: 1, status: 'active', periodStart: start, periodEnd: end, orderKey: null },
+  )
 }
 
 export function buildSeed(): MockDB {
   const today = todayISO()
   const created = at(addDays(today, -32), 9)
   const db: MockDB = {
-    version: 3, users: [], brands: [], memberships: [], invitations: [], contentImages: [], activity: [], contents: [], revisions: [], jobs: [], wallets: {}, ledger: [], orders: [],
+    version: 3, users: [], brands: [], memberships: [], invitations: [], contentImages: [], activity: [], subscriptions: [], addons: [], tasks: [], taskEvents: [], contents: [], revisions: [], jobs: [], wallets: {}, ledger: [], orders: [],
     paymentEvents: [], holidays: [], inquiries: [], feedback: [], idempotency: {}, loginAttempts: {}, seq: 1000,
   }
   const demo = 'u_demo'
@@ -164,9 +200,11 @@ export function buildSeed(): MockDB {
   db.wallets.u_nok = { available: 0, reserved: 0 }
   db.brands.push({ ...BRANDS[2]!, id: 'b_nokstudio', name: 'Nok Design Studio', color: '#6C4CF5', ownerId: 'u_nok', createdAt: created, updatedAt: created })
   for (const b of db.brands) db.memberships.push(membership(b.id, b.ownerId, 'owner', created))
-  db.memberships.push(membership('b_doidee', 'u_nok', 'editor', at(addDays(today, -20), 10)))
+  db.memberships.push(membership('b_doidee', 'u_nok', 'editor', at(addDays(today, -20), 10), ['graphic_designer', 'photographer']))
+  db.memberships.find((m) => m.brandId === 'b_doidee' && m.userId === demo)!.positionKeys = ['content_creator', 'marketing_manager']
+  seedPlans(db, today)
   db.invitations.push({
-    id: 'inv_seed', brandId: 'b_nokstudio', email: DEMO_EMAIL, role: 'editor', tokenHash: 'seed-no-link',
+    id: 'inv_seed', brandId: 'b_nokstudio', email: DEMO_EMAIL, role: 'editor', positionKeys: ['content_creator'], tokenHash: 'seed-no-link',
     status: 'pending', invitedByUserId: 'u_nok', expiresAt: at(addDays(today, 5), 10), acceptedByUserId: null, acceptedAt: null,
     createdAt: at(addDays(today, -2), 10), updatedAt: at(addDays(today, -2), 10),
   })
@@ -183,7 +221,7 @@ export function buildSeed(): MockDB {
     })
   }
   const order = (id: string, credits: number, day: number) => {
-    db.orders.push({ id, ownerId: demo, credits, amountSatang: credits * 1000, currency: 'THB', status: 'paid', provider: 'sandbox', providerRef: `sbx_${id}`, reference: `PLN-${id.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-6)}`, payee: null, slipUploadedAt: null, reviewNote: null, expiresAt: null, createdAt: at(addDays(today, day), 11), paidAt: at(addDays(today, day), 11) })
+    db.orders.push({ id, ownerId: demo, kind: 'credits', planKey: null, quantity: null, credits, amountSatang: credits * 1000, currency: 'THB', status: 'paid', provider: 'sandbox', providerRef: `sbx_${id}`, reference: `PLN-${id.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-6)}`, payee: null, slipUploadedAt: null, reviewNote: null, expiresAt: null, createdAt: at(addDays(today, day), 11), paidAt: at(addDays(today, day), 11) })
     ledger('purchase', credits, 0, day, 'payment', id, `purchase:${id}`)
   }
 
@@ -256,6 +294,23 @@ export function buildSeed(): MockDB {
       if (it.status === 'succeeded') ledger('consume', 0, -1, spec.day, 'item', it.id, `consume:${it.id}`)
       else ledger('release', 1, -1, spec.day, 'item', it.id, `release:${it.id}`)
     }
+  }
+
+  // ---- Task assignment showcase: Nok is designing artwork for an upcoming coffee post.
+  const post = db.contents.find((c) => c.brandId === 'b_doidee' && c.scheduledDate && c.scheduledDate > addDays(today, 3))
+  if (post) {
+    const nokM = db.memberships.find((m) => m.brandId === 'b_doidee' && m.userId === 'u_nok')!
+    const assigned = at(addDays(today, -1), 10)
+    db.tasks.push({
+      id: 't_seed1', brandId: 'b_doidee', contentId: post.id, type: 'design', positionKey: 'graphic_designer', assigneeMemberId: nokM.id, assignedByUserId: demo,
+      dueDate: addDays(post.scheduledDate!, -2), priority: 'high', note: 'Warm tones, show the beans close-up. 1:1 for IG + 4:5 crop.', status: 'in_progress',
+      reviewNote: null, completedAt: null, briefVersion: post.version, briefSnapshot: post.visualBrief, version: 2, createdAt: assigned, updatedAt: at(today, 9),
+      activeKey: `${post.id}:design`,
+    })
+    db.taskEvents.push(
+      { id: 'te_1', taskId: 't_seed1', actorId: demo, actorName: 'มิ้นท์ ครีเอเตอร์', action: 'assigned', fromStatus: null, toStatus: 'todo', note: null, createdAt: assigned },
+      { id: 'te_2', taskId: 't_seed1', actorId: 'u_nok', actorName: 'Nok (Graphic)', action: 'start', fromStatus: 'todo', toStatus: 'in_progress', note: null, createdAt: at(today, 9) },
+    )
   }
 
   db.inquiries.push({

@@ -1,0 +1,21 @@
+{
+  "kind": "collectionType",
+  "collectionName": "task_events",
+  "info": {
+    "singularName": "task-event",
+    "pluralName": "task-events",
+    "displayName": "Task Event",
+    "description": "Append-only history of a task: who moved it, from what, to what, when."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "task": { "type": "relation", "relation": "manyToOne", "target": "api::task.task" },
+    "actor": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "actorName": { "type": "string", "maxLength": 120 },
+    "action": { "type": "string", "required": true, "maxLength": 40 },
+    "fromStatus": { "type": "string", "maxLength": 30 },
+    "toStatus": { "type": "string", "maxLength": 30 },
+    "note": { "type": "text", "maxLength": 1000 }
+  }
+}

@@ -8,9 +8,10 @@ const { factories } = require('@strapi/strapi');
 const { fail } = require('../../../utils/brand-access');
 const { sniffImageType } = require('../../../utils/image-type');
 const { verifySlip } = require('../../../services/slip-verifier');
+const P = require('../../../utils/pricing');
+const { planOf } = require('../../../services/entitlements');
 
 const UID = 'api::payment-order.payment-order';
-const price = () => Number(process.env.CREDIT_PRICE_SATANG || 1000);
 const ttlHours = () => Number(process.env.PAYMENT_ORDER_TTL_HOURS || 24);
 const slipMaxBytes = () => Number(process.env.SLIP_MAX_MB || 5) * 1024 * 1024;
 const payee = () => ({ promptpayId: process.env.PROMPTPAY_ID || '0968870831', name: process.env.PROMPTPAY_NAME || 'Supachai Van Gent' });
@@ -18,7 +19,8 @@ const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // no 0/O/1/I
 
 function view(o) {
   return {
-    id: o.documentId, credits: o.credits, amountSatang: Number(o.amountSatang), currency: o.currency || 'THB', status: o.status,
+    id: o.documentId, kind: o.kind || 'credits', credits: o.credits ?? 0, planKey: o.planKey ?? null, quantity: o.quantity ?? null,
+    brandIds: Array.isArray(o.brandIds) ? o.brandIds : [], amountSatang: Number(o.amountSatang), currency: o.currency || 'THB', status: o.status,
     provider: o.provider, providerRef: o.providerRef, reference: o.reference, payee: o.provider === 'promptpay' ? payee() : null,
     slipUploadedAt: o.slipUploadedAt ?? null, reviewNote: o.reviewNote ?? null, expiresAt: o.expiresAt ?? null,
     createdAt: o.createdAt, paidAt: o.paidAt ?? null,
@@ -55,12 +57,30 @@ module.exports = factories.createCoreController(UID, ({ strapi }) => {
 
     async createMine(ctx) {
       if (!ctx.state.user) return ctx.unauthorized();
-      const credits = Number((ctx.request.body?.data ?? ctx.request.body)?.credits);
-      if (!Number.isInteger(credits) || credits < 1 || credits > 500) return fail(ctx, 400, 'INVALID_INPUT', 'Choose 1–500 credits', { credits: 'invalid_credits' });
+      // What is being bought: AI credits, one month of a plan, or brand add-ons. Price comes from server config only.
+      const body = ctx.request.body?.data ?? ctx.request.body ?? {};
+      const kind = body.kind || 'credits';
+      const input = { kind, credits: Number(body.credits), planKey: body.planKey || null, quantity: Number(body.quantity), brandIds: body.brandIds };
+      if (kind === 'renewal') {
+        // Only the caller's own extra brands (not the 2 free ones) can be renewed.
+        const plan = await planOf(strapi, ctx.state.user.id);
+        const ids = Array.isArray(input.brandIds) ? input.brandIds : [];
+        const extra = new Set(plan.coverage.brands.filter((b) => b.kind !== 'included').map((b) => b.id));
+        if (ids.some((id) => !extra.has(id))) return fail(ctx, 400, 'INVALID_INPUT', 'Only your own extra brands can be renewed.', { brandIds: 'invalid' });
+      }
+      const amount = P.orderAmount(input);
+      if (amount === null) {
+        const field = kind === 'plan' ? 'planKey' : kind === 'brand_addon' ? 'quantity' : kind === 'renewal' ? 'brandIds' : 'credits';
+        return fail(ctx, 400, 'INVALID_INPUT', 'Invalid order', { [field]: kind === 'credits' ? 'invalid_credits' : 'invalid' });
+      }
+      if (kind === 'brand_addon' && (await planOf(strapi, ctx.state.user.id)).planKey === 'studio') {
+        return fail(ctx, 409, 'CONFLICT', 'Studio already includes unlimited brands.');
+      }
       const code = Array.from(crypto.randomBytes(6), (b) => ALPHABET[b % 32]).join('');
       const o = await docs().create({
         data: {
-          user: ctx.state.user.id, credits, amountSatang: credits * price(), currency: 'THB', status: 'pending', provider: 'promptpay',
+          user: ctx.state.user.id, kind, credits: kind === 'credits' ? input.credits : 0, planKey: kind === 'plan' || kind === 'renewal' ? input.planKey : null,
+          quantity: kind === 'brand_addon' ? input.quantity : kind === 'renewal' ? input.brandIds.length : null, brandIds: kind === 'renewal' ? input.brandIds : null, amountSatang: amount, currency: 'THB', status: 'pending', provider: 'promptpay',
           providerRef: `pp_${code.toLowerCase()}`, reference: `PLN-${code}`, expiresAt: new Date(Date.now() + ttlHours() * 3600_000).toISOString(),
         },
       });
@@ -94,14 +114,14 @@ module.exports = factories.createCoreController(UID, ({ strapi }) => {
         return fail(ctx, 502, 'STORAGE', 'The slip could not be stored. Please try again.');
       }
       let updated = await docs().update({ documentId: o.documentId, data: { slip: uploaded.id, slipUploadedAt: new Date().toISOString(), status: 'awaiting_review', reviewNote: null } });
-      strapi.log.info(`[payments] slip received for ${o.reference} (${o.credits} credits, ${Number(o.amountSatang) / 100} THB) — review in the admin: Payment Order`);
+      strapi.log.info(`[payments] slip received for ${o.reference} (${o.kind || 'credits'}, ${Number(o.amountSatang) / 100} THB) — review in the admin: Payment Order`);
 
       const result = await verifySlip(strapi, { order: updated, file });
       if (result.verdict === 'paid' || result.verdict === 'rejected') {
         updated = await docs().update({
           documentId: o.documentId,
           data: { status: result.verdict, verifiedBy: 'slip2go', verification: result.raw ?? null, reviewNote: result.verdict === 'rejected' ? (result.note ?? null) : null },
-        }); // 'paid' → credits granted by the payment-order lifecycle subscriber
+        }); // 'paid' → fulfilled by the payment-order lifecycle subscriber
       }
       ctx.body = { data: view(updated) };
     },

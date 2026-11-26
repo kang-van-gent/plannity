@@ -7,23 +7,74 @@
     "displayName": "Brand Invitation",
     "description": "Invitation to join a brand. Only a SHA-256 hash of the token is stored."
   },
-  "options": { "draftAndPublish": false },
+  "options": {
+    "draftAndPublish": false
+  },
   "pluginOptions": {},
   "attributes": {
-    "brand": { "type": "relation", "relation": "manyToOne", "target": "api::brand.brand", "inversedBy": "invitations" },
-    "email": { "type": "email", "required": true },
-    "role": { "type": "enumeration", "enum": ["admin", "editor", "viewer"], "required": true },
-    "tokenHash": { "type": "string", "unique": true, "required": true, "private": true },
-    "status": { "type": "enumeration", "enum": ["pending", "accepted", "declined", "cancelled", "expired"], "default": "pending", "required": true },
-    "invitedBy": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
-    "expiresAt": { "type": "datetime", "required": true },
-    "acceptedBy": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
-    "acceptedAt": { "type": "datetime" },
+    "brand": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::brand.brand",
+      "inversedBy": "invitations"
+    },
+    "email": {
+      "type": "email",
+      "required": true
+    },
+    "role": {
+      "type": "enumeration",
+      "enum": [
+        "admin",
+        "editor",
+        "viewer"
+      ],
+      "required": true
+    },
+    "tokenHash": {
+      "type": "string",
+      "unique": true,
+      "required": true,
+      "private": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "accepted",
+        "declined",
+        "cancelled",
+        "expired"
+      ],
+      "default": "pending",
+      "required": true
+    },
+    "invitedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "expiresAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "acceptedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "acceptedAt": {
+      "type": "datetime"
+    },
     "pendingKey": {
       "type": "string",
       "unique": true,
       "private": true,
       "description": "brandDocumentId:email while pending, null otherwise — database-level guard against duplicate pending invitations."
+    },
+    "positionKeys": {
+      "type": "json",
+      "description": "Position tags (content_creator, graphic_designer, …). Labels only — never permissions, never seats."
     }
   }
 }

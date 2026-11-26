@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, CalendarPlus, Ban, CircleX, FileText, LoaderCircle, Undo2, WandSparkles } from '@lucide/vue'
+import { CalendarPlus, Ban, CircleX, FileText, LoaderCircle, Undo2, WandSparkles } from '@lucide/vue'
 import { gsap } from 'gsap'
 import type { Content, GenerationJob } from '~/types'
 
@@ -114,7 +114,6 @@ function keepDrafts() {
 
 <template>
   <div>
-    <NuxtLink to="/app/generate" class="btn-ghost btn-sm mb-4 -ml-2"><ArrowLeft class="size-4" />{{ t('nav.generate') }}</NuxtLink>
     <UiErrorState v-if="error && !job" :error="toApiError(error)" @retry="poll" />
     <UiSkeletonList v-else-if="!job" :rows="3" />
     <template v-else>

@@ -35,8 +35,8 @@ module.exports = {
   },
   async updateRole(ctx) {
     const ok = await requireBrand(ctx, ctx.params.brandId, 'brand.read');
-    const role = (ctx.request.body?.data ?? ctx.request.body)?.role;
-    if (ok) await run(ctx, () => svc().updateRole(ok.brand, ctx.state.user, ok.role, ctx.params.memberId, role));
+    const body = ctx.request.body?.data ?? ctx.request.body ?? {};
+    if (ok) await run(ctx, () => svc().updateMember(ok.brand, ctx.state.user, ok.role, ctx.params.memberId, { role: body.role, positionKeys: body.positionKeys }));
   },
   async removeMember(ctx) {
     const ok = await requireBrand(ctx, ctx.params.brandId, 'brand.read');

@@ -21,7 +21,13 @@ useSeoMeta({ robots: 'noindex, nofollow' })
 onMounted(async () => {
   refresh()
   try { await brands.load() } catch (e) { notify.fromError(e, { retry: () => brands.load(true) }) }
+  // Keep lock state current: check end dates every 30s, and re-read brands when the tab regains focus.
+  coverTimer = setInterval(() => brands.expireLapsed(), 30_000)
+  window.addEventListener('focus', onFocus)
 })
+let coverTimer: ReturnType<typeof setInterval> | undefined
+function onFocus() { if (!brands.expireLapsed() && brands.loaded.value) brands.load(true).catch(() => {}) }
+onBeforeUnmount(() => { clearInterval(coverTimer); window.removeEventListener('focus', onFocus) })
 </script>
 
 <template>
@@ -85,6 +91,7 @@ onMounted(async () => {
         </div>
       </header>
       <main id="main" class="mx-auto w-full max-w-[1400px] px-4 pb-[calc(var(--tabbar-h,5rem)+1rem)] pt-5 sm:px-6 sm:pt-8 lg:px-10 lg:pb-10">
+        <UiBackButton v-if="route.path !== '/app'" class="mb-3 sm:mb-4" />
         <slot />
       </main>
     </div>

@@ -1,0 +1,66 @@
+{
+  "kind": "collectionType",
+  "collectionName": "subscription_add_ons",
+  "info": {
+    "singularName": "subscription-add-on",
+    "pluralName": "subscription-add-ons",
+    "displayName": "Brand Slot",
+    "description": "One month of cover for one extra owned brand (฿99) — or an unused slot waiting for a new brand (brand empty). Renewals start where the previous month ends. Brands without cover are locked (read-only), never deleted."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "brand"
+      ],
+      "default": "brand",
+      "required": true
+    },
+    "quantity": {
+      "type": "integer",
+      "min": 1,
+      "required": true,
+      "description": "Unused slots in this row (assigned rows are always 1)."
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "active",
+        "cancelled"
+      ],
+      "default": "active",
+      "required": true
+    },
+    "periodStart": {
+      "type": "datetime",
+      "required": true
+    },
+    "periodEnd": {
+      "type": "datetime",
+      "required": true
+    },
+    "providerReference": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "orderKey": {
+      "type": "string",
+      "unique": true,
+      "private": true
+    },
+    "brand": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::brand.brand"
+    }
+  }
+}

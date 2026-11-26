@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Archive, ArchiveRestore, ArrowLeft, Eye, Library, WandSparkles } from '@lucide/vue'
+import { Archive, ArchiveRestore, Eye, Library, WandSparkles } from '@lucide/vue'
 import type { BrandInput } from '~/types'
 import { isApiError } from '~/services/api/contract'
 
@@ -52,7 +52,6 @@ async function toggleArchive() {
 
 <template>
   <div>
-    <NuxtLink to="/app/brands" class="btn-ghost btn-sm mb-4 -ml-2"><ArrowLeft class="size-4" />{{ t('nav.brands') }}</NuxtLink>
     <UiErrorState v-if="q.error.value" :error="q.error.value" @retry="q.refresh()" />
     <UiSkeletonList v-else-if="!q.data.value || !q.ready.value" :rows="3" />
     <template v-else>
@@ -73,6 +72,7 @@ async function toggleArchive() {
         </div>
       </div>
       <BrandTabs :brand-id="q.data.value.id" active="profile" />
+      <BrandLockBanner :brand="q.data.value" />
       <!-- Only Owners/Admins edit brand settings; everyone else sees them read-only. -->
       <p v-if="!canEdit" class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('team.readOnly') }}</p>
       <fieldset :disabled="!canEdit" class="contents [&:disabled_button[type=submit]]:hidden">
