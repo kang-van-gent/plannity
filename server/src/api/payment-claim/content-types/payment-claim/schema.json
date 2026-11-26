@@ -1,0 +1,24 @@
+{
+  "kind": "collectionType",
+  "collectionName": "payment_claims",
+  "info": {
+    "singularName": "payment-claim",
+    "pluralName": "payment-claims",
+    "displayName": "Payment Claim",
+    "description": "A bank transfer that paid an order. Globally unique by sender bank + transaction reference (and QR digest): one transfer can pay for one order only."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "order": { "type": "relation", "relation": "manyToOne", "target": "api::payment-order.payment-order" },
+    "orderKey": { "type": "string", "unique": true, "required": true, "private": true },
+    "claimKey": { "type": "string", "unique": true, "required": true, "private": true, "description": "senderBankId:transRef" },
+    "qrDigest": { "type": "string", "unique": true, "private": true },
+    "senderBankId": { "type": "string", "maxLength": 10, "required": true },
+    "transRef": { "type": "string", "maxLength": 80, "required": true },
+    "amountSatang": { "type": "biginteger", "required": true },
+    "transferAt": { "type": "datetime", "required": true },
+    "providerReferenceId": { "type": "string", "maxLength": 120 },
+    "approvedBy": { "type": "enumeration", "enum": ["slip2go", "staff"], "required": true }
+  }
+}

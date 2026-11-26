@@ -6,6 +6,7 @@ import { isApiError } from '~/services/api/contract'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
 const { t, locale } = useLocale()
+const opt = useSelectOptions()
 useSeoMeta({ title: () => t('nav.promote') })
 const api = useApi()
 const notify = useNotify()
@@ -98,9 +99,9 @@ async function submit() {
           <button type="button" class="btn-ghost btn-sm" @click="linked = null">{{ t('common.remove') }}</button>
         </div>
         <div class="grid gap-4 sm:grid-cols-3">
-          <div><label class="label" for="p-brand">{{ t('generate.brand') }}</label><select id="p-brand" v-model="form.brandId" class="input" :class="errors.brandId && 'input-error'"><option v-for="b in brands.active.value" :key="b.id" :value="b.id">{{ b.name }}</option></select><p v-if="errors.brandId" class="field-error">{{ errors.brandId }}</p></div>
-          <div><label class="label" for="p-platform">{{ t('content.fields.platform') }}</label><select id="p-platform" v-model="form.platform" class="input"><option v-for="p in PLATFORMS" :key="p" :value="p">{{ PLATFORM_META[p].label }}</option></select></div>
-          <div><label class="label" for="p-obj">{{ t('content.fields.objective') }}</label><select id="p-obj" v-model="form.objective" class="input"><option v-for="o in OBJECTIVES" :key="o" :value="o">{{ t(`objectives.${o}`) }}</option></select></div>
+          <div><label class="label" for="p-brand">{{ t('generate.brand') }}</label><UiSelect id="p-brand" v-model="form.brandId" :options="opt.brandList(brands.active.value)" :invalid="!!errors.brandId" /><p v-if="errors.brandId" class="field-error">{{ errors.brandId }}</p></div>
+          <div><label class="label" for="p-platform">{{ t('content.fields.platform') }}</label><UiSelect id="p-platform" v-model="form.platform" :options="opt.platforms.value" /></div>
+          <div><label class="label" for="p-obj">{{ t('content.fields.objective') }}</label><UiSelect id="p-obj" v-model="form.objective" :options="opt.objectives.value" /></div>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div><label class="label" for="p-url">{{ t('content.postUrl') }} <span class="font-normal text-muted">({{ t('common.optional') }})</span></label><input id="p-url" v-model.trim="form.postUrl" type="url" class="input" placeholder="https://" :class="errors.postUrl && 'input-error'"><p v-if="errors.postUrl" class="field-error">{{ errors.postUrl }}</p></div>

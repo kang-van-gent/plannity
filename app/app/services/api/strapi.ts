@@ -206,7 +206,8 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       async uploadSlip(orderId, file) {
         const form = new FormData()
         form.append('slip', file, file.name)
-        const res = await fetch(`${BFF}/payments/orders/${orderId}/slip`, { method: 'POST', body: form, headers: { 'X-Requested-With': 'plannity' }, credentials: 'same-origin' })
+        // One key per upload: a retried request is processed once (no second Slip2Go check).
+        const res = await fetch(`${BFF}/payments/orders/${orderId}/slip`, { method: 'POST', body: form, headers: { 'X-Requested-With': 'plannity', 'Idempotency-Key': crypto.randomUUID() }, credentials: 'same-origin' })
         const body = await res.json().catch(() => ({})) as { data?: Row } & StrapiErrorBody
         if (!res.ok) throw toApiError({ status: res.status, data: body })
         return norm<PaymentOrder>(body.data)
@@ -288,6 +289,8 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
     return new Promise((resolve, reject) => {
       const form = new FormData()
       for (const f of files) form.append('files', f, f.name)
+      // Multipart parsing can reorder files; tell the server the order they were picked in.
+      form.append('order', JSON.stringify(files.map((f) => ({ name: f.name, size: f.size }))))
       const xhr = new XMLHttpRequest()
       xhr.open('POST', url)
       xhr.setRequestHeader('X-Requested-With', 'plannity')

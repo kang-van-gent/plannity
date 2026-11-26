@@ -7,6 +7,8 @@ import { isApiError } from '~/services/api/contract'
 definePageMeta({ layout: 'app', middleware: 'auth' })
 const features = useFeatures()
 const { t } = useLocale()
+const opt = useSelectOptions()
+const sortOptions = computed(() => [{ value: 'updated' as const, label: t('content.sortUpdated') }, { value: 'date' as const, label: t('content.sortDate') }])
 useSeoMeta({ title: () => t('nav.library') })
 const api = useApi()
 const notify = useNotify()
@@ -96,16 +98,17 @@ async function create() {
           <input v-model="filters.search" type="search" class="input pl-10 max-sm:rounded-full max-sm:bg-surface max-sm:shadow-soft" :placeholder="t('content.searchPh')" :aria-label="t('common.search')">
         </div>
         <div class="h-scroll w-full sm:contents">
-          <select v-model="filters.platform" class="input pill sm:h-auto sm:rounded-2xl sm:py-2.5" :class="filters.platform ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''" :aria-label="t('content.fields.platform')"><option value="">{{ t('content.allPlatforms') }}</option><option v-for="p in PLATFORMS" :key="p" :value="p">{{ PLATFORM_META[p].label }}</option></select>
-          <select v-model="filters.pillar" class="input pill sm:h-auto sm:rounded-2xl sm:py-2.5" :class="filters.pillar ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''" :aria-label="t('content.fields.pillar')"><option value="">{{ t('content.allPillars') }}</option><option v-for="p in pillars" :key="p" :value="p">{{ p }}</option></select>
-          <select v-model="filters.status" class="input pill sm:h-auto sm:rounded-2xl sm:py-2.5" :class="filters.status ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''" :aria-label="t('content.fields.status')"><option value="">{{ t('content.allStatuses') }}</option><option v-for="s in CONTENT_STATUSES" :key="s" :value="s">{{ t(`status.${s}`) }}</option><option value="unscheduled">{{ t('content.unscheduled') }}</option></select>
-          <select v-model="filters.sort" class="input pill sm:hidden" :aria-label="t('content.sort')"><option value="updated">{{ t('content.sortUpdated') }}</option><option value="date">{{ t('content.sortDate') }}</option></select>
+          <UiSelect v-model="filters.platform" size="pill" :active="!!filters.platform" :aria-label="t('content.fields.platform')" :options="opt.withAll(t('content.allPlatforms'), opt.platforms.value)" />
+          <UiSelect v-model="filters.pillar" size="pill" :active="!!filters.pillar" :aria-label="t('content.fields.pillar')" :options="opt.withAll(t('content.allPillars'), pillars.map((p) => ({ value: p, label: p })))" />
+          <UiSelect v-model="filters.status" size="pill" :active="!!filters.status" :aria-label="t('content.fields.status')"
+            :options="[...opt.withAll(t('content.allStatuses'), opt.statuses.value), { value: 'unscheduled', label: t('content.unscheduled'), color: '#CBD5E1' }]" />
+          <UiSelect v-model="filters.sort" class="sm:hidden" size="pill" :aria-label="t('content.sort')" :options="sortOptions" />
         </div>
       </div>
       <div class="mt-2 flex flex-wrap items-center gap-2">
         <label class="flex items-center gap-2 text-xs font-semibold text-muted">{{ t('generate.from') }}<input v-model="filters.from" type="date" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5"></label>
         <label class="flex items-center gap-2 text-xs font-semibold text-muted">{{ t('generate.to') }}<input v-model="filters.to" type="date" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5"></label>
-        <select v-model="filters.sort" class="input hidden w-auto py-1.5 sm:block" :aria-label="t('content.sort')"><option value="updated">{{ t('content.sortUpdated') }}</option><option value="date">{{ t('content.sortDate') }}</option></select>
+        <UiSelect v-model="filters.sort" class="hidden sm:block" size="sm" :aria-label="t('content.sort')" :options="sortOptions" />
         <button v-if="activeFilters" type="button" class="btn-ghost btn-sm" @click="clearFilters"><X class="size-3.5" />{{ t('content.clearFilters', { n: activeFilters }) }}</button>
         <div class="segmented ml-auto">
           <button type="button" :aria-pressed="view === 'grid'" :aria-label="t('content.gridView')" @click="view = 'grid'"><LayoutGrid class="size-4" /></button>

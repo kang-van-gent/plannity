@@ -6,7 +6,8 @@ export function prefersReducedMotion(): boolean {
 
 /** Page-curtain state: entrance animations wait until the curtain lifts. */
 export function useCurtain() {
-  return useState('curtain', () => ({ active: false, covering: false }))
+  // `intro`: the landing intro (first load) is covering — PageCurtain must not lift it.
+  return useState('curtain', () => ({ active: false, covering: false, intro: false }))
 }
 
 /** Run now, or as soon as the page curtain starts lifting. */

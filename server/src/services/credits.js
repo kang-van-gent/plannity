@@ -32,4 +32,19 @@ async function grantPurchase(strapi, orderDocumentId) {
   });
 }
 
-module.exports = { walletFor, grantPurchase, WALLET, LEDGER, ORDER };
+/** Free trial credits for a verified account — exactly once per user (operationKey `trial:<userId>`). */
+async function grantTrial(strapi, userId) {
+  const amount = Number(process.env.TRIAL_CREDITS || 3);
+  if (!amount) return 0;
+  return strapi.db.transaction(async () => {
+    const opKey = `trial:${userId}`;
+    if (await strapi.documents(LEDGER).findFirst({ filters: { operationKey: opKey } })) return 0;
+    const wallet = await walletFor(strapi, userId);
+    const available = Number(wallet.available) + amount;
+    await strapi.documents(WALLET).update({ documentId: wallet.documentId, data: { available, version: Number(wallet.version || 1) + 1 } });
+    await strapi.documents(LEDGER).create({ data: { wallet: wallet.documentId, operationKey: opKey, type: 'trial_grant', deltaAvailable: amount, deltaReserved: 0, availableAfter: available } });
+    return amount;
+  });
+}
+
+module.exports = { walletFor, grantPurchase, grantTrial, WALLET, LEDGER, ORDER };

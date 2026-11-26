@@ -11,7 +11,7 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   }
 
   const headers: Record<string, string> = { accept: 'application/json' }
-  const jwt = getCookie(event, JWT_COOKIE)
+  const jwt = await accessToken(event)
   if (jwt) headers.authorization = `Bearer ${jwt}`
   const idem = getHeader(event, 'idempotency-key')
   if (idem) headers['idempotency-key'] = idem
@@ -32,14 +32,20 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   const binary = /^contents\/[^/]+\/images\/[^/]+\/download$/.test(path)
 
   const search = getRequestURL(event).search
+  const send = () => $fetch.raw<unknown>(`${strapiBase(event)}/api/${path}${search}`, {
+    method: method as 'GET',
+    headers,
+    body,
+    ignoreResponseError: true,
+    responseType: binary ? 'arrayBuffer' : path.startsWith('contents/export') ? 'text' : 'json',
+  })
   try {
-    const res = await $fetch.raw<unknown>(`${strapiBase(event)}/api/${path}${search}`, {
-      method: method as 'GET',
-      headers,
-      body,
-      ignoreResponseError: true,
-      responseType: binary ? 'arrayBuffer' : path.startsWith('contents/export') ? 'text' : 'json',
-    })
+    let res = await send()
+    // Access token revoked or expired early: renew once and retry.
+    if (res.status === 401 && jwt) {
+      const fresh = await accessToken(event, { force: true })
+      if (fresh) { headers.authorization = `Bearer ${fresh}`; res = await send() }
+    }
     setResponseStatus(event, res.status)
     for (const h of ['content-type', 'content-disposition', 'cache-control']) {
       const v = res.headers.get(h)

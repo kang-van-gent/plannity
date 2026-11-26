@@ -71,9 +71,15 @@ async function submitSlip() {
   if (!slip.value) return
   uploading.value = true
   try {
-    emit('update', await api.credits.uploadSlip(props.order.id, slip.value))
+    const o = await api.credits.uploadSlip(props.order.id, slip.value)
+    emit('update', o)
     clearSlip()
-    notify.success(t('pay.slipSent'), t('pay.slipSentBody'))
+    lateUpload.value = false
+    // Slip2Go answers right away: say what happened in the customer's words.
+    if (o.status === 'paid') notify.success(t('pay.result.paid'))
+    else if (o.status === 'rejected' || (o.status === 'pending' && o.resultCode)) notify.warning(t('pay.rejectedTitle'), resultText.value(o.resultCode))
+    else if (o.status === 'awaiting_review') notify.info(t('pay.reviewTitle'), o.resultCode ? resultText.value(o.resultCode) : t('pay.reviewBody'))
+    else notify.success(t('pay.slipSent'), t('pay.slipSentBody'))
   } catch (e) {
     notify.fromError(e, { retry: submitSlip })
   } finally {
@@ -95,33 +101,55 @@ async function demoReview(outcome: 'paid' | 'rejected') {
   }
 }
 const isMock = useIsMock()
+/** Expired orders still take a slip: the customer may have paid in time. */
+const lateUpload = ref(false)
+const resultText = computed(() => (code: string | null | undefined) => (code ? t(`pay.result.${code}`) : t('pay.rejectedBody')))
+const showRejection = computed(() => props.order.status === 'rejected' || (props.order.status === 'pending' && !!props.order.resultCode))
 onBeforeUnmount(clearSlip)
 </script>
 
 <template>
   <div class="space-y-5">
-    <!-- Paid -->
+    <!-- Paid: delivered, or payment received and still activating -->
     <div v-if="order.status === 'paid'" class="flex flex-col items-center py-4 text-center">
       <ResultIcon type="success" :size="84" />
-      <p class="mt-4 font-display text-2xl font-bold">{{ paidTitle }}</p>
-      <p class="mt-1 text-sm text-muted">{{ order.kind === 'credits' || !order.kind ? t('pay.paidBody') : t('plan.activatedBody') }}</p>
+      <template v-if="order.fulfilled === false">
+        <p class="mt-4 font-display text-2xl font-bold">{{ t('pay.activatingTitle') }}</p>
+        <p class="mt-1 text-sm text-muted">{{ t('pay.activatingBody') }}</p>
+      </template>
+      <template v-else>
+        <p class="mt-4 font-display text-2xl font-bold">{{ paidTitle }}</p>
+        <p class="mt-1 text-sm text-muted">{{ order.kind === 'credits' || !order.kind ? t('pay.paidBody') : t('plan.activatedBody') }}</p>
+      </template>
     </div>
 
-    <!-- Expired / failed -->
-    <div v-else-if="order.status === 'expired' || order.status === 'failed'" class="flex flex-col items-center py-4 text-center">
-      <ResultIcon type="warning" :size="72" />
-      <p class="mt-4 font-display text-xl font-bold">{{ t('pay.expiredTitle') }}</p>
-      <p class="mt-1 text-sm text-muted">{{ t('pay.expiredBody') }}</p>
-      <button type="button" class="btn-primary mt-4" @click="emit('restart')"><RefreshCw class="size-4" />{{ t('pay.startOver') }}</button>
-    </div>
-
-    <!-- Slip received, being checked -->
-    <div v-else-if="order.status === 'awaiting_review'" class="flex flex-col items-center py-2 text-center">
+    <!-- Being checked with the bank right now -->
+    <div v-else-if="order.status === 'verifying'" class="flex flex-col items-center py-4 text-center" role="status">
       <span class="relative grid size-20 place-items-center rounded-full bg-brand-500/10 text-brand-500">
         <span class="absolute inset-0 animate-ping rounded-full bg-brand-500/10" /><ShieldCheck class="size-9" />
       </span>
+      <p class="mt-4 font-display text-xl font-bold">{{ t('pay.verifyingTitle') }}</p>
+      <p class="mt-1 max-w-sm text-sm text-muted">{{ t('pay.verifyingBody') }}</p>
+    </div>
+
+    <!-- Expired / failed (a slip can still be sent: the customer may have paid in time) -->
+    <div v-else-if="(order.status === 'expired' || order.status === 'failed') && !lateUpload" class="flex flex-col items-center py-4 text-center">
+      <ResultIcon type="warning" :size="72" />
+      <p class="mt-4 font-display text-xl font-bold">{{ t('pay.expiredTitle') }}</p>
+      <p class="mt-1 text-sm text-muted">{{ t('pay.expiredBody') }}</p>
+      <div class="mt-4 flex flex-wrap justify-center gap-2">
+        <button type="button" class="btn-primary" @click="emit('restart')"><RefreshCw class="size-4" />{{ t('pay.startOver') }}</button>
+        <button v-if="order.status === 'expired'" type="button" class="btn-secondary" @click="lateUpload = true"><ImageUp class="size-4" />{{ t('pay.alreadyPaid') }}</button>
+      </div>
+    </div>
+
+    <!-- With staff: couldn't be confirmed automatically -->
+    <div v-else-if="order.status === 'awaiting_review'" class="flex flex-col items-center py-2 text-center">
+      <span class="relative grid size-20 place-items-center rounded-full bg-sun/15 text-amber-600 dark:text-sun">
+        <ShieldCheck class="size-9" />
+      </span>
       <p class="mt-4 font-display text-xl font-bold">{{ t('pay.reviewTitle') }}</p>
-      <p class="mt-1 max-w-sm text-sm text-muted">{{ t('pay.reviewBody') }}</p>
+      <p class="mt-1 max-w-sm text-sm text-muted">{{ order.resultCode ? resultText(order.resultCode) : t('pay.reviewBody') }}</p>
       <p class="mt-3 text-xs text-muted">{{ t('pay.reference') }}: <b class="font-mono">{{ order.reference }}</b></p>
       <div v-if="isMock && api.credits.simulateReview" class="mt-5 w-full rounded-2xl border border-dashed border-sun bg-sun/10 p-3 text-left text-sm">
         <p class="font-semibold text-amber-700 dark:text-sun">{{ t('pay.demoTitle') }}</p>
@@ -135,9 +163,9 @@ onBeforeUnmount(clearSlip)
 
     <!-- Pending (or rejected → pay/upload again) -->
     <template v-else>
-      <div v-if="order.status === 'rejected'" class="rounded-2xl border border-danger/30 bg-danger/5 p-3 text-sm">
+      <div v-if="showRejection" class="rounded-2xl border border-danger/30 bg-danger/5 p-3 text-sm" role="alert">
         <p class="font-semibold text-danger">{{ t('pay.rejectedTitle') }}</p>
-        <p class="mt-0.5 text-muted">{{ order.reviewNote || t('pay.rejectedBody') }}</p>
+        <p class="mt-0.5 text-muted">{{ order.reviewNote || resultText(order.resultCode) }}</p>
       </div>
 
       <!-- 1 · Pay -->
@@ -176,6 +204,7 @@ onBeforeUnmount(clearSlip)
           <span v-if="expiresIn" class="inline-flex items-center gap-1"><Clock class="size-3.5" />{{ t('pay.payBefore', { date: expiresIn }) }}</span>
         </div>
         <p class="mt-1 text-xs text-muted">{{ t('pay.qrHint') }}</p>
+        <p class="mt-1 text-xs text-muted">{{ t('pay.qrNote') }}</p>
       </section>
 
       <!-- 2 · Upload slip -->

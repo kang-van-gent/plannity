@@ -13,6 +13,14 @@ const { invalidate, planOf, SUB, ADDON } = require('./entitlements');
 async function fulfillOrder(strapi, orderDocumentId) {
   const order = await strapi.documents(ORDER).findOne({ documentId: orderDocumentId, populate: { user: { fields: ['id'] } } });
   if (!order || order.status !== 'paid' || !order.user) return false;
+  const done = await deliver(strapi, order);
+  // Delivered now or earlier (idempotent keys): record it once, so the recovery job stops retrying.
+  if (!order.fulfilledAt) await strapi.documents(ORDER).update({ documentId: order.documentId, data: { fulfilledAt: new Date().toISOString() } });
+  return done;
+}
+
+async function deliver(strapi, order) {
+  const orderDocumentId = order.documentId;
   const kind = order.kind || 'credits';
   if (kind === 'credits') return grantPurchase(strapi, orderDocumentId);
 

@@ -4,11 +4,11 @@ export default defineEventHandler(async (event) => {
   const { email, password } = await readBody<{ email?: string; password?: string }>(event)
   if (!email || !password) throw createError({ statusCode: 400, data: { error: { code: 'INVALID_INPUT', message: 'Email and password are required' } } })
   try {
-    const res = await $fetch<{ jwt: string; user: Record<string, unknown> }>(`${strapiBase(event)}/api/auth/local`, {
+    const res = await $fetch<{ jwt: string; refreshToken?: string; user: Record<string, unknown> }>(`${strapiBase(event)}/api/auth/local`, {
       method: 'POST',
       body: { identifier: email, password },
     })
-    setJwtCookie(event, res.jwt)
+    setJwtCookie(event, res.jwt, res.refreshToken)
     return { user: toAppUser(res.user), token: '1' }
   } catch (e) {
     rethrow(e)

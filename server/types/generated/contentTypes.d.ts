@@ -811,6 +811,7 @@ export interface ApiContentContent extends Struct.CollectionTypeSchema {
       Schema.Attribute.Required;
     hashtags: Schema.Attribute.JSON;
     hook: Schema.Attribute.Text;
+    imageOrder: Schema.Attribute.JSON & Schema.Attribute.Private;
     images: Schema.Attribute.Media<'images', true>;
     jobItemId: Schema.Attribute.String & Schema.Attribute.Unique;
     lastEditedBy: Schema.Attribute.Relation<
@@ -1175,6 +1176,139 @@ export interface ApiHolidayHoliday extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiPaymentAttemptPaymentAttempt
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'payment_attempts';
+  info: {
+    description: 'One uploaded slip for an order and what Slip2Go answered. Saved before the provider is called. The slip file itself is stored privately (open it with Slip link).';
+    displayName: 'Payment Attempt';
+    pluralName: 'payment-attempts';
+    singularName: 'payment-attempt';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    attemptKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    completedAt: Schema.Attribute.DateTime;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    failureReason: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    fileHash: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 64;
+      }>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::payment-attempt.payment-attempt'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::payment-order.payment-order'
+    >;
+    providerCode: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 12;
+      }>;
+    providerReferenceId: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    requester: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    result: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+    sanitizedResult: Schema.Attribute.JSON & Schema.Attribute.Private;
+    slipLink: Schema.Attribute.String & Schema.Attribute.Private;
+    status: Schema.Attribute.Enumeration<
+      ['pending', 'passed', 'rejected', 'retry', 'review', 'manual', 'error']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    storageKey: Schema.Attribute.String & Schema.Attribute.Private;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiPaymentClaimPaymentClaim
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'payment_claims';
+  info: {
+    description: 'A bank transfer that paid an order. Globally unique by sender bank + transaction reference (and QR digest): one transfer can pay for one order only.';
+    displayName: 'Payment Claim';
+    pluralName: 'payment-claims';
+    singularName: 'payment-claim';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    amountSatang: Schema.Attribute.BigInteger & Schema.Attribute.Required;
+    approvedBy: Schema.Attribute.Enumeration<['slip2go', 'staff']> &
+      Schema.Attribute.Required;
+    claimKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::payment-claim.payment-claim'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::payment-order.payment-order'
+    >;
+    orderKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    providerReferenceId: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    qrDigest: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    senderBankId: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 10;
+      }>;
+    transferAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    transRef: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiPaymentEventPaymentEvent
   extends Struct.CollectionTypeSchema {
   collectionName: 'payment_events';
@@ -1216,7 +1350,7 @@ export interface ApiPaymentOrderPaymentOrder
   extends Struct.CollectionTypeSchema {
   collectionName: 'payment_orders';
   info: {
-    description: 'PromptPay: pending \u2192 awaiting_review (slip uploaded) \u2192 paid / rejected; pending expires. Money in satang. When paid: credits are added, or a month of the plan / brand add-on starts \u2014 exactly once per order.';
+    description: 'PromptPay: pending \u2192 verifying (slip being checked by Slip2Go) \u2192 paid / rejected / awaiting_review (staff). Money in satang. Set status to paid to approve manually \u2014 delivery happens exactly once per order.';
     displayName: 'Payment Order';
     pluralName: 'payment-orders';
     singularName: 'payment-order';
@@ -1244,11 +1378,14 @@ export interface ApiPaymentOrderPaymentOrder
       }> &
       Schema.Attribute.DefaultTo<'THB'>;
     expiresAt: Schema.Attribute.DateTime;
+    fulfilledAt: Schema.Attribute.DateTime;
     kind: Schema.Attribute.Enumeration<
       ['credits', 'plan', 'brand_addon', 'renewal']
     > &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'credits'>;
+    leaseToken: Schema.Attribute.String & Schema.Attribute.Private;
+    leaseUntil: Schema.Attribute.DateTime & Schema.Attribute.Private;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1267,17 +1404,24 @@ export interface ApiPaymentOrderPaymentOrder
         },
         number
       >;
+    receiverSnapshot: Schema.Attribute.JSON & Schema.Attribute.Private;
     reference: Schema.Attribute.String &
       Schema.Attribute.Unique &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 20;
       }>;
+    resultCode: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
     reviewNote: Schema.Attribute.Text;
     slip: Schema.Attribute.Media<'images'> & Schema.Attribute.Private;
+    slipLink: Schema.Attribute.String & Schema.Attribute.Private;
     slipUploadedAt: Schema.Attribute.DateTime;
     status: Schema.Attribute.Enumeration<
       [
         'pending',
+        'verifying',
         'awaiting_review',
         'paid',
         'rejected',
@@ -2094,6 +2238,10 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Private;
+    name: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
@@ -2143,6 +2291,8 @@ declare module '@strapi/strapi' {
       'api::generation-item.generation-item': ApiGenerationItemGenerationItem;
       'api::generation-job.generation-job': ApiGenerationJobGenerationJob;
       'api::holiday.holiday': ApiHolidayHoliday;
+      'api::payment-attempt.payment-attempt': ApiPaymentAttemptPaymentAttempt;
+      'api::payment-claim.payment-claim': ApiPaymentClaimPaymentClaim;
       'api::payment-event.payment-event': ApiPaymentEventPaymentEvent;
       'api::payment-order.payment-order': ApiPaymentOrderPaymentOrder;
       'api::promotion-inquiry.promotion-inquiry': ApiPromotionInquiryPromotionInquiry;

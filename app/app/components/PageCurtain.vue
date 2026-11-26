@@ -83,7 +83,7 @@ if (import.meta.client) {
   })
   router.onError(() => reveal())
   const offHook = nuxtApp.hook('page:finish', () => {
-    if (!curtain.value.covering) return
+    if (!curtain.value.covering || curtain.value.intro) return // the landing intro lifts itself
     clearTimeout(safety)
     // Two frames: the new page has painted before the curtain starts moving.
     requestAnimationFrame(() => requestAnimationFrame(reveal))

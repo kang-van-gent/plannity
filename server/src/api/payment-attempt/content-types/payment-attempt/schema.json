@@ -1,0 +1,27 @@
+{
+  "kind": "collectionType",
+  "collectionName": "payment_attempts",
+  "info": {
+    "singularName": "payment-attempt",
+    "pluralName": "payment-attempts",
+    "displayName": "Payment Attempt",
+    "description": "One uploaded slip for an order and what Slip2Go answered. Saved before the provider is called. The slip file itself is stored privately (open it with Slip link)."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "order": { "type": "relation", "relation": "manyToOne", "target": "api::payment-order.payment-order" },
+    "requester": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "attemptKey": { "type": "string", "unique": true, "required": true, "private": true, "description": "orderDocumentId:idempotencyKey — the same upload is processed once." },
+    "fileHash": { "type": "string", "maxLength": 64, "private": true, "description": "SHA-256 of the image — an early repeat signal only, never transaction identity." },
+    "storageKey": { "type": "string", "private": true, "description": "Private file name (deleted after the retention period)." },
+    "slipLink": { "type": "string", "private": true, "description": "Signed link to view the slip (staff only)." },
+    "status": { "type": "enumeration", "enum": ["pending", "passed", "rejected", "retry", "review", "manual", "error"], "default": "pending", "required": true },
+    "result": { "type": "string", "maxLength": 40 },
+    "providerCode": { "type": "string", "maxLength": 12 },
+    "providerReferenceId": { "type": "string", "maxLength": 120 },
+    "sanitizedResult": { "type": "json", "private": true, "description": "Bank-side facts we keep: transRef, sender bank, amount, time, masked receiver. No names." },
+    "failureReason": { "type": "text", "maxLength": 500 },
+    "completedAt": { "type": "datetime" }
+  }
+}

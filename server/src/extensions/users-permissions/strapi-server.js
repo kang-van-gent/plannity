@@ -14,6 +14,11 @@ const APPLE_FORM_POST = {
 };
 
 module.exports = (plugin) => {
+  // Display name and UI language for the app (users-permissions has neither).
+  const attrs = plugin.contentTypes.user.schema.attributes;
+  attrs.name = { type: 'string', maxLength: 80 };
+  attrs.locale = { type: 'enumeration', enum: ['th', 'en'], default: 'th' };
+
   const api = plugin.routes['content-api'];
   if (typeof api === 'function') {
     plugin.routes['content-api'] = (...args) => {

@@ -13,6 +13,7 @@
 const { factories } = require('@strapi/strapi');
 const { roleCan } = require('./permissions');
 const { record } = require('../services/activity');
+const { orderImages } = require('./image-order');
 const { brandFeatures, brandCreateError, lockAccount, invalidate } = require('../services/entitlements');
 
 const MEMBERSHIP = 'api::brand-membership.brand-membership';
@@ -119,6 +120,7 @@ function relationRefs(value) {
  *   versioned?: boolean,                  // optimistic concurrency on `version`
  *   validate?: (next, existing, data) => Record<string, string> | null,
  *   onCreate?: (entity, user) => Promise<void>,
+ *   onUpdate?: (existing, data, user) => Promise<void>,  // before the change is written (e.g. keep a revision)
  *   guardCreate?: (user, trx) => Promise<{ status, code, message } | null>,  // checked inside the create transaction
  *   audit?: {                             // activity log: who did what, when
  *     entityType: 'brand' | 'content',
@@ -128,7 +130,7 @@ function relationRefs(value) {
  *   },
  * }} opts
  */
-function brandScopedController(uid, { brandPath, perms, protectedFields = [], versioned = false, validate, onCreate, guardCreate, audit }) {
+function brandScopedController(uid, { brandPath, perms, protectedFields = [], versioned = false, validate, onCreate, onUpdate, guardCreate, audit }) {
   return factories.createCoreController(uid, ({ strapi }) => {
     const brandOf = (row) => (brandPath ? brandPath.split('.').reduce((acc, k) => acc?.[k], row) : row);
     // nest('content.brand', x) is { content: { brand: x } }; Strapi wants { content: { populate: { brand: x } } }.
@@ -155,18 +157,38 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
       return out;
     }
 
-    async function decorate(ctx, body) {
+    /** Images in their saved order (imageOrder is private, so it's read separately). */
+    async function orderContentImages(body) {
+      const rows = (Array.isArray(body.data) ? body.data : [body.data]).filter((r) => Array.isArray(r.images) && r.images.length > 1);
+      if (!rows.length) return;
+      const orders = await strapi.db.query(uid).findMany({ where: { documentId: { $in: rows.map((r) => r.documentId) } }, select: ['documentId', 'imageOrder'] });
+      const byId = new Map(orders.map((o) => [o.documentId, o.imageOrder]));
+      for (const r of rows) r.images = orderImages(r.images, byId.get(r.documentId));
+    }
+
+    /** Active (not archived) posts per brand, for the brand list. */
+    async function contentCounts(ids) {
+      const out = new Map();
+      for (const id of ids) out.set(id, await strapi.documents('api::content.content').count({ filters: { brand: { documentId: id }, archivedAt: { $null: true } } }));
+      return out;
+    }
+
+    async function decorate(ctx, response) {
+      // transformResponse / super.* may return a promise in Strapi 5.
+      const body = await response;
+      if (uid === 'api::content.content' && body?.data) await orderContentImages(body);
       // Brands carry the viewer's (effective) role, positions, and what the
       // paying account's plan allows there — so the UI can explain gates.
       if (uid !== 'api::brand.brand' || !body?.data) return body;
       const me = ctx.state.user.id;
       const roles = await rolesFor(strapi, me);
+      const counts = Array.isArray(body.data) ? await contentCounts(body.data.map((b) => b.documentId)) : null;
       const add = async (b) => {
         const r = roles.get(b.documentId);
         const f = await brandFeatures(strapi, b.documentId);
         const { maxSeats: _deprecated, ...rest } = b;
         return {
-          ...rest, myRole: r?.role ?? null, myPositionKeys: r?.positionKeys ?? [], planKey: f.planKey, features: f.features,
+          ...rest, ...(counts ? { contentCount: counts.get(b.documentId) ?? 0 } : {}), myRole: r?.role ?? null, myPositionKeys: r?.positionKeys ?? [], planKey: f.planKey, features: f.features,
           isBillingOwner: f.ownerId === me, locked: f.locked, coveredUntil: f.cover?.until ?? null, coverKind: f.cover?.kind ?? 'included',
           suspended: !!r && r.role !== r.storedRole && !f.locked,
         };
@@ -221,7 +243,7 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
             blocked = await guardCreate(user, trx);
             if (blocked) return null;
           }
-          const created = await strapi.documents(uid).create({ data: { ...sanitized, owner: user.id } });
+          const created = await strapi.documents(uid).create({ data: { ...sanitized, owner: user.id }, populate: toPopulate(brandPath) });
           if (onCreate) await onCreate(created, user);
           if (audit) {
             await record(strapi, {
@@ -259,9 +281,13 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
         const fieldErrors = validate?.({ ...existing, ...data }, existing, data);
         if (fieldErrors && Object.keys(fieldErrors).length) return fail(ctx, 400, 'INVALID_INPUT', 'Invalid input', fieldErrors);
         const changes = audit ? audit.diff(existing, data) : [];
-        if (uid === 'api::content.content') data.lastEditedBy = ctx.state.user.id;
         ctx.request.body = { ...ctx.request.body, data };
         const res = await super.update(ctx);
+        // Only after the change is saved: attribution (not writable through the content API) and hooks.
+        if (uid === 'api::content.content') {
+          await strapi.documents(uid).update({ documentId: existing.documentId, data: { lastEditedBy: ctx.state.user.id } });
+        }
+        if (onUpdate) await onUpdate(existing, data, ctx.state.user);
         const action = audit && audit.classify(changes);
         if (action) {
           await record(strapi, {

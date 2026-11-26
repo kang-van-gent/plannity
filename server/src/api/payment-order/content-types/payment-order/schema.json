@@ -5,7 +5,7 @@
     "singularName": "payment-order",
     "pluralName": "payment-orders",
     "displayName": "Payment Order",
-    "description": "PromptPay: pending → awaiting_review (slip uploaded) → paid / rejected; pending expires. Money in satang. When paid: credits are added, or a month of the plan / brand add-on starts — exactly once per order."
+    "description": "PromptPay: pending → verifying (slip being checked by Slip2Go) → paid / rejected / awaiting_review (staff). Money in satang. Set status to paid to approve manually — delivery happens exactly once per order."
   },
   "options": {
     "draftAndPublish": false
@@ -36,6 +36,7 @@
       "type": "enumeration",
       "enum": [
         "pending",
+        "verifying",
         "awaiting_review",
         "paid",
         "rejected",
@@ -120,6 +121,33 @@
     "brandIds": {
       "type": "json",
       "description": "kind = renewal: brands (documentIds) renewed for one month each."
+    },
+    "receiverSnapshot": {
+      "type": "json",
+      "private": true,
+      "description": "Who this order must be paid to, frozen at checkout (PromptPay type/number/name)."
+    },
+    "resultCode": {
+      "type": "string",
+      "maxLength": 40,
+      "description": "Last slip check result shown to the customer (e.g. amount_mismatch, duplicate, unavailable)."
+    },
+    "fulfilledAt": {
+      "type": "datetime",
+      "description": "When the credits / plan / brand slots were delivered. Paid without this = still delivering (recovered automatically)."
+    },
+    "leaseToken": {
+      "type": "string",
+      "private": true
+    },
+    "leaseUntil": {
+      "type": "datetime",
+      "private": true
+    },
+    "slipLink": {
+      "type": "string",
+      "private": true,
+      "description": "Signed link to view the latest slip (staff only)."
     }
   }
 }

@@ -17,7 +17,7 @@ type Filter = 'all' | 'todo' | 'working' | 'review' | 'done'
 const FILTERS: Filter[] = ['all', 'todo', 'working', 'review', 'done']
 const filter = ref<Filter>('all')
 const brandFilter = ref('all')
-const brandsInList = computed(() => [...new Map((q.data.value ?? []).map((x) => [x.brandId, { id: x.brandId, name: x.brandName }])).values()])
+const brandsInList = computed(() => [...new Map((q.data.value ?? []).map((x) => [x.brandId, { id: x.brandId, name: x.brandName, color: x.brandColor }])).values()])
 const count = (f: Filter) => (q.data.value ?? []).filter((x) => f === 'all' || TASK_GROUP[x.status] === f).length
 const shown = computed(() => (q.data.value ?? []).filter((x) => (filter.value === 'all' || TASK_GROUP[x.status] === filter.value) && (brandFilter.value === 'all' || x.brandId === brandFilter.value)))
 
@@ -37,10 +37,8 @@ const canUpload = (x: Task) => x.caps.assignee && ['todo', 'in_progress', 'chang
           {{ t(`tasks.filters.${f}`) }}<span class="rounded-full px-1.5 text-[11px]" :class="filter === f ? 'bg-white/25' : 'bg-surface-2'">{{ count(f) }}</span>
         </button>
       </div>
-      <select v-if="brandsInList.length > 1" v-model="brandFilter" class="input pill w-auto" :aria-label="t('tasks.allBrands')">
-        <option value="all">{{ t('tasks.allBrands') }}</option>
-        <option v-for="b in brandsInList" :key="b.id" :value="b.id">{{ b.name }}</option>
-      </select>
+      <UiSelect v-if="brandsInList.length > 1" v-model="brandFilter" size="pill" :active="brandFilter !== 'all'" :aria-label="t('tasks.allBrands')"
+        :options="[{ value: 'all', label: t('tasks.allBrands') }, ...brandsInList.map((b) => ({ value: b.id, label: b.name, color: b.color }))]" />
     </div>
 
     <UiErrorState v-if="q.error.value" :error="q.error.value" @retry="q.refresh()" />

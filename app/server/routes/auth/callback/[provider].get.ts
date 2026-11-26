@@ -14,8 +14,8 @@ export default defineEventHandler(async (event) => {
 
   try {
     const qs = new URLSearchParams(Object.entries(query).flatMap(([k, v]) => (Array.isArray(v) ? v : [v]).map((x) => [k, String(x)] as [string, string])))
-    const res = await $fetch<{ jwt: string }>(`${strapiBase(event)}/api/auth/${provider}/callback?${qs}`)
-    setJwtCookie(event, res.jwt)
+    const res = await $fetch<{ jwt: string; refreshToken?: string }>(`${strapiBase(event)}/api/auth/${provider}/callback?${qs}`)
+    setJwtCookie(event, res.jwt, res.refreshToken)
     setSessionHint(event)
     return sendRedirect(event, next, 302)
   } catch (e) {

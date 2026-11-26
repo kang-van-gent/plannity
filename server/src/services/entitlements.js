@@ -130,7 +130,6 @@ async function entitlementsFor(strapi, ownerId) {
   const plan = await planOf(strapi, ownerId);
   const usage = await seatUsage(strapi, ownerId);
   const p = cfg.plans[plan.planKey];
-  const covered = plan.coverage.brands.filter((b) => !b.locked).length;
   const now = new Date().toISOString();
   return {
     planKey: plan.planKey,
@@ -139,7 +138,8 @@ async function entitlementsFor(strapi, ownerId) {
     lastPlanEnd: plan.lastPlanEnd,
     brandAddons: plan.planKey === 'studio' ? 0 : plan.addonUnits,
     freeSlots: plan.coverage.freeSlots,
-    brandLimit: plan.planKey === 'studio' ? null : covered + plan.coverage.freeSlots,
+    // 2 free brands + every extra brand with paid cover + unused paid slots.
+    brandLimit: plan.planKey === 'studio' ? null : P.FREE_BRANDS + plan.coverage.brands.filter((b) => b.kind === 'slot').length + plan.coverage.freeSlots,
     brandsOwned: plan.brands.length,
     brands: plan.coverage.brands.map((c) => {
       const b = plan.brands.find((x) => x.id === c.id);

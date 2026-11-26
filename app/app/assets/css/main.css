@@ -116,6 +116,13 @@ devframes-onboard { position: fixed !important; left: 0; bottom: 0; width: 0; he
 /* Entrance animation guard: elements marked by v-anim start hidden only when
    JS animation is enabled (class set by the boot script). A fallback timer
    reveals them if hydration never happens. */
+/* Landing intro: none without JS animation (reduced motion / no JS), and the
+   boot script's 3.5s fallback removes it if the app never hydrates. */
+html:not(.js-anim) .landing-intro,
+html.anim-fallback .landing-intro { display: none; }
+/* Landing intro: no scrolling underneath it while it covers the page. */
+.js-anim:not(.anim-fallback):has(.landing-intro) { overflow: hidden; }
+
 .js-anim:not(.anim-fallback) [data-anim] {
   opacity: 0;
 }

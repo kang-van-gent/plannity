@@ -8,7 +8,7 @@ import type {
   ActivityChange, Brand, BrandInput, BrandInvitation, BrandMember, BrandRole, Content, ContentDraft, ContentImage, ContentQuery, DashboardSummary, GenerationInput, GenerationJob,
   Holiday, ItemStatus, LedgerEntry, LedgerType, OrderInput, Paginated, PaymentOrder, PlanKey, PositionKey, PromotionInquiry, Task, TaskAction, User, Wallet,
 } from '~/types'
-import { DEFAULT_PRICING, activePlan, addBillingMonths, brandCoverage, brandCreateErrorFor, featureFlags, nextPeriod, renewalStart, seatCount, slotAssignments } from '~/utils/pricing'
+import { DEFAULT_PRICING, FREE_BRANDS, activePlan, addBillingMonths, brandCoverage, brandCreateErrorFor, featureFlags, nextPeriod, renewalStart, seatCount, slotAssignments } from '~/utils/pricing'
 import { normalizePositions } from '~/utils/positions'
 import { TASK_TRANSITIONS, OPEN_TASK_STATUSES, actorCapabilities, assigneeError, isOverdue, transitionError } from '~/utils/tasks'
 import { inviteError, leaveError, removeError, roleCan, roleChangeError, type Permission } from '~/utils/permissions'
@@ -356,7 +356,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
   function orderView(o: Owned<PaymentOrder>): PaymentOrder {
     const v = strip(o) as PaymentOrder
     return {
-      ...v, kind: v.kind ?? 'credits', planKey: v.planKey ?? null, quantity: v.quantity ?? null,
+      ...v, kind: v.kind ?? 'credits', planKey: v.planKey ?? null, quantity: v.quantity ?? null, resultCode: v.resultCode ?? null, fulfilled: v.status === 'paid',
       reference: v.reference ?? `PLN-${o.id.slice(-6).toUpperCase()}`, payee: v.payee ?? null, slipUploadedAt: v.slipUploadedAt ?? null, reviewNote: v.reviewNote ?? null, expiresAt: v.expiresAt ?? null,
     }
   }
@@ -1129,7 +1129,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
           o.paidAt = nowISO()
           fulfill(o) // idempotent: once per order
         } else {
-          Object.assign(o, { status: 'rejected', reviewNote: 'The amount or receiver on the slip did not match this order.' })
+          Object.assign(o, { status: 'rejected', resultCode: 'amount_mismatch', reviewNote: null })
         }
         persist()
       },
@@ -1165,7 +1165,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         return {
           planKey: plan.planKey, periodEnd: plan.periodEnd, lastPlanKey: plan.lastPlanKey, lastPlanEnd: plan.lastPlanEnd,
           brandAddons: plan.planKey === 'studio' ? 0 : plan.addonUnits, freeSlots: plan.coverage.freeSlots,
-          brandLimit: plan.planKey === 'studio' ? null : plan.coverage.brands.filter((b) => !b.locked).length + plan.coverage.freeSlots,
+          brandLimit: plan.planKey === 'studio' ? null : FREE_BRANDS + plan.coverage.brands.filter((b) => b.kind === 'slot').length + plan.coverage.freeSlots,
           brandsOwned: owned.length,
           brands: plan.coverage.brands.map((c) => {
             const b = owned.find((x) => x.id === c.id)!

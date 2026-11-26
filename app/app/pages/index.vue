@@ -144,7 +144,7 @@ onBeforeUnmount(() => {
         <Doodle v-parallax="{ y: -120, rotate: -45 }" variant="petal" class="absolute bottom-24 right-[18%] size-28 text-lime/70" />
       </div>
       <div class="mx-auto max-w-5xl text-center">
-        <span v-anim="{ from: 'pop' }" class="eyebrow"><Doodle variant="spark" class="size-3.5" />{{ t('landing.hero.eyebrow') }}</span>
+        <!-- <span v-anim="{ from: 'pop' }" class="eyebrow"><Doodle variant="spark" class="size-3.5" />{{ t('landing.hero.eyebrow') }}</span> -->
         <h1 class="mt-6 font-display text-[2.6rem] font-bold leading-[1.08] sm:text-6xl lg:text-7xl">
           <span v-anim="1" class="block">{{ t('landing.hero.title1') }}</span>
           <span v-anim="2" class="relative inline-block text-gradient">

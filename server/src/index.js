@@ -4,6 +4,7 @@ const holidays = require('./seed/holidays.json');
 const { configureBuiltInProviders, registerAppleProvider } = require('./auth/social-providers');
 const { fulfillOrder } = require('./services/billing');
 const { invalidate } = require('./services/entitlements');
+const createPayments = require('./services/payments');
 
 /**
  * Actions the signed-in ("authenticated") role may call.
@@ -26,6 +27,7 @@ const AUTHENTICATED_ACTIONS = {
   'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip'],
   'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
   'api::subscription.subscription': ['me'],
+  'api::account.account': ['dashboard', 'verify', 'updateMe', 'exportCsv'],
   'api::task.task': ['forContent', 'create', 'mine', 'forBrand', 'updateAssignment', 'transition'],
 };
 
@@ -81,6 +83,7 @@ module.exports = {
   },
 
   async bootstrap({ strapi }) {
+    const payments = createPayments({ strapi });
     await grantPermissions(strapi, 'authenticated', AUTHENTICATED_ACTIONS);
     await grantPermissions(strapi, 'public', PUBLIC_ACTIONS);
     await seedHolidays(strapi);
@@ -94,11 +97,22 @@ module.exports = {
       models: ['api::payment-order.payment-order'],
       async afterUpdate(event) {
         const r = event.result;
-        if (r && r.status === 'paid' && r.documentId) {
-          try { await fulfillOrder(strapi, r.documentId); } catch (e) { strapi.log.error(`[billing] fulfilment failed for ${r.documentId}: ${e.message}`); }
+        if (r && r.status === 'paid' && r.documentId && !r.fulfilledAt) {
+          try {
+            // Staff approvals with Slip2Go facts obey the same one-transfer-one-order rule.
+            const order = await strapi.documents('api::payment-order.payment-order').findOne({ documentId: r.documentId });
+            if (await payments.claimForStaffApproval(order)) await fulfillOrder(strapi, r.documentId);
+          } catch (e) { strapi.log.error(`[billing] fulfilment failed for ${r.documentId}: ${e.message}`); }
         }
       },
     });
+    // Slip2Go: report connection/quota at startup; every 5 min finish interrupted
+    // checks and undelivered payments; daily, delete slips past retention.
+    payments.healthCheck().catch((e) => strapi.log.error(`[slip2go] health check error: ${e.message}`));
+    const every = (ms, fn) => { const t = setInterval(() => fn().catch((e) => strapi.log.error(`[payments] job failed: ${e.message}`)), ms); t.unref?.(); };
+    every(5 * 60_000, () => payments.recover());
+    every(24 * 3600_000, () => payments.purgeOldSlips());
+
     // Staff can also grant, extend or cancel plans/add-ons in the admin; entitlements follow at once.
     strapi.db.lifecycles.subscribe({
       models: ['api::subscription.subscription', 'api::subscription-add-on.subscription-add-on', 'api::brand.brand'],

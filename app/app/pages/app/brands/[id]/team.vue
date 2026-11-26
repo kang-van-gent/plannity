@@ -7,6 +7,7 @@ import { POSITION_KEYS } from '~/types'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
 const { t, locale } = useLocale()
+const opt = useSelectOptions()
 const api = useApi()
 const notify = useNotify()
 const brands = useBrands()
@@ -257,10 +258,8 @@ const initials = (s: string) => s.split(/[\s@._()\[\]-]+/).filter(Boolean).slice
               <button v-if="canTag && (myRole === 'owner' || m.role !== 'owner')" type="button" class="btn-icon btn-ghost" :aria-label="`${t('team.editPositions')}: ${m.name}`" :title="t('team.editPositions')" @click="openTags(m)">
                 <Tags class="size-4" />
               </button>
-              <select v-if="roleOptions(m).length > 1" class="input pill flex-1 sm:flex-none" :value="m.role" :disabled="busy === `role:${m.id}`" :aria-label="`${t('team.role')}: ${m.name}`"
-                @change="changeRole(m, ($event.target as HTMLSelectElement).value as BrandRole)">
-                <option v-for="r in roleOptions(m)" :key="r" :value="r">{{ t(`roles.${r}`) }}</option>
-              </select>
+              <UiSelect v-if="roleOptions(m).length > 1" class="flex-1 sm:flex-none" size="pill" :model-value="m.role" :options="opt.roles(roleOptions(m))"
+                :disabled="busy === `role:${m.id}`" :aria-label="`${t('team.role')}: ${m.name}`" @change="changeRole(m, $event)" />
               <span v-else class="chip bg-surface-2 text-muted">{{ t(`roles.${m.role}`) }}</span>
               <button v-if="canRemove(m)" type="button" class="btn-icon btn-ghost text-danger" :disabled="busy === `rm:${m.id}`" :aria-label="`${t('team.remove')} ${m.name}`" :title="t('team.remove')" @click="remove(m)">
                 <Trash2 class="size-4" />

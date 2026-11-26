@@ -54,14 +54,38 @@ function view(file) {
   };
 }
 
+const { orderImages } = require('../../../utils/image-order');
+
 async function imagesOf(contentDocumentId) {
   const c = await strapi.documents(CONTENT).findOne({ documentId: contentDocumentId, populate: { images: true } });
-  return c?.images ?? [];
+  return c ? orderImages(c.images, c.imageOrder) : [];
 }
 
+/** Saves the images and their order (Strapi doesn't keep media relation order on its own). */
 async function setImages(contentDocumentId, ids, userId) {
-  const c = await strapi.documents(CONTENT).update({ documentId: contentDocumentId, data: { images: ids, lastEditedBy: userId }, populate: { images: true } });
-  return (c.images ?? []).map(view);
+  const c = await strapi.documents(CONTENT).update({
+    documentId: contentDocumentId, data: { images: ids, imageOrder: ids.map(String), lastEditedBy: userId }, populate: { images: true },
+  });
+  return orderImages(c.images, ids.map(String)).map(view);
+}
+
+/**
+ * Multipart parsing and the upload service can both reorder files; the app sends
+ * the order they were picked in (`order`: [{ name, size }]) so the post keeps it.
+ */
+function inPickedOrder(ctx, files, uploaded) {
+  let picked = [];
+  try { picked = JSON.parse(String(ctx.request.body?.order ?? '[]')); } catch { picked = []; }
+  if (!Array.isArray(picked) || !picked.length) picked = files.map((f) => ({ name: f.originalFilename || f.name, size: f.size }));
+  const pool = [...uploaded];
+  const out = [];
+  for (const p of picked) {
+    const close = (u) => u.name === p.name && Math.abs(Number(u.size) * 1024 - Number(p.size)) < 1024;
+    let i = pool.findIndex(close);
+    if (i < 0) i = pool.findIndex((u) => u.name === p.name);
+    if (i >= 0) out.push(...pool.splice(i, 1));
+  }
+  return [...out, ...pool];
 }
 
 async function upload(files) {
@@ -94,7 +118,7 @@ module.exports = {
     if (current.length + files.length > maxCount()) return fail(ctx, 400, 'TOO_MANY_IMAGES', `A post can have up to ${maxCount()} images.`);
     if (checkFiles(ctx, files) !== true) return;
     await guarded(ctx, async () => {
-      const uploaded = await upload(files);
+      const uploaded = inPickedOrder(ctx, files, await upload(files));
       ctx.body = { data: await setImages(ok.content.documentId, [...current.map((f) => f.id), ...uploaded.map((f) => f.id)], ctx.state.user.id) };
       await logImage(ctx, ok.content, 'content.image_added', [{ field: 'images', from: null, to: uploaded.map((f) => f.name) }]);
     });

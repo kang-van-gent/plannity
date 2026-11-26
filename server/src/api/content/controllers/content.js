@@ -15,6 +15,15 @@ function validate(next, _existing, data) {
   return errors;
 }
 
+const REVISION_FIELDS = ['title', 'concept', 'hook', 'caption', 'cta', 'visualBrief', 'videoScript', 'hashtags'];
+const SNAPSHOT_FIELDS = ['title', 'concept', 'pillar', 'objective', 'platform', 'format', 'hook', 'caption', 'cta', 'hashtags', 'visualBrief', 'videoScript', 'suggestedDate', 'rationale'];
+async function revision(c, reason, user) {
+  const snapshot = Object.fromEntries(SNAPSHOT_FIELDS.map((k) => [k, c[k] ?? null]));
+  await strapi.documents('api::content-revision.content-revision').create({
+    data: { content: c.documentId, version: Number(c.version || 1), reason, snapshot, owner: user.id },
+  });
+}
+
 // Access follows the member's role in the content's brand (Team Workspace).
 module.exports = brandScopedController('api::content.content', {
   brandPath: 'brand',
@@ -24,4 +33,11 @@ module.exports = brandScopedController('api::content.content', {
   versioned: true,
   validate,
   audit: { entityType: 'content', title: (c) => c.title, diff: (before, data) => diff(before, data, CONTENT_FIELDS), classify: classifyContent },
+  // Version history: a snapshot at creation and before every edit of the post's text.
+  async onCreate(created, user) {
+    await revision(created, 'create', user);
+  },
+  async onUpdate(existing, data, user) {
+    if (REVISION_FIELDS.some((k) => k in data && JSON.stringify(data[k]) !== JSON.stringify(existing[k]))) await revision(existing, 'edit', user);
+  },
 });

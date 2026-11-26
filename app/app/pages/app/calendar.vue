@@ -7,6 +7,7 @@ import { isApiError } from '~/services/api/contract'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
 const { t, locale } = useLocale()
+const opt = useSelectOptions()
 useSeoMeta({ title: () => t('nav.calendar') })
 const api = useApi()
 const notify = useNotify()
@@ -367,8 +368,8 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
             <CalendarDays v-if="v === 'month'" class="size-3.5" /><CalendarRange v-else-if="v === 'week'" class="size-3.5" /><List v-else class="size-3.5" />{{ t(`calendar.${v}`) }}
           </button>
         </div>
-        <select v-model="filters.platform" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5" :class="filters.platform ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''" :aria-label="t('content.fields.platform')"><option value="">{{ t('content.allPlatforms') }}</option><option v-for="p in PLATFORMS" :key="p" :value="p">{{ PLATFORM_META[p].label }}</option></select>
-        <select v-model="filters.status" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5" :class="filters.status ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''" :aria-label="t('content.fields.status')"><option value="">{{ t('content.allStatuses') }}</option><option v-for="s in CONTENT_STATUSES" :key="s" :value="s">{{ t(`status.${s}`) }}</option></select>
+        <UiSelect v-model="filters.platform" size="pill" :active="!!filters.platform" :aria-label="t('content.fields.platform')" :options="opt.withAll(t('content.allPlatforms'), opt.platforms.value)" />
+        <UiSelect v-model="filters.status" size="pill" :active="!!filters.status" :aria-label="t('content.fields.status')" :options="opt.withAll(t('content.allStatuses'), opt.statuses.value)" />
       </div>
     </div>
 
@@ -529,7 +530,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         </div>
         <div>
           <label class="label" for="q-status">{{ t('content.fields.status') }}</label>
-          <select id="q-status" v-model="quick.status" class="input"><option v-for="s in CONTENT_STATUSES" :key="s" :value="s">{{ t(`status.${s}`) }}</option></select>
+          <UiSelect id="q-status" v-model="quick.status" :options="opt.statuses.value" />
           <p class="hint">{{ t('content.statusHint') }}</p>
         </div>
         </fieldset>

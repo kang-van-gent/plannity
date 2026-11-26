@@ -22,7 +22,7 @@ const date = (iso: string | null) => (iso ? formatDateTime(iso, locale.value, { 
 const pct = (used: number, max: number | null) => (max ? Math.min(100, (used / max) * 100) : 18)
 
 const STATUS_STYLE: Record<PaymentStatus, string> = {
-  pending: 'bg-sun/15 text-amber-700 dark:text-sun', awaiting_review: 'bg-brand-500/12 text-brand-600 dark:text-brand-300',
+  pending: 'bg-sun/15 text-amber-700 dark:text-sun', verifying: 'bg-brand-500/12 text-brand-600 dark:text-brand-300', awaiting_review: 'bg-brand-500/12 text-brand-600 dark:text-brand-300',
   paid: 'bg-success/12 text-success', rejected: 'bg-danger/12 text-danger', failed: 'bg-danger/12 text-danger',
   expired: 'bg-slate-500/10 text-muted', refunded: 'bg-sky/15 text-sky-700 dark:text-sky',
 }
@@ -69,13 +69,17 @@ const choosePlan = (k: Exclude<PlanKey, 'solo'>) => buy({ kind: 'plan', planKey:
 
 function onOrderUpdate(o: PaymentOrder) {
   const was = order.value?.status
+  const wasDelivered = order.value?.fulfilled
   order.value = o
-  if (was !== o.status) settle(o)
+  // Refresh balances when the status changes, and again once a paid order is delivered.
+  if (was !== o.status || (o.status === 'paid' && o.fulfilled && wasDelivered === false)) settle(o)
   watchReview()
 }
 function watchReview() {
   clearTimeout(pollTimer)
-  if (order.value?.status !== 'awaiting_review') return
+  // Keep checking while staff review it, while it's verifying, or while a paid order is still being delivered.
+  const o = order.value
+  if (!o || !(o.status === 'awaiting_review' || o.status === 'verifying' || (o.status === 'paid' && o.fulfilled === false))) return
   pollTimer = setTimeout(async () => {
     if (!order.value) return
     try { onOrderUpdate(await api.credits.getOrder(order.value.id)) } catch { watchReview() }

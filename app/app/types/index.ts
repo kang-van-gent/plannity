@@ -434,7 +434,9 @@ export interface LedgerEntry {
  * pending = waiting for the transfer · awaiting_review = slip uploaded, being checked
  * paid = verified, credits added · rejected = slip didn't match (upload a new one)
  */
-export type PaymentStatus = 'pending' | 'awaiting_review' | 'paid' | 'rejected' | 'failed' | 'expired' | 'refunded'
+export type PaymentStatus = 'pending' | 'verifying' | 'awaiting_review' | 'paid' | 'rejected' | 'failed' | 'expired' | 'refunded'
+/** Why the last slip check ended the way it did (Slip2Go), shown to the customer. */
+export type SlipResult = 'paid' | 'receiver_mismatch' | 'amount_mismatch' | 'date_mismatch' | 'not_found' | 'invalid_slip' | 'duplicate' | 'unavailable' | 'unclear' | 'manual'
 
 export type OrderKind = 'credits' | 'plan' | 'brand_addon' | 'renewal'
 /** What to buy: AI credits, a plan month, new brand slots, or a renewal (plan month + a month for each listed brand) in one payment. */
@@ -463,6 +465,10 @@ export interface PaymentOrder {
   reviewNote: string | null
   /** Pending orders stop accepting payment after this. */
   expiresAt: ISODateTime | null
+  /** Last slip check result (null before any slip). */
+  resultCode?: SlipResult | null
+  /** Paid and what was bought has been delivered. Paid but not yet fulfilled = activating. */
+  fulfilled?: boolean
   createdAt: ISODateTime
   paidAt: ISODateTime | null
 }

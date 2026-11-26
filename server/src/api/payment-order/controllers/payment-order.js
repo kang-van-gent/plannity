@@ -7,14 +7,20 @@ const crypto = require('node:crypto');
 const { factories } = require('@strapi/strapi');
 const { fail } = require('../../../utils/brand-access');
 const { sniffImageType } = require('../../../utils/image-type');
-const { verifySlip } = require('../../../services/slip-verifier');
+const createPayments = require('../../../services/payments');
 const P = require('../../../utils/pricing');
 const { planOf } = require('../../../services/entitlements');
 
 const UID = 'api::payment-order.payment-order';
-const ttlHours = () => Number(process.env.PAYMENT_ORDER_TTL_HOURS || 24);
-const slipMaxBytes = () => Number(process.env.SLIP_MAX_MB || 5) * 1024 * 1024;
-const payee = () => ({ promptpayId: process.env.PROMPTPAY_ID || '0968870831', name: process.env.PROMPTPAY_NAME || 'Supachai Van Gent' });
+/** Payment window (minutes). Short on purpose: only transfers made inside it are approved automatically. */
+const ttlMs = () => (process.env.PAYMENT_ORDER_TTL_MINUTES
+  ? Number(process.env.PAYMENT_ORDER_TTL_MINUTES) * 60_000
+  : Number(process.env.PAYMENT_ORDER_TTL_HOURS || 0.5) * 3600_000);
+const slipMaxBytes = () => Number(process.env.PAYMENT_SLIP_MAX_BYTES || 0) || Number(process.env.SLIP_MAX_MB || 5) * 1024 * 1024;
+const payee = () => ({
+  promptpayId: process.env.PROMPTPAY_CODE || process.env.PROMPTPAY_ID || '0968870831',
+  name: process.env.PROMPTPAY_NAME || 'Supachai Van Gent',
+});
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // no 0/O/1/I
 
 function view(o) {
@@ -24,10 +30,13 @@ function view(o) {
     provider: o.provider, providerRef: o.providerRef, reference: o.reference, payee: o.provider === 'promptpay' ? payee() : null,
     slipUploadedAt: o.slipUploadedAt ?? null, reviewNote: o.reviewNote ?? null, expiresAt: o.expiresAt ?? null,
     createdAt: o.createdAt, paidAt: o.paidAt ?? null,
+    // Last slip-check result for the customer (never the raw provider response), and whether delivery finished.
+    resultCode: o.resultCode ?? null, fulfilled: !!o.fulfilledAt,
   };
 }
 
 module.exports = factories.createCoreController(UID, ({ strapi }) => {
+  const payments = createPayments({ strapi });
   const docs = () => strapi.documents(UID);
 
   async function expireStale(userId) {
@@ -80,21 +89,26 @@ module.exports = factories.createCoreController(UID, ({ strapi }) => {
       const o = await docs().create({
         data: {
           user: ctx.state.user.id, kind, credits: kind === 'credits' ? input.credits : 0, planKey: kind === 'plan' || kind === 'renewal' ? input.planKey : null,
-          quantity: kind === 'brand_addon' ? input.quantity : kind === 'renewal' ? input.brandIds.length : null, brandIds: kind === 'renewal' ? input.brandIds : null, amountSatang: amount, currency: 'THB', status: 'pending', provider: 'promptpay',
-          providerRef: `pp_${code.toLowerCase()}`, reference: `PLN-${code}`, expiresAt: new Date(Date.now() + ttlHours() * 3600_000).toISOString(),
+          quantity: kind === 'brand_addon' ? input.quantity : kind === 'renewal' && input.brandIds.length ? input.brandIds.length : null, brandIds: kind === 'renewal' ? input.brandIds : null, amountSatang: amount, currency: 'THB', status: 'pending', provider: 'promptpay',
+          providerRef: `pp_${code.toLowerCase()}`, reference: `PLN-${code}`, expiresAt: new Date(Date.now() + ttlMs()).toISOString(), receiverSnapshot: createPayments.receiverSnapshot(),
         },
       });
       ctx.body = { data: view(o) };
     },
 
     /** Multipart field "slip". pending/rejected → awaiting_review; then staff (or Slip2Go) decides. */
+    /**
+     * Multipart field "slip" (+ Idempotency-Key header). Checked by Slip2Go when
+     * configured: paid / rejected (upload a correct slip) / awaiting_review (staff).
+     * Expired orders still accept a slip — a transfer made inside the window is
+     * honoured; anything later goes to staff rather than being refused outright.
+     */
     async uploadSlip(ctx) {
       if (!ctx.state.user) return ctx.unauthorized();
       await expireStale(ctx.state.user.id);
       const o = await mine(ctx);
       if (!o) return;
-      if (o.status === 'expired') return fail(ctx, 409, 'CONFLICT', 'This payment request has expired. Start a new purchase.');
-      if (!['pending', 'rejected'].includes(o.status)) return fail(ctx, 409, 'CONFLICT', 'A slip was already submitted for this order.');
+      if (o.status === 'paid') { ctx.body = { data: view(o) }; return; }
       const f = ctx.request.files?.slip;
       const file = Array.isArray(f) ? f[0] : f;
       if (!file) return fail(ctx, 400, 'INVALID_INPUT', 'No slip received', { slip: 'required' });
@@ -103,27 +117,28 @@ module.exports = factories.createCoreController(UID, ({ strapi }) => {
       fs.readSync(fd, head, 0, 16, 0);
       fs.closeSync(fd);
       const type = sniffImageType(head);
-      if (!type || type === 'image/gif') return fail(ctx, 400, 'FILE_TYPE', 'The slip must be a JPG, PNG or WEBP image.');
+      // Real image bytes only (no SVG/GIF/other), within the size limit.
+      if (!type || !['image/jpeg', 'image/png', 'image/webp'].includes(type)) return fail(ctx, 400, 'FILE_TYPE', 'The slip must be a JPG, PNG or WEBP image.');
       if (file.size > slipMaxBytes()) return fail(ctx, 400, 'FILE_TOO_LARGE', `The slip must be under ${Math.round(slipMaxBytes() / 1048576)} MB.`);
-      file.mimetype = type;
-      let uploaded;
       try {
-        [uploaded] = await strapi.plugin('upload').service('upload').upload({ data: {}, files: [file] });
+        const updated = await payments.submitSlip(o, ctx.state.user, { filepath: file.filepath, size: file.size, mime: type, name: file.originalFilename || 'slip' }, ctx.get('idempotency-key') || null);
+        strapi.log.info(`[payments] slip for ${o.reference}: ${updated.status}${updated.resultCode ? ` (${updated.resultCode})` : ''}`);
+        ctx.body = { data: view(updated) };
       } catch (e) {
-        strapi.log.error(`[slip] upload failed: ${e.message}`);
-        return fail(ctx, 502, 'STORAGE', 'The slip could not be stored. Please try again.');
+        if (e instanceof payments.PaymentError) return fail(ctx, e.status, e.code, e.message, e.fieldErrors);
+        throw e;
       }
-      let updated = await docs().update({ documentId: o.documentId, data: { slip: uploaded.id, slipUploadedAt: new Date().toISOString(), status: 'awaiting_review', reviewNote: null } });
-      strapi.log.info(`[payments] slip received for ${o.reference} (${o.kind || 'credits'}, ${Number(o.amountSatang) / 100} THB) — review in the admin: Payment Order`);
+    },
 
-      const result = await verifySlip(strapi, { order: updated, file });
-      if (result.verdict === 'paid' || result.verdict === 'rejected') {
-        updated = await docs().update({
-          documentId: o.documentId,
-          data: { status: result.verdict, verifiedBy: 'slip2go', verification: result.raw ?? null, reviewNote: result.verdict === 'rejected' ? (result.note ?? null) : null },
-        }); // 'paid' → fulfilled by the payment-order lifecycle subscriber
-      }
-      ctx.body = { data: view(updated) };
+    /** Staff-only slip view through the signed link stored on the order/attempt (no login, no public folder). */
+    async slipFile(ctx) {
+      const file = await payments.slipFile(ctx.params.attemptId, ctx.query.exp, ctx.query.sig);
+      if (!file) { ctx.status = 404; ctx.body = 'Not found'; return; }
+      ctx.set('Content-Type', file.mime);
+      ctx.set('Cache-Control', 'private, no-store');
+      ctx.set('X-Robots-Tag', 'noindex, nofollow');
+      ctx.set('Content-Disposition', 'inline; filename="slip"');
+      ctx.body = file.buffer;
     },
   };
 });

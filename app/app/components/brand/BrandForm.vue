@@ -113,7 +113,7 @@ function submit() {
           <div><label class="label" for="b-tone">{{ t('brands.fields.tone') }}</label><input id="b-tone" v-model="form.profile.tone" class="input" :placeholder="t('brands.ph.tone')"></div>
           <div>
             <label class="label" for="b-lang">{{ t('brands.fields.language') }}</label>
-            <select id="b-lang" v-model="form.profile.language" class="input"><option v-for="l in languages" :key="l" :value="l">{{ t(`brands.languages.${l}`) }}</option></select>
+            <UiSelect id="b-lang" v-model="form.profile.language" :options="languages.map((l) => ({ value: l, label: t(`brands.languages.${l}`) }))" />
           </div>
         </div>
         <div><label class="label" for="b-guide">{{ t('brands.fields.guidelines') }}</label><textarea id="b-guide" v-model="form.profile.guidelines" class="input" rows="2" /></div>
@@ -141,8 +141,7 @@ function submit() {
               {{ p }}<button type="button" class="rounded-full p-0.5 hover:bg-brand-500/20" :aria-label="t('common.remove')" @click="form.profile.pillars.splice(i, 1)"><X class="size-3" /></button>
             </span>
             <div class="flex items-center gap-1">
-              <input v-model="newPillar" list="pillar-suggestions" class="input w-40 py-1.5" :placeholder="t('brands.ph.pillar')" @keydown.enter.prevent="addPillar">
-              <datalist id="pillar-suggestions"><option v-for="p in DEFAULT_PILLARS" :key="p" :value="p" /></datalist>
+              <UiCombobox v-model="newPillar" class="w-48" size="sm" :suggestions="DEFAULT_PILLARS.filter((p) => !form.profile.pillars.includes(p))" :placeholder="t('brands.ph.pillar')" :aria-label="t('brands.ph.pillar')" @enter="addPillar()" />
               <button type="button" class="btn-icon btn-secondary p-2" :aria-label="t('common.add')" @click="addPillar"><Plus class="size-4" /></button>
             </div>
           </div>

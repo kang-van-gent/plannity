@@ -5,7 +5,7 @@
     "singularName": "content",
     "pluralName": "contents",
     "displayName": "Content",
-    "description": "One planned content item; fields follow the AI output contract (spec \u00a79\u201310)."
+    "description": "One planned content item; fields follow the AI output contract (spec §9–10)."
   },
   "options": {
     "draftAndPublish": false
@@ -155,6 +155,11 @@
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user",
       "description": "Attribution: the member who last edited (owner = creator)."
+    },
+    "imageOrder": {
+      "type": "json",
+      "private": true,
+      "description": "Display order of `images` (file ids). Strapi doesn't guarantee media relation order, so it's kept here."
     }
   }
 }

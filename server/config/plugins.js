@@ -25,8 +25,13 @@ module.exports = () => ({
   'users-permissions': {
     config: {
       jwtManagement: 'refresh',
+      // The app's sign-up form sends a display name.
+      register: { allowedFields: ['name', 'locale'] },
+      // Refresh tokens are returned in the response body: the browser never talks to
+      // Strapi directly — the Nuxt BFF stores both tokens in its own HttpOnly cookies
+      // (app/server/utils/session.ts), so a Strapi-side cookie would never reach it.
       sessions: {
-        httpOnly: true,
+        httpOnly: false,
       },
     },
   },

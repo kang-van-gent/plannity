@@ -5,6 +5,9 @@ const { locale } = useLocale()
 const curtain = useCurtain()
 const config = useRuntimeConfig()
 const route = useRoute()
+// The landing intro plays only when the site is first loaded (or refreshed) on '/',
+// never when navigating back to it — decided once, on the first render.
+useState('landing-intro-done', () => route.path !== '/')
 
 useHead({
   htmlAttrs: { lang: locale },
