@@ -19,13 +19,22 @@ function slip2goConfig(env = process.env) {
     accountType: String(env.PAYMENT_RECEIVER_ACCOUNT_TYPE || RECEIVER_TYPES[promptpayType] || '').trim(),
     accountNumber: String(env.PAYMENT_RECEIVER_ACCOUNT_NUMBER || env.PROMPTPAY_CODE || env.PROMPTPAY_ID || '').replace(/\D/g, ''),
     nameTH: String(env.PAYMENT_RECEIVER_NAME_TH || '').trim() || null,
+    // The bank account behind the PromptPay ID. Many banking apps print this on
+    // the slip instead of the PromptPay number; Slip2Go accepts a slip when ANY
+    // checkReceiver entry matches, so both are sent.
+    alternates: [],
   };
+  const bankAccount = String(env.PAYMENT_RECEIVER_BANK_ACCOUNT || '').replace(/\D/g, '');
+  if (bankAccount) receiver.alternates.push({ accountType: String(env.PAYMENT_RECEIVER_BANK_TYPE || '01004').trim(), accountNumber: bankAccount });
   const problems = [];
   if (!apiUrl || !secret) problems.push('SLIP2GO_API_URL and SLIP2GO_SECRET_KEY are required');
   if (apiUrl && !/^https:\/\//i.test(apiUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(apiUrl)) problems.push('SLIP2GO_API_URL must be https');
   if (!/^0\d{4}$/.test(receiver.accountType)) problems.push('PAYMENT_RECEIVER_ACCOUNT_TYPE (e.g. 02001 for a PromptPay phone number) is required');
   if (!receiver.accountNumber) problems.push('PAYMENT_RECEIVER_ACCOUNT_NUMBER (or PROMPTPAY_CODE) is required');
   if (receiver.accountType === '02001' && !/^0\d{9}$/.test(receiver.accountNumber)) problems.push('a PromptPay phone receiver must be a 10-digit number starting with 0');
+  for (const a of receiver.alternates) {
+    if (!/^01\d{3}$/.test(a.accountType) || !/^\d{10,15}$/.test(a.accountNumber)) problems.push('PAYMENT_RECEIVER_BANK_ACCOUNT must be the bank account digits, PAYMENT_RECEIVER_BANK_TYPE a bank code such as 01004 (KBank)');
+  }
   const configured = !!(apiUrl || secret);
   if (configured && problems.length && !warned) {
     warned = true;

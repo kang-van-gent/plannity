@@ -34,6 +34,15 @@ test('payload: exact amount, receiver without spaces or title, date from order c
   assert.deepEqual(p.checkDate, { type: 'gte', date: '2026-11-26T07:59:00.000Z' });
 });
 
+test('payload: the bank account behind the PromptPay ID is accepted too', () => {
+  const p = d.buildPayload(order, { accountType: '02001', accountNumber: '0968870831', nameTH: null, alternates: [{ accountType: '01004', accountNumber: '123-4-56789-0' }] });
+  assert.deepEqual(p.checkReceiver, [{ accountType: '02001', accountNumber: '0968870831' }, { accountType: '01004', accountNumber: '1234567890' }]);
+  const cfg = require('../src/services/slip2go').slip2goConfig({ SLIP2GO_API_URL: 'https://x.test', SLIP2GO_SECRET_KEY: 's', PAYMENT_RECEIVER_ACCOUNT_NUMBER: '0968870831', PAYMENT_RECEIVER_BANK_ACCOUNT: '123-4-56789-0' });
+  assert.equal(cfg.enabled, true);
+  assert.deepEqual(cfg.receiver.alternates, [{ accountType: '01004', accountNumber: '1234567890' }]);
+  assert.equal(require('../src/services/slip2go').slip2goConfig({ SLIP2GO_API_URL: 'https://x.test', SLIP2GO_SECRET_KEY: 's', PAYMENT_RECEIVER_ACCOUNT_NUMBER: '0968870831', PAYMENT_RECEIVER_BANK_ACCOUNT: '12' }).enabled, false, 'bad account number');
+});
+
 test('only 200200 with complete, matching data is paid', () => {
   const r = d.decide(ok({ code: '200200', message: 'Slip is valid.', data: data() }), order, AUTO);
   assert.equal(r.outcome, 'paid');

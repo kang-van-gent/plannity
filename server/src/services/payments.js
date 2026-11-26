@@ -158,6 +158,12 @@ module.exports = ({ strapi }) => {
       const res = await verifyImage(cfg, { buffer, mime: file.mime, filename: `slip.${EXT[file.mime] || 'jpg'}`, payload: D.buildPayload(snapshot, receiver) });
       decision = D.decide(res, snapshot, { now: Date.now(), notFoundAttempts, autoApprove: cfg.autoApprove });
       if (decision.alert) strapi.log.error(`[slip2go] operator attention needed: ${decision.reason} (order ${snapshot.reference})`);
+      if (decision.result === D.RESULT.receiverMismatch) {
+        // Masked values only: enough to see which receiver form the slip used.
+        const f = decision.facts || {};
+        const sent = D.buildPayload(snapshot, receiver).checkReceiver.map((r) => `${r.accountType}:…${String(r.accountNumber).slice(-4)}${r.accountNameTH ? ' +nameTH' : ''}`).join(', ');
+        strapi.log.warn(`[slip2go] receiver mismatch for ${snapshot.reference}: slip paid bank ${f.receiverBankId ?? '?'}, PromptPay ${f.receiverProxyType ?? 'none'} ${f.receiverAccountMasked ?? ''}, account ${f.receiverBankAccountMasked ?? '?'} — we accept ${sent}`);
+      }
     }
     return finalize(order.documentId, attempt.documentId, leaseToken, decision);
   }

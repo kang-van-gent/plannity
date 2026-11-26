@@ -54,7 +54,8 @@ function receiverCheck(receiver) {
 function buildPayload(order, receiver, { skewMs = 60_000 } = {}) {
   return {
     checkDuplicate: true,
-    checkReceiver: [receiverCheck(receiver)],
+    // Any entry matching passes: the PromptPay ID, and the bank account behind it (as some slips show).
+    checkReceiver: [receiverCheck(receiver), ...(receiver.alternates || []).map((a) => receiverCheck({ ...a, nameTH: receiver.nameTH }))],
     checkAmount: { type: 'eq', amount: satangToBaht(order.amountSatang) },
     // Transfers made before the order existed are not accepted (small clock allowance).
     checkDate: { type: 'gte', date: new Date(Date.parse(order.createdAt) - skewMs).toISOString() },
@@ -146,6 +147,7 @@ function extractFacts(data) {
     receiverBankId: str(data.receiver?.bank?.id),
     receiverProxyType: str(data.receiver?.account?.proxy?.type),
     receiverAccountMasked: str(data.receiver?.account?.proxy?.account ?? data.receiver?.account?.bank?.account),
+    receiverBankAccountMasked: str(data.receiver?.account?.bank?.account),
   };
 }
 const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
