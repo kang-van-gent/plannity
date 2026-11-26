@@ -184,6 +184,10 @@ const en: Messages = {
     videoUnavailable: 'Video preview isn’t available yet — this shows the photo version.',
   },
 
+  consent: {
+    title: 'Help us improve Plannity', body: 'May we use Google Analytics cookies to see how the site is used? No ads, and we never send your content or account details.',
+    more: 'Privacy policy', accept: 'Allow', decline: 'No thanks', settings: 'Cookie settings', settingsBody: 'Change your choice about analytics cookies.', reset: 'Ask me again',
+  },
   pay: {
     handoff: {
       tabPhone: 'Pay with your phone', tabHere: 'Pay on this computer',
@@ -403,6 +407,7 @@ const en: Messages = {
       { h: 'Retention', p: 'We keep data for the life of your account. Financial records are retained as required by law even after deletion.' },
       { h: 'Export and deletion', p: 'Export your content as CSV any time and request account deletion from Settings. Data is deleted or anonymised per policy.' },
       { h: 'Upstify', p: 'We share a service request with Upstify only when you tick the consent box on the form.' },
+      { h: 'Analytics cookies', p: 'With your permission we use Google Analytics to understand how the website is used (pages visited, device type, approximate location). It never receives your content, brand data, account details, payment links or slips. You can change your choice at any time below.' },
     ],
     termsTitle: 'Terms of Service', termsIntro: 'The terms for using Plannity: plans, AI credits, renewals, teams, your content and acceptable use.',
   },

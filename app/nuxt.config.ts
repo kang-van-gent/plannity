@@ -24,6 +24,10 @@ export default defineNuxtConfig({
     strapiUrl: 'http://localhost:1337',
     // Browser-reachable Strapi URL for social sign-in redirects (defaults to strapiUrl).
     strapiPublicUrl: '',
+    // SEO tools. Normally set in Strapi (Content Manager → Site settings); these
+    // env values (NUXT_GOOGLE_ANALYTICS_ID / NUXT_GOOGLE_SITE_VERIFICATION) are only a fallback.
+    googleAnalyticsId: '',
+    googleSiteVerification: '',
     public: {
       /** 'mock' (default, in-browser demo data) or 'strapi' (BFF proxy to the Strapi API). */
       dataSource: 'mock',

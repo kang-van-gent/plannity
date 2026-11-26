@@ -1,0 +1,36 @@
+{
+  "kind": "singleType",
+  "collectionName": "site_settings",
+  "info": {
+    "singularName": "site-setting",
+    "pluralName": "site-settings",
+    "displayName": "Site settings",
+    "description": "SEO & analytics for the public website: Google Analytics and Google Search Console. Changes reach the site within a minute."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "googleAnalyticsId": {
+      "type": "string",
+      "regex": "^G-[A-Z0-9]{4,15}$",
+      "description": "Google Analytics 4 Measurement ID, e.g. G-ABC123XYZ (Admin → Data streams → Web). Empty = no Analytics."
+    },
+    "analyticsEnabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Quick switch: turn Analytics off without deleting the ID."
+    },
+    "requireCookieConsent": {
+      "type": "boolean",
+      "default": true,
+      "description": "Ask visitors before loading Analytics (recommended under Thailand's PDPA). Off = load for everyone."
+    },
+    "googleSiteVerification": {
+      "type": "string",
+      "maxLength": 400,
+      "description": "Google Search Console → Add property → URL prefix → HTML tag. Paste the whole <meta> tag or just its content value."
+    }
+  }
+}

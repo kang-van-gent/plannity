@@ -67,6 +67,7 @@ const pageTransition = {
       <NuxtPage :transition="pageTransition" />
     </NuxtLayout>
     <ActionCenter />
+    <AnalyticsConsent />
     <PageCurtain />
   </div>
 </template>

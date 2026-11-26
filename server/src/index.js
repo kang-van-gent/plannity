@@ -34,6 +34,8 @@ const AUTHENTICATED_ACTIONS = {
 /** Actions anyone may call without signing in (the public blog). */
 const PUBLIC_ACTIONS = {
   'api::blog-post.blog-post': ['find', 'findOne'],
+  // SEO & analytics settings read by the public website.
+  'api::site-setting.site-setting': ['find'],
 };
 
 async function grantPermissions(strapi, roleType, map) {
