@@ -78,4 +78,17 @@ async function accountInfo(cfg) {
   return call(cfg, '/api/account/info', { method: 'GET' });
 }
 
-module.exports = { slip2goConfig, verifyImage, accountInfo };
+/**
+ * POST /api/qr-payment/generate-qr-code — amount-fixed PromptPay payload
+ * (code "200", data.qrCode). Only a QR to pay with: never evidence of payment.
+ * Shorter timeout than slip checks: checkout falls back to a locally built QR.
+ */
+async function generateQr(cfg, { promptPayCode, promptPayType, accountName, amount }) {
+  return call({ ...cfg, timeoutMs: Math.min(cfg.timeoutMs, 6000) }, '/api/qr-payment/generate-qr-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ promptPayCode, promptPayType, accountName, amount }),
+  });
+}
+
+module.exports = { slip2goConfig, verifyImage, accountInfo, generateQr };

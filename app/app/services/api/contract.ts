@@ -3,7 +3,7 @@ import type {
   FeedbackInput, GenerationInput, GenerationJob, Holiday, ISODate, LedgerEntry, Paginated, PaymentOrder,
   PromotionInput, PromotionInquiry, RegisterInput, Session, SocialProvider, User, Wallet,
   BrandRole, ContentImage, InvitationPreview, InviteResult, MyInvitation, TeamSummary, BrandMember, ActivityEntityType, ActivityEntry,
-  Entitlements, OrderInput, PositionKey, Task, TaskAction, TaskInput,
+  Entitlements, OrderInput, PaymentHandoff, PositionKey, Task, TaskAction, TaskInput,
 } from '~/types'
 
 /**
@@ -118,6 +118,14 @@ export interface DataSource {
     simulateWebhook?(orderId: string, outcome: 'paid' | 'failed'): Promise<void>
     /** Demo only: stands in for the slip check (staff review today, Slip2Go later). */
     simulateReview?(orderId: string, outcome: 'paid' | 'rejected'): Promise<void>
+    /** Owner only: a short-lived link that opens this order on a phone (pay + send the slip there). */
+    createHandoff(orderId: string): Promise<PaymentHandoff>
+  }
+
+  /** The phone side of a payment hand-off. No sign-in: the token is the only credential, for one order. */
+  handoff: {
+    get(token: string): Promise<PaymentOrder>
+    uploadSlip(token: string, file: File, idempotencyKey: string): Promise<PaymentOrder>
   }
 
   /** Plans & brand add-ons (pricing.md). Purchases use credits.createOrder / uploadSlip like credit top-ups. */
@@ -155,6 +163,8 @@ export type ApiErrorCode =
   | 'SEAT_LIMIT' | 'PLAN_REQUIRED' | 'BRAND_LIMIT' | 'ALREADY_MEMBER' | 'DUPLICATE_INVITE' | 'INVITE_EXPIRED' | 'INVITE_INVALID' | 'EMAIL_MISMATCH' | 'LAST_OWNER'
   // Post images
   | 'FILE_TYPE' | 'FILE_TOO_LARGE' | 'TOO_MANY_IMAGES' | 'STORAGE'
+  // Mobile payment hand-off
+  | 'LINK_EXPIRED'
 
 /** Mirrors the error envelope in spec §17: {error:{code,message,fieldErrors,requestId}}. */
 export class ApiError extends Error {

@@ -6,7 +6,7 @@
 
 import type {
   ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, Entitlements, GenerationJob, Holiday, InvitationPreview,
-  InviteResult, LedgerEntry, MyInvitation, PaymentOrder, PromotionInquiry, Session, Task, TeamSummary, User, Wallet,
+  InviteResult, LedgerEntry, MyInvitation, PaymentHandoff, PaymentOrder, PromotionInquiry, Session, Task, TeamSummary, User, Wallet,
 } from '~/types'
 import { ApiError, type ApiErrorCode, type DataSource } from './contract'
 
@@ -208,6 +208,19 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
         form.append('slip', file, file.name)
         // One key per upload: a retried request is processed once (no second Slip2Go check).
         const res = await fetch(`${BFF}/payments/orders/${orderId}/slip`, { method: 'POST', body: form, headers: { 'X-Requested-With': 'plannity', 'Idempotency-Key': crypto.randomUUID() }, credentials: 'same-origin' })
+        const body = await res.json().catch(() => ({})) as { data?: Row } & StrapiErrorBody
+        if (!res.ok) throw toApiError({ status: res.status, data: body })
+        return norm<PaymentOrder>(body.data)
+      },
+      createHandoff: (orderId) => call<{ data: PaymentHandoff }>(`${BFF}/payments/orders/${orderId}/handoff`, { method: 'POST' }).then((r) => r.data),
+    },
+
+    handoff: {
+      get: (token) => one<PaymentOrder>(`${BFF}/payments/handoff/${encodeURIComponent(token)}`),
+      async uploadSlip(token, file, idempotencyKey) {
+        const form = new FormData()
+        form.append('slip', file, file.name)
+        const res = await fetch(`${BFF}/payments/handoff/${encodeURIComponent(token)}/slip`, { method: 'POST', body: form, headers: { 'X-Requested-With': 'plannity', 'Idempotency-Key': idempotencyKey }, credentials: 'omit' })
         const body = await res.json().catch(() => ({})) as { data?: Row } & StrapiErrorBody
         if (!res.ok) throw toApiError({ status: res.status, data: body })
         return norm<PaymentOrder>(body.data)

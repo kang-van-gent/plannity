@@ -185,6 +185,20 @@ const en: Messages = {
   },
 
   pay: {
+    handoff: {
+      tabPhone: 'Pay with your phone', tabHere: 'Pay on this computer',
+      scanTitle: 'Scan with your phone camera', scanAlt: 'QR code that opens this payment on your phone',
+      s1: 'Scan this code with your phone camera', s2: 'Pay the PromptPay QR in your banking app', s3: 'Send the slip from your phone — no need to move it to this computer',
+      waiting: 'Waiting for your payment…', waitingBody: 'This page updates by itself as soon as your slip is checked.',
+      refreshes: 'The code refreshes on its own', newCode: 'Get a new code', loadFailed: 'We couldn’t create the phone link.',
+      privacy: 'The link only opens this payment. It expires on its own.',
+      phoneTitle: 'Pay Plannity', phoneIntro: 'Pay this QR, then send the slip right here.',
+      phoneSave: 'Paying on this phone? Save the QR, open your banking app and choose “Scan from gallery”.',
+      phonePaid: 'All done — your computer has updated too. You can close this page.',
+      phoneExpired: 'Start a new purchase on your computer to get a fresh QR.',
+      linkExpiredTitle: 'This payment link has expired', linkExpiredBody: 'Scan the new QR shown on your computer, or start the purchase again there.',
+      loadError: 'We couldn’t load this payment.',
+    },
     verifyingTitle: 'Checking your slip', verifyingBody: 'We’re confirming the transfer with the bank. This usually takes a few seconds.',
     activatingTitle: 'Payment received', activatingBody: 'We’re activating what you bought — this page updates on its own.',
     reviewTitle: 'We couldn’t confirm the payment yet', reviewBody: 'Our team will check it and update this order. Please don’t transfer again.',
@@ -224,7 +238,7 @@ const en: Messages = {
   errors: {
     codes: {
       FORBIDDEN: 'Your role doesn’t allow this', SEAT_LIMIT: 'All seats are in use', ALREADY_MEMBER: 'Already a member',
-      DUPLICATE_INVITE: 'Already invited', INVITE_EXPIRED: 'Invitation expired', INVITE_INVALID: 'Invitation unavailable',
+      DUPLICATE_INVITE: 'Already invited', INVITE_EXPIRED: 'Invitation expired', INVITE_INVALID: 'Invitation unavailable', LINK_EXPIRED: 'Payment link expired',
       EMAIL_MISMATCH: 'Different account', LAST_OWNER: 'A brand needs an owner', FILE_TYPE: 'Unsupported file',
       FILE_TOO_LARGE: 'File too large', TOO_MANY_IMAGES: 'Too many images', STORAGE: 'Upload failed',
       PLAN_REQUIRED: 'Needs a Team or Studio plan', BRAND_LIMIT: 'No free brand slot',

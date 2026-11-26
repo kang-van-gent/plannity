@@ -24,7 +24,7 @@ const AUTHENTICATED_ACTIONS = {
   'api::team.team': ['get', 'invite', 'resend', 'cancel', 'updateRole', 'removeMember', 'leave', 'mine', 'acceptMine', 'declineMine', 'accept', 'decline'],
   'api::content-image.content-image': ['upload', 'reorder', 'replace', 'remove', 'download'],
   'api::activity-log.activity-log': ['list'],
-  'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip'],
+  'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip', 'createHandoff'],
   'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
   'api::subscription.subscription': ['me'],
   'api::account.account': ['dashboard', 'verify', 'updateMe', 'exportCsv'],

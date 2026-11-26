@@ -52,7 +52,6 @@ const COVER_STYLE = { included: 'bg-success/12 text-success', plan: 'bg-brand-50
 const addonQty = ref(1)
 const creating = ref<string | null>(null)
 const order = ref<PaymentOrder | null>(null)
-let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 async function buy(input: OrderInput, key: string) {
   creating.value = key
@@ -73,18 +72,8 @@ function onOrderUpdate(o: PaymentOrder) {
   order.value = o
   // Refresh balances when the status changes, and again once a paid order is delivered.
   if (was !== o.status || (o.status === 'paid' && o.fulfilled && wasDelivered === false)) settle(o)
-  watchReview()
 }
-function watchReview() {
-  clearTimeout(pollTimer)
-  // Keep checking while staff review it, while it's verifying, or while a paid order is still being delivered.
-  const o = order.value
-  if (!o || !(o.status === 'awaiting_review' || o.status === 'verifying' || (o.status === 'paid' && o.fulfilled === false))) return
-  pollTimer = setTimeout(async () => {
-    if (!order.value) return
-    try { onOrderUpdate(await api.credits.getOrder(order.value.id)) } catch { watchReview() }
-  }, 5000)
-}
+// The checkout panel follows the order itself (every 3 s until it settles), including slips sent from a phone.
 function settle(o: PaymentOrder) {
   orders.refresh({ silent: true })
   if (o.status === 'paid') {
@@ -94,9 +83,8 @@ function settle(o: PaymentOrder) {
     notify.success(o.kind === 'plan' && o.planKey ? t('plan.activated', { plan: planName(o.planKey) }) : o.kind === 'renewal' ? t('plan.renewed') : t('plan.addonActivated'), t('plan.activatedBody'))
   } else if (o.status === 'rejected') notify.warning(t('pay.rejectedTitle'), o.reviewNote ?? undefined)
 }
-function closeCheckout() { clearTimeout(pollTimer); order.value = null }
-function resume(o: PaymentOrder) { order.value = o; watchReview() }
-onBeforeUnmount(() => clearTimeout(pollTimer))
+function closeCheckout() { order.value = null }
+function resume(o: PaymentOrder) { order.value = o }
 
 async function demoExpire() {
   if (!api.billing.simulateExpire) return

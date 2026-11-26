@@ -75,6 +75,8 @@ export default defineNuxtConfig({
     // The user panel is a client-rendered app and must never be indexed.
     '/app': { ssr: false, headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
     '/app/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
+    // Mobile payment hand-off: the token in the URL is a credential — never cached, indexed or sent as a referrer.
+    '/pay/**': { ssr: false, headers: { 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' } },
   },
 
   typescript: {

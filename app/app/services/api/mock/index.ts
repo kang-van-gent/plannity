@@ -344,6 +344,28 @@ export function createMockSource(getToken: () => string | null | undefined, limi
   }
 
   /** Pending PromptPay orders stop accepting payment after their window (slips already sent are still reviewed). */
+  /** Demo slip check shared by the signed-in upload and the phone hand-off. */
+  async function acceptSlip(o: Owned<PaymentOrder>, file: File): Promise<PaymentOrder> {
+    if (o.status === 'expired') throw new ApiError(409, 'CONFLICT', 'This payment request has expired. Start a new purchase.')
+    if (o.status !== 'pending' && o.status !== 'rejected') throw new ApiError(409, 'CONFLICT', 'A slip was already submitted for this order.')
+    const type = await sniffFile(file)
+    if (!type || type === 'image/gif') throw new ApiError(400, 'FILE_TYPE', `"${file.name}" isn't a JPG, PNG or WEBP image of the slip.`)
+    if (file.size > payment.slipMaxBytes) throw new ApiError(400, 'FILE_TOO_LARGE', `The slip must be under ${Math.round(payment.slipMaxBytes / 1048576)} MB.`)
+    try {
+      await idbDo('readwrite', (st) => st.put(file.slice(0, file.size, type), `slip_${o.id}`))
+    } catch {
+      throw new ApiError(507, 'STORAGE', 'Could not save the slip (browser storage is full or unavailable).')
+    }
+    Object.assign(o, { status: 'awaiting_review', slipUploadedAt: nowISO(), reviewNote: null })
+    persist()
+    return orderView(o)
+  }
+  function handoffOrder(token: string): Owned<PaymentOrder> {
+    const m = /^demo\.([\w-]+)\.([0-9a-z]+)$/.exec(token)
+    const o = m && parseInt(m[2]!, 36) > Date.now() ? load().orders.find((x) => x.id === m[1]) : undefined
+    if (!o) throw new ApiError(404, 'LINK_EXPIRED', 'This payment link has expired. Scan the new QR on your computer.')
+    return o
+  }
   function expireOrders(userId: string) {
     const now = nowISO()
     for (const o of load().orders) {
@@ -1103,19 +1125,18 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         expireOrders(uidOf())
         const o = load().orders.find((x) => x.id === orderId && x.ownerId === uidOf())
         if (!o) throw new ApiError(404, 'NOT_FOUND', 'Order not found')
-        if (o.status === 'expired') throw new ApiError(409, 'CONFLICT', 'This payment request has expired. Start a new purchase.')
-        if (o.status !== 'pending' && o.status !== 'rejected') throw new ApiError(409, 'CONFLICT', 'A slip was already submitted for this order.')
-        const type = await sniffFile(file)
-        if (!type || type === 'image/gif') throw new ApiError(400, 'FILE_TYPE', `"${file.name}" isn't a JPG, PNG or WEBP image of the slip.`)
-        if (file.size > payment.slipMaxBytes) throw new ApiError(400, 'FILE_TOO_LARGE', `The slip must be under ${Math.round(payment.slipMaxBytes / 1048576)} MB.`)
-        try {
-          await idbDo('readwrite', (st) => st.put(file.slice(0, file.size, type), `slip_${o.id}`))
-        } catch {
-          throw new ApiError(507, 'STORAGE', 'Could not save the slip (browser storage is full or unavailable).')
-        }
-        Object.assign(o, { status: 'awaiting_review', slipUploadedAt: nowISO(), reviewNote: null })
-        persist()
-        return orderView(o)
+        return acceptSlip(o, file)
+      },
+      async createHandoff(orderId) {
+        await net({ latency: 200 })
+        expireOrders(uidOf())
+        const o = load().orders.find((x) => x.id === orderId && x.ownerId === uidOf())
+        if (!o) throw new ApiError(404, 'NOT_FOUND', 'Order not found')
+        if (!['pending', 'rejected', 'verifying', 'expired'].includes(o.status)) throw new ApiError(409, 'CONFLICT', `This order is ${o.status}.`)
+        // Demo: the "token" just names the order and only works in this browser (data lives in localStorage).
+        const expiresAt = new Date(Date.now() + 45 * 60_000).toISOString()
+        const token = `demo.${o.id}.${Date.parse(expiresAt).toString(36)}`
+        return { token, url: `${location.origin}/pay/${token}`, expiresAt }
       },
       async simulateReview(orderId, outcome) {
         // Demo stand-in for the slip check (staff review now, Slip2Go later).
@@ -1151,6 +1172,21 @@ export function createMockSource(getToken: () => string | null | undefined, limi
           o.status = 'failed'
         }
         persist()
+      },
+    },
+
+    handoff: {
+      async get(token) {
+        await net({ latency: 200 })
+        const o = handoffOrder(token)
+        expireOrders(o.ownerId)
+        return orderView(o)
+      },
+      async uploadSlip(token, file) {
+        await net({ latency: 700 })
+        const o = handoffOrder(token)
+        expireOrders(o.ownerId)
+        return acceptSlip(o, file)
       },
     },
 

@@ -31,13 +31,12 @@ const ORDER_STYLE: Record<PaymentStatus, string> = {
 }
 
 // --- PromptPay checkout --------------------------------------------------------
-// Pay by scanning the QR, then upload the slip. Credits are added only when the
-// server marks the order paid (staff review now, Slip2Go later); while a slip is
-// being checked the panel polls the order for the decision.
+// Pay by scanning the QR, then send the slip (here or from the phone via the
+// hand-off QR). Credits are added only when the server marks the order paid; the
+// checkout panel follows the order itself until it settles.
 const custom = ref(20)
 const creating = ref<number | null>(null)
 const order = ref<PaymentOrder | null>(null)
-let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 async function buy(credits: number) {
   if (!Number.isInteger(credits) || credits < 1 || credits > 500) { notify.warning(t('validation.invalid_credits')); return }
@@ -58,18 +57,6 @@ function onOrderUpdate(o: PaymentOrder) {
   order.value = o
   // Refresh balances when the status changes, and again once a paid order is delivered.
   if (was !== o.status || (o.status === 'paid' && o.fulfilled && wasDelivered === false)) settle(o)
-  watchReview()
-}
-
-async function watchReview() {
-  clearTimeout(pollTimer)
-  // Keep checking while staff review it, while it's verifying, or while a paid order is still being delivered.
-  const o = order.value
-  if (!o || !(o.status === 'awaiting_review' || o.status === 'verifying' || (o.status === 'paid' && o.fulfilled === false))) return
-  pollTimer = setTimeout(async () => {
-    if (!order.value) return
-    try { onOrderUpdate(await api.credits.getOrder(order.value.id)) } catch { watchReview() /* transient; keep watching */ }
-  }, 5000)
 }
 
 function settle(o: PaymentOrder) {
@@ -84,7 +71,6 @@ function settle(o: PaymentOrder) {
 
 function closeCheckout() {
   if (order.value?.status === 'pending') notify.info(t('credits.orderPending'), t('credits.orderPendingBody'))
-  clearTimeout(pollTimer)
   order.value = null
   orders.refresh({ silent: true })
 }
@@ -97,7 +83,6 @@ async function resume(o: PaymentOrder) {
   order.value = o
   try { onOrderUpdate(await api.credits.getOrder(o.id)) } catch { /* show what we have */ }
 }
-onBeforeUnmount(() => clearTimeout(pollTimer))
 </script>
 
 <template>
