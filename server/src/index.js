@@ -26,11 +26,16 @@ const AUTHENTICATED_ACTIONS = {
   'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
 };
 
-async function grantAuthenticatedPermissions(strapi) {
-  const role = await strapi.db.query('plugin::users-permissions.role').findOne({ where: { type: 'authenticated' } });
+/** Actions anyone may call without signing in (the public blog). */
+const PUBLIC_ACTIONS = {
+  'api::blog-post.blog-post': ['find', 'findOne'],
+};
+
+async function grantPermissions(strapi, roleType, map) {
+  const role = await strapi.db.query('plugin::users-permissions.role').findOne({ where: { type: roleType } });
   if (!role) return;
   const permissions = strapi.db.query('plugin::users-permissions.permission');
-  for (const [uid, actions] of Object.entries(AUTHENTICATED_ACTIONS)) {
+  for (const [uid, actions] of Object.entries(map)) {
     for (const action of actions) {
       const name = `${uid}.${action}`;
       const exists = await permissions.findOne({ where: { action: name, role: role.id } });
@@ -73,7 +78,8 @@ module.exports = {
   },
 
   async bootstrap({ strapi }) {
-    await grantAuthenticatedPermissions(strapi);
+    await grantPermissions(strapi, 'authenticated', AUTHENTICATED_ACTIONS);
+    await grantPermissions(strapi, 'public', PUBLIC_ACTIONS);
     await seedHolidays(strapi);
     await configureBuiltInProviders(strapi);
     await backfillOwnerMemberships(strapi);

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import {
-  ArrowRight, CalendarCheck, CalendarDays, Check, ChevronDown, Image, Layers, Lightbulb, Megaphone, MousePointerClick,
-  Puzzle, Repeat2, ShieldCheck, Store, Target, Type, WandSparkles, Zap,
+  ArrowRight, CalendarDays, Check, ChevronDown, EyeOff, FileDown, History, Images, Layers, ListChecks,
+  MessagesSquare, PenLine, Puzzle, ShieldCheck, Store, UserCog, Users, WandSparkles,
 } from '@lucide/vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
-const { t, tm, locale } = useLocale()
+const { t, tm } = useLocale()
 const config = useRuntimeConfig()
-const price = computed(() => formatTHB(config.public.creditPriceSatang, locale.value))
+const seats = Number(config.public.teamSeats) || 5
 
 useSeoMeta({
   title: () => t('landing.seoTitle'),
@@ -17,26 +17,28 @@ useSeoMeta({
   ogDescription: () => t('landing.seoDescription'),
 })
 
-const pains = computed(() => [
-  { icon: Lightbulb, color: '#FFB23F', key: 'ideas' },
-  { icon: Layers, color: '#FF6FAE', key: 'brands' },
-  { icon: Repeat2, color: '#62C5F4', key: 'repeat' },
-  { icon: Puzzle, color: '#A7E66B', key: 'briefs' },
-])
-const steps = computed(() => [
-  { icon: Store, color: '#6C4CF5', key: 'brand' },
-  { icon: Target, color: '#FF6FAE', key: 'goal' },
-  { icon: WandSparkles, color: '#FFB23F', key: 'plan' },
-  { icon: CalendarDays, color: '#62C5F4', key: 'calendar' },
-])
-const deliverables = computed(() => [
-  { icon: Zap, key: 'hook' }, { icon: Lightbulb, key: 'concept' }, { icon: Type, key: 'caption' },
-  { icon: MousePointerClick, key: 'cta' }, { icon: Image, key: 'brief' }, { icon: Layers, key: 'pillar' }, { icon: CalendarCheck, key: 'date' },
-])
-const faqs = computed(() => tm<{ q: string; a: string }[]>('landing.faq.items'))
+const pains = [
+  { icon: Puzzle, color: '#FFB23F', key: 'scattered' },
+  { icon: MessagesSquare, color: '#FF6FAE', key: 'approvals' },
+  { icon: Layers, color: '#62C5F4', key: 'brands' },
+  { icon: EyeOff, color: '#A7E66B', key: 'visibility' },
+]
+const steps = [
+  { icon: Store, color: '#6C4CF5', key: 'brand', art: 'brand' },
+  { icon: Users, color: '#FF6FAE', key: 'team', art: 'team' },
+  { icon: PenLine, color: '#FFB23F', key: 'plan', art: 'plan' },
+  { icon: CalendarDays, color: '#62C5F4', key: 'calendar', art: 'calendar' },
+]
+const features = [
+  { icon: CalendarDays, key: 'calendar' }, { icon: ListChecks, key: 'workflow' }, { icon: UserCog, key: 'roles' },
+  { icon: History, key: 'activity' }, { icon: Images, key: 'images' }, { icon: Store, key: 'brands' }, { icon: FileDown, key: 'export' },
+]
+// FAQ answers are plain strings from tm(), so the seat count is filled in here.
+const faqs = computed(() => tm<{ q: string; a: string }[]>('landing.faq.items').map((f) => ({ q: f.q, a: f.a.replace('{n}', String(seats)) })))
 const openFaq = ref<number | null>(0)
 const ctaWords = computed(() => t('landing.final.title').split(' '))
-const marquee = computed(() => deliverables.value.map((d) => t(`landing.deliverables.items.${d.key}.title`)))
+const marquee = computed(() => features.map((d) => t(`landing.features.items.${d.key}.title`)))
+const team = [{ i: 'P', c: 'from-pink to-sun' }, { i: 'K', c: 'from-brand-500 to-sky' }, { i: 'M', c: 'from-lime to-sky' }]
 
 // Fictional preview data for the hero mock-up (labelled as sample).
 const previewDays = Array.from({ length: 35 }, (_, i) => i - 1)
@@ -112,7 +114,7 @@ onMounted(() => {
       gsap.fromTo(q('[data-how-line]'), { scaleY: 0 }, { scaleY: 1, ease: 'none', transformOrigin: 'top', scrollTrigger: { trigger: track, start: 'top 70%', end: 'bottom 60%', scrub: true } })
     }
 
-    // Deliverables light up one by one while the sample card highlights the matching field.
+    // Features light up one by one while the sample card highlights the matching field.
     const tl = gsap.timeline({ scrollTrigger: { trigger: q('[data-deliver]')[0], start: 'top 65%', end: 'bottom 70%', scrub: true } })
     q('[data-deliver-item]').forEach((el, i) => {
       tl.fromTo(el, { opacity: 0.28, x: 18 }, { opacity: 1, x: 0, duration: 1 }, i)
@@ -122,9 +124,6 @@ onMounted(() => {
 
     // Pricing: the middle card rises above its neighbours.
     gsap.fromTo(q('[data-price-hero]'), { y: 40, scale: 0.96 }, { y: -12, scale: 1.03, ease: 'none', scrollTrigger: { trigger: q('[data-pricing]')[0], start: 'top 90%', end: 'center 50%', scrub: true } })
-
-    // Upstify: circular reveal of the dark panel.
-    gsap.fromTo(q('[data-upstify]'), { clipPath: 'circle(12% at 50% 60%)' }, { clipPath: 'circle(85% at 50% 50%)', ease: 'none', scrollTrigger: { trigger: q('[data-upstify]')[0], start: 'top 95%', end: 'top 25%', scrub: true } })
 
     // Final CTA: words fill in as you scroll.
     gsap.fromTo(q('[data-word]'), { opacity: 0.12, y: 20 }, { opacity: 1, y: 0, stagger: 0.25, ease: 'none', scrollTrigger: { trigger: q('[data-final]')[0], start: 'top 80%', end: 'top 30%', scrub: true } })
@@ -157,13 +156,13 @@ onBeforeUnmount(() => {
             <Doodle data-underline variant="underline" class="absolute -bottom-3 left-0 h-4 w-full text-sun sm:-bottom-4" />
           </span>
         </h1>
-        <p v-anim="3" class="mx-auto mt-8 max-w-2xl text-lg text-muted sm:text-xl">{{ t('landing.hero.subtitle', { price }) }}</p>
+        <p v-anim="3" class="mx-auto mt-8 max-w-2xl text-lg text-muted sm:text-xl">{{ t('landing.hero.subtitle') }}</p>
         <div v-anim="4" class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <NuxtLink to="/register" class="btn-primary btn-lg group">{{ t('landing.hero.cta') }}<ArrowRight class="size-5 transition group-hover:translate-x-1" /></NuxtLink>
           <NuxtLink to="/#how" class="btn-secondary btn-lg" @click.capture="onHashClick($event, '/#how')">{{ t('landing.hero.secondary') }}</NuxtLink>
         </div>
         <p v-anim="5" class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted">
-          <span v-for="k in ['trial', 'noSub', 'calendarFree']" :key="k" class="inline-flex items-center gap-1.5"><Check class="size-4 text-success" />{{ t(`landing.hero.points.${k}`, { n: config.public.trialCredits }) }}</span>
+          <span v-for="k in ['free', 'team', 'noCard']" :key="k" class="inline-flex items-center gap-1.5"><Check class="size-4 text-success" />{{ t(`landing.hero.points.${k}`) }}</span>
         </p>
       </div>
 
@@ -190,13 +189,19 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <div class="rounded-3xl border border-line bg-surface p-4">
-              <div class="flex items-center gap-2"><UiPlatformBadge platform="instagram" /><span class="chip bg-pink/15 text-pink">Education</span><UiStatusBadge status="approved" class="ml-auto" small /></div>
+              <div class="flex items-center gap-2"><UiPlatformBadge platform="instagram" /><span class="chip bg-pink/15 text-pink">Education</span><span data-field="workflow" class="ml-auto rounded-xl p-1"><UiStatusBadge status="approved" small /></span></div>
               <p class="mt-3 font-display text-lg font-bold leading-snug">{{ t('landing.preview.title') }}</p>
               <dl class="mt-3 space-y-2 text-sm">
                 <div data-field="hook" class="rounded-xl p-2 transition"><dt class="text-[11px] font-bold uppercase tracking-wider text-muted">Hook</dt><dd>{{ t('landing.preview.hook') }}</dd></div>
                 <div data-field="caption" class="rounded-xl p-2 transition"><dt class="text-[11px] font-bold uppercase tracking-wider text-muted">Caption</dt><dd class="line-clamp-2">{{ t('landing.preview.caption') }}</dd></div>
                 <div data-field="cta" class="rounded-xl p-2 transition"><dt class="text-[11px] font-bold uppercase tracking-wider text-muted">CTA</dt><dd>{{ t('landing.preview.cta') }}</dd></div>
               </dl>
+              <div data-field="images" class="mt-1 flex gap-1.5 rounded-xl p-2">
+                <span v-for="c in ['#FFB23F', '#FF6FAE', '#62C5F4']" :key="c" class="size-10 rounded-lg" :style="{ background: `linear-gradient(135deg, ${c}, ${c}66)` }" />
+              </div>
+              <p data-field="activity" class="mt-1 flex items-center gap-2 rounded-xl p-2 text-xs text-muted">
+                <span class="grid size-6 place-items-center rounded-full bg-gradient-to-br from-pink to-sun text-[10px] font-bold text-white">P</span>{{ t('landing.preview.approvedBy') }}
+              </p>
             </div>
           </div>
         </div>
@@ -206,7 +211,10 @@ onBeforeUnmount(() => {
         </div>
         <div v-parallax="-130" class="absolute -right-3 bottom-10 hidden rotate-[5deg] rounded-2xl bg-ink px-4 py-3 text-white shadow-pop md:block">
           <p class="text-xs text-white/70">{{ t('landing.preview.floatB') }}</p>
-          <p class="font-display text-xl font-bold">{{ price }} <span class="text-sm font-medium text-white/70">/ {{ t('credits.perContent') }}</span></p>
+          <div class="mt-1 flex items-center">
+            <span v-for="(m, i) in team" :key="m.i" class="grid size-8 place-items-center rounded-full bg-gradient-to-br font-display text-xs font-bold text-white ring-2 ring-ink" :class="[m.c, i ? '-ml-2' : '']">{{ m.i }}</span>
+            <span class="ml-2 font-display text-lg font-bold">+{{ seats - team.length }}</span>
+          </div>
         </div>
       </div>
     </section>
@@ -252,7 +260,7 @@ onBeforeUnmount(() => {
               <span class="grid size-12 place-items-center rounded-2xl" :style="{ background: `${s.color}22`, color: s.color }"><component :is="s.icon" class="size-6" /></span>
             </div>
             <div class="mt-5 grid h-40 place-items-center overflow-hidden rounded-2xl p-4 lg:h-48" :style="{ background: `color-mix(in srgb, ${s.color} 12%, white)` }">
-              <img :src="`/illustrations/how-${s.key}.svg`" alt="" aria-hidden="true" loading="lazy" decoding="async" class="h-full w-auto max-w-full object-contain">
+              <img :src="`/illustrations/how-${s.art}.svg`" alt="" aria-hidden="true" loading="lazy" decoding="async" class="h-full w-auto max-w-full object-contain">
             </div>
             <h3 class="mt-5 text-2xl font-bold lg:text-3xl">{{ t(`landing.how.steps.${s.key}.title`) }}</h3>
             <p class="mt-2 text-muted lg:text-lg">{{ t(`landing.how.steps.${s.key}.body`) }}</p>
@@ -271,19 +279,19 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <!-- DELIVERABLES -->
-    <section data-deliver class="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2">
+    <!-- FEATURES (team) -->
+    <section id="features" data-deliver class="mx-auto grid max-w-7xl scroll-mt-24 items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2">
       <div class="lg:sticky lg:top-28">
-        <span v-anim class="eyebrow">{{ t('landing.deliverables.eyebrow') }}</span>
-        <h2 v-anim="1" class="section-title mt-4">{{ t('landing.deliverables.title') }}</h2>
-        <p v-anim="2" class="mt-4 text-lg text-muted">{{ t('landing.deliverables.body') }}</p>
+        <span v-anim class="eyebrow"><Users class="size-3.5" />{{ t('landing.features.eyebrow') }}</span>
+        <h2 v-anim="1" class="section-title mt-4">{{ t('landing.features.title') }}</h2>
+        <p v-anim="2" class="mt-4 text-lg text-muted">{{ t('landing.features.body') }}</p>
       </div>
       <ul class="space-y-3">
-        <li v-for="d in deliverables" :key="d.key" :data-deliver-item="d.key" class="card flex items-start gap-4 p-4 sm:p-5">
+        <li v-for="d in features" :key="d.key" :data-deliver-item="d.key" class="card flex items-start gap-4 p-4 sm:p-5">
           <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand-500/10 text-brand-500"><component :is="d.icon" class="size-5" /></span>
           <div>
-            <p class="font-display text-lg font-bold">{{ t(`landing.deliverables.items.${d.key}.title`) }}</p>
-            <p class="text-sm text-muted">{{ t(`landing.deliverables.items.${d.key}.body`) }}</p>
+            <p class="font-display text-lg font-bold">{{ t(`landing.features.items.${d.key}.title`) }}</p>
+            <p class="text-sm text-muted">{{ t(`landing.features.items.${d.key}.body`) }}</p>
           </div>
         </li>
       </ul>
@@ -292,53 +300,35 @@ onBeforeUnmount(() => {
     <!-- PRICING -->
     <section id="pricing" data-pricing class="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 sm:px-8">
       <div class="mx-auto max-w-2xl text-center">
-        <span v-anim class="eyebrow">{{ t('landing.pricing.eyebrow') }}</span>
-        <h2 v-anim="1" class="section-title mt-4">{{ t('landing.pricing.title') }}</h2>
+        <span v-anim class="eyebrow">{{ t('landing.plans.eyebrow') }}</span>
+        <h2 v-anim="1" class="section-title mt-4">{{ t('landing.plans.title') }}</h2>
       </div>
       <div class="mt-12 grid items-center gap-5 md:grid-cols-3">
         <article v-anim="0" class="card card-pad">
           <CalendarDays class="size-8 text-sky" />
-          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.pricing.calendar.title') }}</p>
-          <p class="mt-1 font-display text-4xl font-bold">{{ t('landing.pricing.free') }}</p>
-          <p class="mt-3 text-sm text-muted">{{ t('landing.pricing.calendar.body') }}</p>
+          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.plans.planning.title') }}</p>
+          <p class="mt-1 font-display text-4xl font-bold">{{ t('landing.plans.free') }}</p>
+          <p class="mt-3 text-sm text-muted">{{ t('landing.plans.planning.body') }}</p>
         </article>
         <article data-price-hero class="relative overflow-hidden rounded-3xl bg-ink p-6 text-white shadow-pop sm:p-8">
           <Doodle variant="burst" class="absolute right-5 top-4 size-10 text-sun" />
-          <WandSparkles class="size-8 text-sun" />
-          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.pricing.ai.title') }}</p>
-          <p class="mt-1 font-display text-5xl font-bold">{{ price }}<span class="text-lg font-medium text-white/60"> / {{ t('credits.perContent') }}</span></p>
-          <p class="mt-3 text-sm text-white/70">{{ t('landing.pricing.ai.body') }}</p>
-          <NuxtLink to="/pricing" class="mt-6 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-ink">{{ t('landing.pricing.details') }}<ArrowRight class="size-4" /></NuxtLink>
+          <Users class="size-8 text-sun" />
+          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.plans.team.title') }}</p>
+          <p class="mt-1 font-display text-5xl font-bold">{{ t('landing.plans.free') }}</p>
+          <p class="mt-2 inline-flex rounded-full bg-white/10 px-3 py-1 text-sm font-bold text-sun">{{ t('landing.plans.team.value', { n: seats }) }}</p>
+          <p class="mt-3 text-sm text-white/70">{{ t('landing.plans.team.body') }}</p>
+          <NuxtLink to="/register" class="mt-6 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-ink">{{ t('landing.hero.cta') }}<ArrowRight class="size-4" /></NuxtLink>
         </article>
-        <article v-anim="2" class="card card-pad">
-          <Zap class="size-8 text-pink" />
-          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.pricing.trial.title') }}</p>
-          <p class="mt-1 font-display text-4xl font-bold">{{ t('landing.pricing.trial.value', { n: config.public.trialCredits }) }}</p>
-          <p class="mt-3 text-sm text-muted">{{ t('landing.pricing.trial.body') }}</p>
+        <article v-anim="2" class="card card-pad border-dashed">
+          <WandSparkles class="size-8 text-pink" />
+          <p class="mt-4 font-display text-xl font-bold">{{ t('landing.plans.ai.title') }}</p>
+          <p class="mt-1 font-display text-4xl font-bold text-muted">{{ t('landing.plans.ai.soon') }}</p>
+          <p class="mt-3 text-sm text-muted">{{ t('landing.plans.ai.body') }}</p>
         </article>
       </div>
       <ul v-anim class="mx-auto mt-8 grid max-w-4xl gap-2 text-sm text-muted sm:grid-cols-2">
-        <li v-for="(c, i) in tm<string[]>('landing.pricing.conditions')" :key="i" class="flex gap-2"><ShieldCheck class="mt-0.5 size-4 shrink-0 text-success" />{{ c }}</li>
+        <li v-for="(c, i) in tm<string[]>('landing.plans.points')" :key="i" class="flex gap-2"><ShieldCheck class="mt-0.5 size-4 shrink-0 text-success" />{{ c }}</li>
       </ul>
-    </section>
-
-    <!-- UPSTIFY -->
-    <section id="upstify" class="scroll-mt-24 px-3 py-16 sm:px-6">
-      <div data-upstify class="relative mx-auto max-w-7xl overflow-hidden rounded-[2.5rem] bg-ink px-6 py-16 text-white sm:px-12">
-        <div class="absolute -right-24 -top-24 size-80 rounded-full bg-brand-500/50 blur-3xl" />
-        <div class="absolute -bottom-24 -left-10 size-72 rounded-full bg-pink/40 blur-3xl" />
-        <div class="relative grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-          <div>
-            <span class="eyebrow bg-white/10 text-sun"><Megaphone class="size-3.5" />Upstify</span>
-            <h2 class="mt-4 font-display text-3xl font-bold sm:text-5xl">{{ t('landing.upstify.title') }}</h2>
-            <p class="mt-4 max-w-xl text-lg text-white/75">{{ t('landing.upstify.body') }}</p>
-          </div>
-          <ul class="space-y-3">
-            <li v-for="(c, i) in tm<string[]>('landing.upstify.points')" :key="i" class="flex gap-3 rounded-2xl bg-white/8 p-4 backdrop-blur"><Check class="mt-0.5 size-5 shrink-0 text-lime" /><span>{{ c }}</span></li>
-            <li class="rounded-2xl border border-white/15 p-4 text-sm text-white/70">{{ t('landing.upstify.disclaimer') }}</li>
-          </ul>
-        </div>
-      </div>
     </section>
 
     <!-- FAQ -->

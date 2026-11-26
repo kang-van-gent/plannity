@@ -37,6 +37,8 @@ export default defineNuxtConfig({
       /** Post images (must match the backend's CONTENT_IMAGE_MAX_MB / CONTENT_IMAGE_MAX_COUNT). */
       imageMaxMb: 10,
       imageMaxCount: 10,
+      /** Seats per brand shown on the landing page (keep in sync with the backend's TEAM_DEFAULT_SEATS). */
+      teamSeats: 5,
       /** Where Strapi serves uploaded media (relative /uploads URLs are resolved against it). */
       mediaBaseUrl: '',
       /** Demo-mode payee. With Strapi, the server's PROMPTPAY_ID / PROMPTPAY_NAME are used (sent on each order). */

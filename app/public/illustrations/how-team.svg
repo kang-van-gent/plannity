@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 420" fill="none">
+  <!-- Plannity: team around a shared plan (flat style to match the other step illustrations) -->
+  <ellipse cx="300" cy="398" rx="250" ry="10" fill="#E6E6E6"/>
+  <!-- shared board -->
+  <rect x="170" y="40" width="260" height="190" rx="14" fill="#fff" stroke="#3F3D56" stroke-width="6"/>
+  <rect x="170" y="40" width="260" height="34" rx="14" fill="#3F3D56"/>
+  <rect x="170" y="60" width="260" height="14" fill="#3F3D56"/>
+  <circle cx="192" cy="57" r="5" fill="#FF6FAE"/><circle cx="208" cy="57" r="5" fill="#FFB23F"/><circle cx="224" cy="57" r="5" fill="#A7E66B"/>
+  <rect x="192" y="92" width="60" height="44" rx="8" fill="#6C4CF5" opacity=".9"/>
+  <rect x="264" y="92" width="60" height="44" rx="8" fill="#FF6FAE" opacity=".85"/>
+  <rect x="336" y="92" width="72" height="44" rx="8" fill="#E6E6E6"/>
+  <rect x="192" y="148" width="60" height="44" rx="8" fill="#E6E6E6"/>
+  <rect x="264" y="148" width="60" height="44" rx="8" fill="#62C5F4" opacity=".9"/>
+  <rect x="336" y="148" width="72" height="44" rx="8" fill="#FFB23F" opacity=".9"/>
+  <circle cx="404" cy="96" r="16" fill="#6C4CF5"/>
+  <path d="M396 96l6 6 11-12" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="192" y="204" width="120" height="8" rx="4" fill="#E6E6E6"/>
+  <!-- dotted links from people to the board -->
+  <path d="M120 250 C150 230 160 220 176 210" stroke="#6C4CF5" stroke-width="3" stroke-dasharray="2 8" stroke-linecap="round"/>
+  <path d="M300 286 V238" stroke="#FF6FAE" stroke-width="3" stroke-dasharray="2 8" stroke-linecap="round"/>
+  <path d="M480 250 C450 230 440 220 424 210" stroke="#FFB23F" stroke-width="3" stroke-dasharray="2 8" stroke-linecap="round"/>
+  <!-- person left -->
+  <circle cx="100" cy="262" r="26" fill="#FFB8B8"/>
+  <path d="M74 256c0-20 14-32 28-32s26 10 26 26c-10-8-30-8-54 6z" fill="#2F2E41"/>
+  <path d="M50 398v-70c0-26 22-44 50-44s50 18 50 44v70z" fill="#6C4CF5"/>
+  <!-- person middle -->
+  <circle cx="300" cy="316" r="26" fill="#A0616A"/>
+  <path d="M272 312c-2-24 12-36 28-36 18 0 30 12 28 34-6-12-18-18-28-18s-22 6-28 20z" fill="#2F2E41"/>
+  <path d="M250 398v-36c0-14 22-24 50-24s50 10 50 24v36z" fill="#FF6FAE"/>
+  <!-- person right -->
+  <circle cx="500" cy="262" r="26" fill="#FFB8B8"/>
+  <path d="M474 262c-4-22 8-38 26-38 20 0 32 16 26 40-4-14-14-20-26-20s-22 6-26 18z" fill="#2F2E41"/>
+  <path d="M450 398v-70c0-26 22-44 50-44s50 18 50 44v70z" fill="#FFB23F"/>
+  <!-- role badges -->
+  <rect x="68" y="340" width="64" height="20" rx="10" fill="#fff"/><rect x="80" y="348" width="40" height="4" rx="2" fill="#6C4CF5"/>
+  <rect x="268" y="366" width="64" height="20" rx="10" fill="#fff"/><rect x="280" y="374" width="40" height="4" rx="2" fill="#FF6FAE"/>
+  <rect x="468" y="340" width="64" height="20" rx="10" fill="#fff"/><rect x="480" y="348" width="40" height="4" rx="2" fill="#FFB23F"/>
+</svg>

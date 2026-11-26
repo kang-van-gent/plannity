@@ -15,7 +15,9 @@ const config = useRuntimeConfig()
         <p class="font-display font-semibold">{{ t('footer.product') }}</p>
         <ul class="mt-3 space-y-2 text-sm text-muted">
           <li><NuxtLink to="/#how" class="hover:text-fg">{{ t('nav.howItWorks') }}</NuxtLink></li>
-          <li><NuxtLink to="/pricing" class="hover:text-fg">{{ t('nav.pricing') }}</NuxtLink></li>
+          <li><NuxtLink to="/#features" class="hover:text-fg">{{ t('nav.features') }}</NuxtLink></li>
+          <li><NuxtLink to="/#pricing" class="hover:text-fg">{{ t('nav.pricing') }}</NuxtLink></li>
+          <li><NuxtLink to="/blog" class="hover:text-fg">{{ t('nav.blog') }}</NuxtLink></li>
           <li><NuxtLink to="/register" class="hover:text-fg">{{ t('nav.tryFree') }}</NuxtLink></li>
         </ul>
       </div>
