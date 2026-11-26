@@ -8,7 +8,7 @@
  *   →    STRAPI /api/connect/:provider       (grant → provider consent screen)
  *   →    STRAPI /api/connect/:provider/callback
  *   →    app  /auth/callback/:provider   (the "redirect URL" below; Strapi keeps the
- *                                           provider tokens in its koa.sess cookie)
+ *                                           provider tokens in its plannity.sess cookie)
  *   →    STRAPI /api/auth/:provider/callback  (server-to-server with that cookie forwarded;
  *                                           returns { jwt, user }). In production the
  *                                           cookie is set on SESSION_COOKIE_DOMAIN so the app sees it.

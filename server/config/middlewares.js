@@ -16,7 +16,12 @@ module.exports = [
     // app (plannity.space) has to forward it to finish the sign-in, so in
     // production it's set on the parent domain: SESSION_COOKIE_DOMAIN=plannity.space.
     name: 'strapi::session',
+    //
+    // Own cookie name (not the default koa.sess): browsers may still hold an old
+    // host-only koa.sess on api.plannity.space, which would shadow the
+    // parent-domain one and make the OAuth state check fail.
     config: {
+      key: 'plannity.sess',
       ...(process.env.NODE_ENV === 'production' ? { sameSite: 'none', secure: true } : {}),
       ...(process.env.SESSION_COOKIE_DOMAIN ? { domain: process.env.SESSION_COOKIE_DOMAIN } : {}),
     },
