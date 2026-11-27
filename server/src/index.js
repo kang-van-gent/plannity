@@ -5,6 +5,7 @@ const { configureBuiltInProviders, registerAppleProvider } = require('./auth/soc
 const { fulfillOrder } = require('./services/billing');
 const { invalidate } = require('./services/entitlements');
 const createPayments = require('./services/payments');
+const destinations = require('./services/destinations');
 
 /**
  * Actions the signed-in ("authenticated") role may call.
@@ -23,6 +24,7 @@ const AUTHENTICATED_ACTIONS = {
   'api::feedback.feedback': ['create'],
   'api::team.team': ['get', 'invite', 'resend', 'cancel', 'updateRole', 'removeMember', 'leave', 'mine', 'acceptMine', 'declineMine', 'accept', 'decline'],
   'api::content-image.content-image': ['upload', 'reorder', 'replace', 'remove', 'download'],
+  'api::publish-destination.publish-destination': ['list', 'replace', 'markPublished'],
   'api::activity-log.activity-log': ['list'],
   'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip', 'createHandoff'],
   'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
@@ -91,6 +93,18 @@ module.exports = {
     await seedHolidays(strapi);
     await configureBuiltInProviders(strapi);
     await backfillOwnerMemberships(strapi);
+    // Multi-platform content: every existing post gets its platform as a manual destination (never auto-posted).
+    await destinations.backfill(strapi);
+
+    // New posts — from the editor, AI generation or "duplicate" — start with their platform as a destination.
+    strapi.db.lifecycles.subscribe({
+      models: ['api::content.content'],
+      async afterCreate(event) {
+        const documentId = event.result?.documentId;
+        if (!documentId) return;
+        try { await destinations.ensureFor(strapi, documentId); } catch (e) { strapi.log.error(`[destinations] could not add the default destination for ${documentId}: ${e.message}`); }
+      },
+    });
 
     // An order becomes "paid" — by staff in the admin today, by the slip
     // verifier later — and what it bought is delivered: credits, a plan month

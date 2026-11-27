@@ -2,6 +2,8 @@
 
 const { brandScopedController } = require('../../../utils/brand-access');
 const { CONTENT_FIELDS, diff, classifyContent } = require('../../../utils/activity');
+const { PLATFORMS } = require('../../../utils/destinations');
+const destinations = require('../../../services/destinations');
 
 // Status rules from plannity-spec §10. Publishing is always a user confirmation;
 // nothing here posts to social networks.
@@ -28,8 +30,9 @@ async function revision(c, reason, user) {
 module.exports = brandScopedController('api::content.content', {
   brandPath: 'brand',
   perms: { read: 'content.read', create: 'content.create', update: 'content.update', delete: 'content.delete' },
-  // Images change only through /contents/:id/images (validation, ordering, file cleanup).
-  protectedFields: ['images'],
+  // Images change only through /contents/:id/images (validation, ordering, file cleanup);
+  // platforms only through /contents/:id/destinations.
+  protectedFields: ['images', 'destinations'],
   versioned: true,
   validate,
   audit: { entityType: 'content', title: (c) => c.title, diff: (before, data) => diff(before, data, CONTENT_FIELDS), classify: classifyContent },
@@ -39,5 +42,20 @@ module.exports = brandScopedController('api::content.content', {
   },
   async onUpdate(existing, data, user) {
     if (REVISION_FIELDS.some((k) => k in data && JSON.stringify(data[k]) !== JSON.stringify(existing[k]))) await revision(existing, 'edit', user);
+    await destinations.syncFromContent(strapi, existing, data);
+  },
+  // A post going to several platforms is marked published per platform, never all at once.
+  precheck: (existing, data) => destinations.contentPrecheck(strapi, existing, data),
+  // ?platform=instagram matches any of the post's destinations, not just its first platform.
+  extraFilters(ctx) {
+    const p = ctx.query.platform;
+    delete ctx.query.platform;
+    if (p === undefined) return null;
+    return { destinations: { platform: PLATFORMS.includes(p) ? p : '__none__' } };
+  },
+  // Every post carries its destinations (platform, own caption/images/date, manual publish state).
+  async decorateRows(rows) {
+    const byContent = await destinations.listForMany(strapi, rows.map((r) => r.documentId));
+    for (const r of rows) r.destinations = (byContent.get(r.documentId) ?? []).map((d) => destinations.view(d, r.documentId, null));
   },
 });

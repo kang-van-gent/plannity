@@ -6,6 +6,7 @@
 
 import type {
   ActivityChange, Brand, BrandInput, BrandInvitation, BrandMember, BrandRole, Content, ContentDraft, ContentImage, ContentQuery, DashboardSummary, GenerationInput, GenerationJob,
+  ContentStatePatch, PublishDestination,
   Holiday, ItemStatus, LedgerEntry, LedgerType, OrderInput, Paginated, PaymentOrder, PlanKey, PositionKey, PromotionInquiry, Task, TaskAction, User, Wallet,
 } from '~/types'
 import { DEFAULT_PRICING, FREE_BRANDS, activePlan, addBillingMonths, brandCoverage, brandCreateErrorFor, featureFlags, nextPeriod, renewalStart, seatCount, slotAssignments } from '~/utils/pricing'
@@ -18,6 +19,7 @@ import { CONTENT_STATUSES, FORMATS, OBJECTIVES, PLATFORMS } from '~/types'
 import { addDays, diffDays, isValidISODate, nowISO, todayISO } from '~/utils/date'
 import { normalizeTitle, uid } from '~/utils/format'
 import { buildContentCsv } from '~/utils/csv'
+import { DEFAULT_TIMEZONE, MAX_CAPTION, platformsOf, rollupContent } from '~/utils/destinations'
 import { ApiError, type DataSource } from '../contract'
 import { buildSeed, membership, seedPlans, type MockBrand, type MockContentImage, type MockDB, type MockInvitation, type MockJob, type MockTask, type Owned } from './seed'
 import { hashString, mockGenerate, validateDraft } from './llm'
@@ -59,6 +61,7 @@ function load(): MockDB {
     persist()
   }
   db.contentImages ??= []
+  db.destinations ??= []
   db.activity ??= []
   // Pricing v0.2 / positions / tasks: older demo data gets the demo plans and empty tags.
   if (!db.subscriptions) {
@@ -255,7 +258,41 @@ export function createMockSource(getToken: () => string | null | undefined, limi
   }
   /** Lists/calendar carry only the image count — no files are loaded. */
   function contentView(c: Owned<Content>): Content {
-    return { ...strip(c), imageCount: imagesOf(c.id).length }
+    return { ...strip(c), imageCount: imagesOf(c.id).length, destinations: destsOf(c).map(destView) }
+  }
+
+  // ---- multi-platform content (mirrors server/src/services/destinations.js) ----
+  type MockDest = MockDB['destinations'][number]
+  /** Every post has at least its own platform as a (manual) destination; older demo data is migrated here. */
+  function destsOf(c: Content): MockDest[] {
+    const d = load()
+    let rows = d.destinations.filter((x) => x.contentId === c.id)
+    if (!rows.length) {
+      const pub = c.status === 'published'
+      d.destinations.push(newDest(c, c.platform, pub ? { status: 'published', publishedAt: c.publishedAt ?? c.updatedAt, externalPostUrl: c.postUrl } : {}))
+      persist()
+      rows = d.destinations.filter((x) => x.contentId === c.id)
+    }
+    return rows
+  }
+  function newDest(c: Content, platform: Content['platform'], extra: Partial<MockDest> = {}): MockDest {
+    return {
+      id: `pd_${nextSeq()}`, contentId: c.id, brandId: c.brandId, platform, captionOverride: null, mediaOverrideIds: null, scheduledAt: null,
+      timezone: DEFAULT_TIMEZONE, mode: 'manual', status: 'draft', revision: 1, externalPostUrl: null, publishedAt: null, lastErrorCode: null, updatedAt: nowISO(), ...extra,
+    }
+  }
+  function destView(x: MockDest): PublishDestination {
+    const { brandId: _b, ...rest } = x
+    const own = new Set(imagesOf(x.contentId).map((i) => i.id))
+    return { ...clone(rest), mediaOverrideIds: x.mediaOverrideIds ? x.mediaOverrideIds.filter((id) => own.has(id)) : null }
+  }
+  /** Moves the post's own status when its platforms say so; returns what changed for the UI. */
+  function rollupFor(c: Owned<Content>, extra: Partial<Content> = {}): ContentStatePatch | null {
+    const patch = { ...(rollupContent(c, destsOf(c)) ?? {}), ...extra }
+    for (const k of Object.keys(extra) as (keyof Content)[]) if (c[k] === extra[k]) delete (patch as Record<string, unknown>)[k]
+    if (!Object.keys(patch).length) return null
+    Object.assign(c, patch, { version: c.version + 1, updatedAt: nowISO() })
+    return { status: c.status, version: c.version, publishedAt: c.publishedAt, postUrl: c.postUrl, platform: c.platform }
   }
   function wallet(userId: string) {
     const d = load()
@@ -631,6 +668,12 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         if (next.status === 'scheduled' && !next.scheduledDate) errors.scheduledDate = 'needs_date'
         if (next.scheduledTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(next.scheduledTime)) errors.scheduledTime = 'invalid_time'
         if (next.postUrl && !/^https?:\/\//i.test(next.postUrl)) errors.postUrl = 'invalid_url'
+        // A post going to several platforms is marked published per platform, never all at once.
+        const dests = destsOf(c)
+        if (patch.status && patch.status !== c.status && dests.length > 1) {
+          if (patch.status === 'published' && !dests.every((x) => x.status === 'published')) errors.status = 'publish_each_platform'
+          if (c.status === 'published' && patch.status !== 'published') errors.status = 'unpublish_each_platform'
+        }
         if (Object.keys(errors).length) fieldError(errors)
         if (next.status === 'published' && !next.publishedAt) next.publishedAt = nowISO()
         if (next.status !== 'published') next.publishedAt = null
@@ -638,6 +681,18 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         if (contentChanged) addRevision(c, 'edit')
         const changes = diffFields(c, next, CONTENT_AUDIT_FIELDS)
         Object.assign(c, next, { version: c.version + 1, updatedAt: nowISO() })
+        // Destinations follow: a new platform renames the only draft one (or is added); a single-platform post's status mirrors.
+        if (!dests.some((x) => x.platform === c.platform)) {
+          if (dests.length === 1 && dests[0]!.status === 'draft') Object.assign(dests[0]!, { platform: c.platform, revision: dests[0]!.revision + 1, updatedAt: nowISO() })
+          else load().destinations.push(newDest(c, c.platform))
+        }
+        const now = destsOf(c)
+        if (now.length === 1) {
+          const only = now[0]!
+          if (c.status === 'published' && only.status !== 'published') Object.assign(only, { status: 'published', publishedAt: c.publishedAt, externalPostUrl: c.postUrl ?? only.externalPostUrl })
+          else if (c.status !== 'published' && only.status === 'published') Object.assign(only, { status: 'draft', publishedAt: null })
+          else if (c.status === 'published' && 'postUrl' in patch) only.externalPostUrl = c.postUrl
+        }
         logContent(c, classifyContent(changes), changes)
         persist()
         return contentView(c)
@@ -948,6 +1003,70 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const blob = img ? await idbDo<Blob | undefined>('readonly', (st) => st.get(img.id)) : undefined
         if (!img || !blob) throw new ApiError(404, 'NOT_FOUND', 'This image is no longer available')
         return blob
+      },
+    },
+
+    destinations: {
+      async list(contentId) {
+        await net()
+        return destsOf(contentAccess(contentId, 'content.read')).map(destView)
+      },
+      async replace(contentId, items) {
+        await net()
+        const c = contentAccess(contentId, 'content.update')
+        if (c.archivedAt) throw new ApiError(409, 'CONFLICT', 'This post is archived')
+        const own = new Set(imagesOf(c.id).map((i) => i.id))
+        const errors: Record<string, string> = {}
+        if (!Array.isArray(items) || !items.length) fieldError({ destinations: 'required' })
+        const seen = new Set<string>()
+        items.forEach((it, i) => {
+          if (!PLATFORMS.includes(it.platform)) errors[`destinations.${i}.platform`] = 'invalid'
+          else if (seen.has(it.platform)) errors[`destinations.${i}.platform`] = 'duplicate'
+          seen.add(it.platform)
+          if (typeof it.captionOverride === 'string' && it.captionOverride.length > MAX_CAPTION) errors[`destinations.${i}.captionOverride`] = 'too_long'
+          if (it.mediaOverrideIds?.some((id) => !own.has(id))) errors[`destinations.${i}.mediaOverrideIds`] = 'not_this_content'
+          if (it.scheduledAt && Number.isNaN(Date.parse(it.scheduledAt))) errors[`destinations.${i}.scheduledAt`] = 'invalid_date'
+        })
+        if (Object.keys(errors).length) fieldError(errors)
+        const d = load()
+        const before = destsOf(c)
+        const wanted = new Set(items.map((x) => x.platform))
+        if (before.some((x) => !wanted.has(x.platform) && x.status !== 'draft')) {
+          throw new ApiError(409, 'CONFLICT', 'A platform that is already published can’t be removed. Undo “published” first.', { destinations: 'published_cannot_remove' })
+        }
+        d.destinations = d.destinations.filter((x) => x.contentId !== c.id || wanted.has(x.platform))
+        for (const it of items) {
+          const fields = { captionOverride: it.captionOverride ?? null, mediaOverrideIds: it.mediaOverrideIds ?? null, scheduledAt: it.scheduledAt ? new Date(it.scheduledAt).toISOString() : null, timezone: it.timezone || DEFAULT_TIMEZONE }
+          const cur = d.destinations.find((x) => x.contentId === c.id && x.platform === it.platform)
+          if (!cur) d.destinations.push(newDest(c, it.platform, fields))
+          else if (JSON.stringify([cur.captionOverride, cur.mediaOverrideIds, cur.scheduledAt, cur.timezone]) !== JSON.stringify([fields.captionOverride, fields.mediaOverrideIds, fields.scheduledAt, fields.timezone])) {
+            Object.assign(cur, fields, { revision: cur.revision + 1, updatedAt: nowISO() })
+          }
+        }
+        const from = before.map((x) => x.platform)
+        const to = items.map((x) => x.platform)
+        const content = rollupFor(c, wanted.has(c.platform) ? {} : { platform: items[0]!.platform })
+        if (from.join() !== to.join()) logContent(c, 'content.platforms_changed', [{ field: 'platform', from, to }])
+        persist()
+        return { data: destsOf(c).map(destView), content }
+      },
+      async markPublished(destinationId, input) {
+        await net()
+        const dest = load().destinations.find((x) => x.id === destinationId)
+        if (!dest) throw new ApiError(404, 'NOT_FOUND', 'Not found')
+        const c = contentAccess(dest.contentId, 'content.update')
+        if (c.archivedAt) throw new ApiError(409, 'CONFLICT', 'This post is archived')
+        const published = input.published !== false
+        const url = typeof input.postUrl === 'string' ? input.postUrl.trim() : input.postUrl
+        if (url && !/^https?:\/\/\S+$/i.test(url)) fieldError({ postUrl: 'invalid_url' })
+        if (published && input.publishedAt && Date.parse(input.publishedAt) > Date.now() + 5 * 60_000) fieldError({ publishedAt: 'in_future' })
+        if (published) Object.assign(dest, { status: 'published', publishedAt: input.publishedAt ? new Date(input.publishedAt).toISOString() : nowISO(), ...(url !== undefined ? { externalPostUrl: url || null } : {}) })
+        else Object.assign(dest, { status: 'draft', publishedAt: null })
+        dest.updatedAt = nowISO()
+        const content = rollupFor(c)
+        logContent(c, published ? 'content.platform_published' : 'content.platform_unpublished', [{ field: 'platform', from: null, to: dest.platform }])
+        persist()
+        return { data: destView(dest), content }
       },
     },
 
@@ -1416,7 +1535,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
       && (q.includeArchived || (!c.archivedAt && !archivedBrands.has(c.brandId)))
       && (!q.brandId || c.brandId === q.brandId)
       && (!s || c.title.toLowerCase().includes(s) || c.caption.toLowerCase().includes(s))
-      && (!q.platform || c.platform === q.platform)
+      && (!q.platform || platformsOf({ platform: c.platform, destinations: destsOf(c) }).includes(q.platform))
       && (!q.pillar || c.pillar === q.pillar)
       && (!q.status || (q.status === 'unscheduled' ? !c.scheduledDate : c.status === q.status))
       && (!q.from || (c.scheduledDate !== null && c.scheduledDate >= q.from))

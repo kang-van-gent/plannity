@@ -110,14 +110,16 @@ module.exports = ({ strapi }) => ({
     const brandFilter = q.brand?.documentId?.$eq;
     const scope = brandFilter ? ids.filter((id) => id === brandFilter) : ids;
     const { brand: _b, ...rest } = q;
+    // ?platform= matches any of a post's platforms (same as the library list).
+    const platform = typeof ctx.query.platform === 'string' ? { destinations: { platform: ctx.query.platform } } : null;
     const rows = scope.length ? await strapi.documents(CONTENT).findMany({
-      filters: { $and: [rest, { brand: { documentId: { $in: scope } } }] },
-      populate: { brand: { fields: ['documentId', 'name'] } }, sort: 'scheduledDate:asc', limit: 10000,
+      filters: { $and: [rest, { brand: { documentId: { $in: scope } } }, ...(platform ? [platform] : [])] },
+      populate: { brand: { fields: ['documentId', 'name'] }, destinations: { fields: ['platform'], sort: 'id:asc' } }, sort: 'scheduledDate:asc', limit: 10000,
     }) : [];
     const head = ['date', 'brand', 'platform', 'format', 'pillar', 'title', 'hook', 'caption', 'CTA', 'brief', 'status', 'post URL'];
     const lines = [head.map(safeCell).join(',')];
     for (const c of rows) {
-      lines.push([c.scheduledDate ?? c.suggestedDate ?? '', c.brand?.name ?? '', c.platform, c.format, c.pillar, c.title, c.hook, c.caption, c.cta, c.visualBrief, c.status, c.postUrl ?? '']
+      lines.push([c.scheduledDate ?? c.suggestedDate ?? '', c.brand?.name ?? '', (c.destinations?.length ? c.destinations.map((d) => d.platform) : [c.platform]).join(' + '), c.format, c.pillar, c.title, c.hook, c.caption, c.cta, c.visualBrief, c.status, c.postUrl ?? '']
         .map(safeCell).join(','));
     }
     ctx.set('Content-Type', 'text/csv; charset=utf-8');

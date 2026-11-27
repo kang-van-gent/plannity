@@ -4,6 +4,7 @@ import type {
   PromotionInput, PromotionInquiry, RegisterInput, Session, SocialProvider, User, Wallet,
   BrandRole, ContentImage, InvitationPreview, InviteResult, MyInvitation, TeamSummary, BrandMember, ActivityEntityType, ActivityEntry,
   Entitlements, OrderInput, PaymentHandoff, PositionKey, Task, TaskAction, TaskInput,
+  DestinationInput, DestinationResult, PublishDestination,
 } from '~/types'
 
 /**
@@ -88,6 +89,18 @@ export interface DataSource {
     /** Paid: creates a 1-credit job and a new revision; the original is kept. */
     regenerate(id: string, idempotencyKey: string): Promise<Content>
     exportCsv(query: ContentQuery): Promise<string>
+  }
+
+  /**
+   * Multi-platform content: one destination per platform. Manual publishing only —
+   * nothing is posted for you. Editing needs content-edit rights in the brand.
+   */
+  destinations: {
+    list(contentId: string): Promise<PublishDestination[]>
+    /** Replaces the post's platform list (kept platforms keep their id and history). */
+    replace(contentId: string, items: DestinationInput[]): Promise<DestinationResult<PublishDestination[]>>
+    /** "I posted it" on one platform (or undo with published: false). */
+    markPublished(destinationId: string, input: { published?: boolean; publishedAt?: string; postUrl?: string | null }): Promise<DestinationResult<PublishDestination>>
   }
 
   calendar: {

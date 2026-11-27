@@ -14,7 +14,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
     <span class="h-1.5 w-full" :style="{ background: brand?.color ?? '#6C4CF5' }" />
     <div class="flex flex-1 flex-col p-4">
       <div class="flex items-center gap-2">
-        <UiPlatformBadge :platform="content.platform" />
+        <UiPlatformStack :content="content" />
         <span class="chip bg-surface-2 py-0.5 text-muted">{{ t(`formats.${content.format}`) }}</span>
         <Sparkles v-if="content.source === 'ai'" class="size-3.5 text-sun" :aria-label="t('content.aiMade')" />
         <UiStatusBadge :status="content.status" small class="ml-auto" />
@@ -35,7 +35,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
     </div>
   </NuxtLink>
   <NuxtLink v-else :to="`/app/content/${content.id}`" class="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3.5 transition hover:bg-surface-2 active:bg-surface-2 sm:py-3 sm:grid-cols-[auto_1fr_8rem_7rem_7rem]">
-    <UiPlatformBadge :platform="content.platform" />
+    <UiPlatformStack :content="content" />
     <div class="min-w-0">
       <p class="truncate font-semibold">{{ content.title }}</p>
       <p class="flex min-w-0 items-center gap-1.5 truncate text-xs text-muted"><span class="truncate">{{ brand?.name }} · {{ content.pillar }} · {{ t(`formats.${content.format}`) }}</span><UiImageCount :count="content.imageCount" compact /></p>

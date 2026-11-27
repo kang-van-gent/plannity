@@ -156,6 +156,13 @@
       "target": "plugin::users-permissions.user",
       "description": "Attribution: the member who last edited (owner = creator)."
     },
+    "destinations": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::publish-destination.publish-destination",
+      "mappedBy": "content",
+      "description": "One row per platform. Changed only through /contents/:id/destinations."
+    },
     "imageOrder": {
       "type": "json",
       "private": true,

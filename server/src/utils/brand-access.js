@@ -120,7 +120,10 @@ function relationRefs(value) {
  *   versioned?: boolean,                  // optimistic concurrency on `version`
  *   validate?: (next, existing, data) => Record<string, string> | null,
  *   onCreate?: (entity, user) => Promise<void>,
- *   onUpdate?: (existing, data, user) => Promise<void>,  // before the change is written (e.g. keep a revision)
+ *   onUpdate?: (existing, data, user) => Promise<void>,  // after the change is written (e.g. keep a revision, sync destinations)
+ *   precheck?: (existing, data) => Promise<Record<string, string> | null>,  // async field checks before an update is written
+ *   extraFilters?: (ctx) => object | null, // list: server-side filters from custom query params (removed from ctx.query)
+ *   decorateRows?: (rows) => Promise<void>, // adds computed fields to response rows
  *   guardCreate?: (user, trx) => Promise<{ status, code, message } | null>,  // checked inside the create transaction
  *   audit?: {                             // activity log: who did what, when
  *     entityType: 'brand' | 'content',
@@ -130,7 +133,7 @@ function relationRefs(value) {
  *   },
  * }} opts
  */
-function brandScopedController(uid, { brandPath, perms, protectedFields = [], versioned = false, validate, onCreate, onUpdate, guardCreate, audit }) {
+function brandScopedController(uid, { brandPath, perms, protectedFields = [], versioned = false, validate, onCreate, onUpdate, precheck, extraFilters, decorateRows, guardCreate, audit }) {
   return factories.createCoreController(uid, ({ strapi }) => {
     const brandOf = (row) => (brandPath ? brandPath.split('.').reduce((acc, k) => acc?.[k], row) : row);
     // nest('content.brand', x) is { content: { brand: x } }; Strapi wants { content: { populate: { brand: x } } }.
@@ -177,6 +180,7 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
       // transformResponse / super.* may return a promise in Strapi 5.
       const body = await response;
       if (uid === 'api::content.content' && body?.data) await orderContentImages(body);
+      if (decorateRows && body?.data) await decorateRows(Array.isArray(body.data) ? body.data : [body.data]);
       // Brands carry the viewer's (effective) role, positions, and what the
       // paying account's plan allows there — so the UI can explain gates.
       if (uid !== 'api::brand.brand' || !body?.data) return body;
@@ -201,11 +205,13 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
       async find(ctx) {
         const user = ctx.state.user;
         if (!user) return ctx.unauthorized();
+        const extra = extraFilters ? extraFilters(ctx) : null;
         await this.validateQuery(ctx);
         const query = await this.sanitizeQuery(ctx);
         // Membership constraint is added server-side; clients can't filter on users.
         const scope = nest(brandPath, memberLeaf(user.id));
-        const filters = query.filters ? { $and: [query.filters, scope] } : scope;
+        const all = [query.filters, extra, scope].filter(Boolean);
+        const filters = all.length > 1 ? { $and: all } : scope;
         const { results, pagination } = await strapi.service(uid).find({ ...query, filters });
         const sanitized = await this.sanitizeOutput(results, ctx);
         return decorate(ctx, this.transformResponse(sanitized, { pagination }));
@@ -278,8 +284,8 @@ function brandScopedController(uid, { brandPath, perms, protectedFields = [], ve
           }
           data.version = Number(existing.version) + 1;
         }
-        const fieldErrors = validate?.({ ...existing, ...data }, existing, data);
-        if (fieldErrors && Object.keys(fieldErrors).length) return fail(ctx, 400, 'INVALID_INPUT', 'Invalid input', fieldErrors);
+        const fieldErrors = { ...(validate?.({ ...existing, ...data }, existing, data) ?? {}), ...((precheck && (await precheck(existing, data))) ?? {}) };
+        if (Object.keys(fieldErrors).length) return fail(ctx, 400, 'INVALID_INPUT', 'Invalid input', fieldErrors);
         const changes = audit ? audit.diff(existing, data) : [];
         ctx.request.body = { ...ctx.request.body, data };
         const res = await super.update(ctx);
