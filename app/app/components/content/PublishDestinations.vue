@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, ChevronDown, Copy, Download, ExternalLink, Eye, Hand, Undo2 } from '@lucide/vue'
+import { Check, ChevronDown, Clock, Copy, Download, ExternalLink, Eye, Hand, Lock, Undo2, Zap } from '@lucide/vue'
 import type { Brand, Content, ContentImage, ContentStatePatch, DestinationInput, Platform, PublishDestination } from '~/types'
 import { PLATFORMS } from '~/types'
 import { isApiError } from '~/services/api/contract'
@@ -277,6 +277,15 @@ const previewFor = ref<PublishDestination | null>(null)
       </li>
     </ul>
     <p class="mt-3 text-xs text-muted">{{ t('publishing.manualNote') }}</p>
+    <!-- Automatic posting: connect accounts in the brand's Social channels (locked on Solo, coming soon on Team/Studio) -->
+    <NuxtLink :to="`/app/brands/${content.brandId}/channels`" class="mt-3 flex items-center gap-3 rounded-2xl border border-dashed border-line p-3 text-sm transition hover:bg-surface-2">
+      <span class="grid size-8 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-300"><Zap class="size-4" /></span>
+      <span class="min-w-0 flex-1"><b>{{ t('channels.autoTitle') }}</b><span class="block text-xs text-muted">{{ t('channels.autoBody') }}</span></span>
+      <span class="chip shrink-0 bg-surface-2 py-0.5 text-muted">
+        <template v-if="brand?.features?.socialConnections"><Clock class="size-3" />{{ t('channels.soonChip') }}</template>
+        <template v-else><Lock class="size-3" />{{ t('channels.planChip') }}</template>
+      </span>
+    </NuxtLink>
 
     <SidePanel :open="!!markFor" size="sm" :title="markFor ? t('publishing.markPostedOn', { p: PLATFORM_META[markFor.platform].label }) : ''" :subtitle="t('content.markPublishedHint')" @close="markFor = null">
       <div class="grid grid-cols-2 gap-3">

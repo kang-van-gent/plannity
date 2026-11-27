@@ -36,7 +36,7 @@ const rank = (k) => PLAN_KEYS.indexOf(k);
 /** Centralised entitlement flags (pricing.md §6). Post preview + manual briefs are on every plan. */
 function featureFlags(planKey) {
   const collab = planKey === 'team' || planKey === 'studio';
-  return { collaboration: collab, memberPositions: collab, taskAssignment: collab, taskReview: collab, postPreview: true, creativeBrief: true };
+  return { collaboration: collab, memberPositions: collab, taskAssignment: collab, taskReview: collab, postPreview: true, creativeBrief: true, socialConnections: collab };
 }
 
 const isActiveAt = (row, now) => row && row.status === 'active' && row.periodStart <= now && now < row.periodEnd;

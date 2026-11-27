@@ -22,7 +22,7 @@ const rank = (k: PlanKey) => PLAN_KEYS.indexOf(k)
 
 export function featureFlags(planKey: PlanKey): FeatureFlags {
   const collab = planKey === 'team' || planKey === 'studio'
-  return { collaboration: collab, memberPositions: collab, taskAssignment: collab, taskReview: collab, postPreview: true, creativeBrief: true }
+  return { collaboration: collab, memberPositions: collab, taskAssignment: collab, taskReview: collab, postPreview: true, creativeBrief: true, socialConnections: collab }
 }
 
 interface Period { planKey: PlanKey; status: 'active' | 'cancelled'; periodStart: string; periodEnd: string }

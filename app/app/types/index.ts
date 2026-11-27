@@ -100,6 +100,8 @@ export interface FeatureFlags {
   taskReview: boolean
   postPreview: boolean
   creativeBrief: boolean
+  /** Connect social accounts for automatic publishing (Team/Studio; pricing in plannity-context-social-publishing.md §2). */
+  socialConnections: boolean
 }
 export interface PlanConfig { key: PlanKey; monthlySatang: number; includedBrands: number | null; maxMembers: number; collaboration: boolean }
 export interface PricingConfig {
