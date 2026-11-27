@@ -1,0 +1,56 @@
+name: CI / Deploy
+
+# PRs into main: tests only. Push/merge to main: tests, then deploy to the server.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: # "Run workflow" button for a manual redeploy
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            app/package-lock.json
+      - name: Strapi unit tests
+        working-directory: server
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+      - name: Nuxt typecheck
+        working-directory: app
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false # never stop a deploy halfway
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          command_timeout: 30m
+          script: |
+            set -e
+            cd "${{ vars.APP_DIR }}"
+            git fetch --prune origin main && git reset --hard origin/main
+            APP_DIR="${{ vars.APP_DIR }}" WEB_PM2="${{ vars.WEB_PM2 }}" API_PM2="${{ vars.API_PM2 }}" \
+              BACKUP_DB_URL="${{ secrets.BACKUP_DB_URL }}" bash deploy/deploy.sh
