@@ -173,6 +173,23 @@ const en: Messages = {
     events: { assigned: 'assigned it', reassigned: 'reassigned it', updated: 'edited it', start: 'started work', submit: 'submitted for review', approve: 'approved it', request_changes: 'asked for changes', cancel: 'cancelled it' },
   },
 
+  channels: {
+    tab: 'Social channels', title: 'Social channels', subtitle: 'Connect accounts so Plannity can post for this brand.',
+    notConnected: 'Not connected', locked: 'Locked', connectSoon: 'Connect · coming soon', connectLocked: 'Team & Studio',
+    lockedTitle: 'Automatic posting is part of Team and Studio',
+    lockedOwner: 'Upgrade to connect this brand’s Facebook Page, Instagram and TikTok and let Plannity post on schedule. Planning and manual posting stay free.',
+    lockedMember: 'Ask the brand owner to upgrade to Team or Studio to connect accounts. Planning and manual posting stay free.',
+    soonTitle: 'Connecting accounts is coming soon',
+    soonBody: 'Your plan includes automatic posting. We’re finishing the connections with Meta and TikTok — nothing is connected or posted yet.',
+    adminsOnly: 'Only the brand’s owner and admins can connect or disconnect accounts.',
+    manualMeanwhile: 'Meanwhile, every post can go to several platforms: pick them in the post’s Platforms card, copy the caption, download the images and mark each one posted.',
+    what: {
+      facebook: 'A Facebook Page you manage (not a personal profile). Text and photo posts.',
+      instagram: 'An Instagram professional (business or creator) account. Image and carousel posts.',
+      tiktok: 'Your TikTok account. Available after TikTok’s review; you choose privacy and interaction settings for every post.',
+    },
+    autoTitle: 'Automatic posting', autoBody: 'Connect accounts in Social channels', soonChip: 'Coming soon', planChip: 'Team & Studio',
+  },
   publishing: {
     title: 'Platforms', subtitle: 'Plan once, post everywhere. Each platform can have its own caption, images and time.',
     choose: 'Choose platforms', progress: 'Posted on {done} of {total}', posted: 'Posted', manualNotPosted: 'Manual · not posted yet',

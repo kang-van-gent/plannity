@@ -24,6 +24,8 @@ test('feature flags: collaboration only on paid plans; preview on all', () => {
   assert.equal(p.featureFlags('solo').postPreview, true);
   assert.equal(p.featureFlags('team').memberPositions, true);
   assert.equal(p.featureFlags('studio').taskReview, true);
+  assert.equal(p.featureFlags('solo').socialConnections, false);
+  assert.equal(p.featureFlags('team').socialConnections, true);
 });
 
 test('active plan: highest covering period, Solo otherwise', () => {
