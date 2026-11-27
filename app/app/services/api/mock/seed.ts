@@ -5,6 +5,7 @@
 import type {
   ActivityEntry, Brand, BrandRole, Content, ContentFormat, GenerationItem, GenerationJob, Holiday, InvitationStatus, LedgerEntry, LedgerType,
   PaymentOrder, PlanKey, Platform, PositionKey, PromotionInquiry, Task, TaskEvent, User,
+  PublishDestination,
 } from '~/types'
 import { addDays, todayISO } from '~/utils/date'
 import { mockGenerate, rng } from './llm'
@@ -59,6 +60,8 @@ export interface MockDB {
   memberships: MockMembership[]
   invitations: MockInvitation[]
   contentImages: MockContentImage[]
+  /** Multi-platform content: one row per post and platform (added later — may be missing in saved demo data). */
+  destinations: (PublishDestination & { brandId: string })[]
   activity: ActivityEntry[]
   subscriptions: MockSubscription[]
   addons: MockAddon[]
@@ -176,7 +179,7 @@ export function buildSeed(): MockDB {
   const today = todayISO()
   const created = at(addDays(today, -32), 9)
   const db: MockDB = {
-    version: 3, users: [], brands: [], memberships: [], invitations: [], contentImages: [], activity: [], subscriptions: [], addons: [], tasks: [], taskEvents: [], contents: [], revisions: [], jobs: [], wallets: {}, ledger: [], orders: [],
+    version: 3, users: [], brands: [], memberships: [], invitations: [], contentImages: [], destinations: [], activity: [], subscriptions: [], addons: [], tasks: [], taskEvents: [], contents: [], revisions: [], jobs: [], wallets: {}, ledger: [], orders: [],
     paymentEvents: [], holidays: [], inquiries: [], feedback: [], idempotency: {}, loginAttempts: {}, seq: 1000,
   }
   const demo = 'u_demo'

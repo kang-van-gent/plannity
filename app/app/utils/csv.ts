@@ -1,4 +1,5 @@
 import type { Brand, Content } from '~/types'
+import { platformsOf } from './destinations'
 
 /**
  * Neutralises spreadsheet formula injection (spec §10): any cell that a
@@ -20,7 +21,7 @@ export function buildContentCsv(rows: Content[], brands: Pick<Brand, 'id' | 'nam
     lines.push([
       c.scheduledDate ?? c.suggestedDate ?? '',
       brandName.get(c.brandId) ?? '',
-      c.platform, c.format, c.pillar, c.title, c.hook, c.caption, c.cta, c.visualBrief, c.status, c.postUrl ?? '',
+      platformsOf(c).join(' + '), c.format, c.pillar, c.title, c.hook, c.caption, c.cta, c.visualBrief, c.status, c.postUrl ?? '',
     ].map(safeCell).join(','))
   }
   return '﻿' + lines.join('\r\n')

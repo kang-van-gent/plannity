@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Activity, Archive, CalendarX2, Check, Copy, CopyPlus, Download, Eye, History, Megaphone, MessageSquareHeart, RefreshCw, Rocket, Save, Sparkles } from '@lucide/vue'
 import { gsap } from 'gsap'
-import type { Content, ContentFormModel, ContentImage, ContentRevision, ContentStatus } from '~/types'
+import type { Content, ContentFormModel, ContentImage, ContentRevision, ContentStatePatch, ContentStatus, PublishDestination } from '~/types'
 import { CONTENT_STATUSES } from '~/types'
 import { isApiError } from '~/services/api/contract'
 
@@ -19,12 +19,15 @@ const content = ref<Content | null>(null)
 const form = ref<ContentFormModel | null>(null)
 // Kept apart from `content`: saving returns the content without its image files.
 const images = ref<ContentImage[]>([])
+// The post's platforms (one destination each); kept apart for the same reason.
+const dests = ref<PublishDestination[]>([])
 const activityOpen = ref(false)
 const errors = ref<Record<string, string>>({})
 const q = useQuery(async () => {
   const c = await api.contents.get(id.value)
   setContent(c)
   images.value = c.images ?? []
+  dests.value = c.destinations?.length ? c.destinations : await api.destinations.list(c.id)
   return c
 }, { watch: [id] })
 useSeoMeta({ title: () => content.value?.title ?? t('nav.library') })
@@ -38,6 +41,16 @@ function setContent(c: Content) {
   errors.value = {}
 }
 const dirty = computed(() => !!form.value && JSON.stringify(form.value) !== snapshot)
+/** A platform change moved the whole post (all posted → published, version…): apply it without touching unsaved edits. */
+function applyContentPatch(p: ContentStatePatch) {
+  if (!content.value || !form.value) return
+  content.value = { ...content.value, ...p, destinations: dests.value }
+  const base = JSON.parse(snapshot) as ContentFormModel
+  form.value.platform = base.platform = p.platform
+  snapshot = JSON.stringify(base)
+}
+const multiPlatform = computed(() => dests.value.length > 1)
+function focusPlatforms() { document.getElementById('platforms')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' }) }
 const brand = computed(() => brands.byId(content.value?.brandId))
 // Role in this content's brand (UX only — the backend enforces it). Until the
 // brands list arrives, assume editable rather than flashing a read-only view.
@@ -57,6 +70,7 @@ async function save(extra: Partial<Content> = {}, successTitle = t('common.saved
     const { brandId: _b, ...input } = formToInput(form.value)
     const updated = await api.contents.update(content.value.id, { ...input, ...extra, version: content.value.version })
     setContent(updated)
+    if (updated.destinations?.length) dests.value = updated.destinations
     notify.success(successTitle, t('content.versionNow', { v: updated.version }))
     return true
   } catch (e) {
@@ -79,6 +93,12 @@ const publishOpen = ref(false)
 const publishForm = reactive({ date: todayISO(), time: '', url: '' })
 async function setStatus(s: ContentStatus) {
   if (!content.value || !form.value || s === content.value.status) return
+  // Several platforms: "published" is confirmed per platform, never for all at once.
+  if (multiPlatform.value && (s === 'published' || content.value.status === 'published')) {
+    notify.info(t('publishing.perPlatformTitle'), t('publishing.perPlatformBody'))
+    focusPlatforms()
+    return
+  }
   if (statusBlocker({ scheduledDate: form.value.scheduledDate || null }, s) === 'needs_date') {
     errors.value = { scheduledDate: t('validation.needs_date') }
     notify.warning(t('content.needDateTitle'), t('content.needDateBody'))
@@ -202,7 +222,8 @@ onBeforeRouteLeave(async () => {
         <div class="min-w-0 flex-1">
           <div v-anim class="flex flex-wrap items-center gap-2 text-sm">
             <UiBrandDot :name="brand?.name" :color="brand?.color" :size="22" /><span class="font-semibold">{{ brand?.name }}</span>
-            <UiPlatformBadge :platform="content.platform" with-label />
+            <UiPlatformBadge v-if="dests.length <= 1" :platform="content.platform" with-label />
+            <button v-else type="button" class="rounded-full" :aria-label="t('publishing.title')" @click="focusPlatforms"><UiPlatformStack :content="{ ...content, destinations: dests }" with-progress /></button>
             <span v-if="content.source === 'ai'" class="chip bg-sun/15 text-amber-700 dark:text-sun"><Sparkles class="size-3" />AI · v{{ content.version }}</span>
             <span v-else class="chip bg-surface-2 text-muted">{{ t('content.manual') }} · v{{ content.version }}</span>
           </div>
@@ -254,10 +275,12 @@ onBeforeRouteLeave(async () => {
         <div class="min-w-0 space-y-5">
           <div ref="cardEl" v-anim class="card card-pad">
             <fieldset :disabled="!canEdit" class="contents">
-              <ContentForm v-model="form" :brands="brands.active.value" :errors="errors" brand-locked />
+              <ContentForm v-model="form" :brands="brands.active.value" :errors="errors" brand-locked hide-platform />
             </fieldset>
           </div>
           <ContentPostImages ref="imagesEl" v-model="images" v-anim class="scroll-mt-24" :content-id="content.id" :can-edit="canEdit" :title="content.title" />
+          <!-- Platforms: plan once, post to each (manual), with per-platform caption / images / time -->
+          <ContentPublishDestinations v-model="dests" v-anim :content="content" :images="images" :caption="form.caption" :brand="brand" :can-edit="canEdit" @content="applyContentPatch" />
           <!-- Approximate Facebook / Instagram / TikTok preview of the current (even unsaved) caption and images -->
           <ContentPostPreview v-anim :caption="form.caption" :images="images" :brand-name="brand?.name ?? ''" :brand-color="brand?.color"
             :platform="form.platform" :format="form.format" :unsaved="form.caption !== (content.caption ?? '')" />

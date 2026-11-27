@@ -1,0 +1,91 @@
+{
+  "kind": "collectionType",
+  "collectionName": "publish_destinations",
+  "info": {
+    "singularName": "publish-destination",
+    "pluralName": "publish-destinations",
+    "displayName": "Publish destination",
+    "description": "Where one content item goes: one row per platform. Caption/media/time inherit from the content unless overridden (null = inherit). Written only through /contents/:id/destinations and /destinations/:id/* (plannity-context-social-publishing.md §3)."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "content": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::content.content",
+      "inversedBy": "destinations"
+    },
+    "brand": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::brand.brand"
+    },
+    "platform": {
+      "type": "enumeration",
+      "enum": ["facebook", "instagram", "tiktok", "youtube", "line", "x", "linkedin"],
+      "required": true
+    },
+    "destinationKey": {
+      "type": "string",
+      "unique": true,
+      "required": true,
+      "description": "contentDocumentId:platform — one destination per content and platform."
+    },
+    "captionOverride": {
+      "type": "text",
+      "description": "null = use the content caption; \"\" = deliberately empty."
+    },
+    "mediaOverrideIds": {
+      "type": "json",
+      "description": "null = all content images in order; otherwise the chosen image ids in order."
+    },
+    "scheduledAt": {
+      "type": "datetime",
+      "description": "UTC. null = use the content date/time."
+    },
+    "timezone": {
+      "type": "string",
+      "default": "Asia/Bangkok",
+      "maxLength": 64
+    },
+    "mode": {
+      "type": "enumeration",
+      "enum": ["manual", "auto"],
+      "default": "manual",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["draft", "scheduled", "publishing", "published", "failed", "reconciling", "cancelled", "paused"],
+      "default": "draft",
+      "required": true
+    },
+    "revision": {
+      "type": "integer",
+      "default": 1,
+      "min": 1,
+      "required": true,
+      "description": "Bumped on every material change (caption, media, time, platform)."
+    },
+    "approvedRevision": { "type": "integer" },
+    "externalJobId": { "type": "string", "maxLength": 200, "private": true },
+    "externalPostId": { "type": "string", "maxLength": 200 },
+    "externalPostUrl": { "type": "string", "maxLength": 500 },
+    "attemptCount": { "type": "integer", "default": 0, "min": 0 },
+    "nextAttemptAt": { "type": "datetime" },
+    "lastErrorCode": { "type": "string", "maxLength": 80 },
+    "idempotencyKey": { "type": "string", "unique": true, "private": true },
+    "postedAt": {
+      "type": "datetime",
+      "description": "When it went live on the platform (manual: as confirmed by the user). Strapi reserves publishedAt, as on content."
+    },
+    "addedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

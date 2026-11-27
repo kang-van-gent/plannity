@@ -7,6 +7,7 @@
 import type {
   ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, Entitlements, GenerationJob, Holiday, InvitationPreview,
   InviteResult, LedgerEntry, MyInvitation, PaymentHandoff, PaymentOrder, PromotionInquiry, Session, Task, TeamSummary, User, Wallet,
+  ContentStatePatch, PublishDestination,
 } from '~/types'
 import { ApiError, type ApiErrorCode, type DataSource } from './contract'
 
@@ -93,7 +94,7 @@ function contentFilters(q: ContentQuery): Query {
     f['filters[$or][0][title][$containsi]'] = q.search
     f['filters[$or][1][caption][$containsi]'] = q.search
   }
-  if (q.platform) f['filters[platform][$eq]'] = q.platform
+  if (q.platform) f.platform = q.platform // any of the post's platforms (resolved by the server)
   if (q.pillar) f['filters[pillar][$eq]'] = q.pillar
   if (q.status === 'unscheduled') f['filters[scheduledDate][$null]'] = true
   else if (q.status) f['filters[status][$eq]'] = q.status
@@ -169,6 +170,18 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       revisions: (id) => many<ContentRevision>(`${BFF}/content-revisions${qs({ 'filters[content][documentId][$eq]': id, 'sort[0]': 'version:desc', 'pagination[pageSize]': 100 })}`),
       regenerate: (id, key) => one<Content>(`${BFF}/contents/${id}/regenerate`, { method: 'POST', headers: { 'Idempotency-Key': key } }),
       exportCsv: (q) => call<string>(`${BFF}/contents/export${qs(contentFilters({ ...q, pageSize: 100 }))}`, { raw: true }),
+    },
+
+    destinations: {
+      list: (contentId) => call<{ data: PublishDestination[] }>(`${BFF}/contents/${contentId}/destinations`).then((r) => r.data),
+      replace: async (contentId, items) => {
+        const r = await call<{ data: PublishDestination[]; meta?: { content?: Row | null } }>(`${BFF}/contents/${contentId}/destinations`, { method: 'PATCH', body: { data: { destinations: items } } })
+        return { data: r.data, content: (r.meta?.content as ContentStatePatch | null | undefined) ?? null }
+      },
+      markPublished: async (id, input) => {
+        const r = await call<{ data: PublishDestination; meta?: { content?: Row | null } }>(`${BFF}/destinations/${id}/mark-published`, { method: 'POST', body: { data: input } })
+        return { data: r.data, content: (r.meta?.content as ContentStatePatch | null | undefined) ?? null }
+      },
     },
 
     calendar: {

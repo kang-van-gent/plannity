@@ -4,7 +4,8 @@ import { FORMATS, OBJECTIVES, PLATFORMS } from '~/types'
 
 
 const model = defineModel<ContentFormModel>({ required: true })
-const props = defineProps<{ brands: Brand[]; errors?: Record<string, string>; compact?: boolean; brandLocked?: boolean }>()
+/** hidePlatform: the post page picks platforms in its own Platforms card. */
+const props = defineProps<{ brands: Brand[]; errors?: Record<string, string>; compact?: boolean; brandLocked?: boolean; hidePlatform?: boolean }>()
 const { t } = useLocale()
 const opt = useSelectOptions()
 const brand = computed(() => props.brands.find((b) => b.id === model.value.brandId))
@@ -25,8 +26,8 @@ const uid = useId()
         <p v-if="errors?.title" class="field-error">{{ errors.title }}</p>
       </div>
     </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <div><label class="label" :for="`${uid}-platform`">{{ t('content.fields.platform') }}</label><UiSelect :id="`${uid}-platform`" v-model="model.platform" :options="opt.platforms.value" /></div>
+    <div class="grid gap-4 sm:grid-cols-2" :class="hidePlatform ? 'lg:grid-cols-3' : 'lg:grid-cols-4'">
+      <div v-if="!hidePlatform"><label class="label" :for="`${uid}-platform`">{{ t('content.fields.platform') }}</label><UiSelect :id="`${uid}-platform`" v-model="model.platform" :options="opt.platforms.value" /></div>
       <div><label class="label" :for="`${uid}-format`">{{ t('content.fields.format') }}</label><UiSelect :id="`${uid}-format`" v-model="model.format" :options="opt.formats.value" /></div>
       <div><label class="label" :for="`${uid}-pillar`">{{ t('content.fields.pillar') }}</label><UiCombobox :id="`${uid}-pillar`" v-model="model.pillar" :suggestions="pillars" /></div>
       <div><label class="label" :for="`${uid}-obj`">{{ t('content.fields.objective') }}</label><UiSelect :id="`${uid}-obj`" v-model="model.objective" :options="opt.objectives.value" /></div>

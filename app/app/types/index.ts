@@ -328,6 +328,44 @@ export interface Content extends ContentDraft {
   imageCount?: number
   /** Attached images in order — only on the single-content endpoint. */
   images?: ContentImage[]
+  /** Where the post goes: one per platform (lists, calendar and the post itself). */
+  destinations?: PublishDestination[]
+}
+
+// ---- Multi-platform content (plannity-context-social-publishing.md) -------
+/** Manual publishing uses draft → published; the rest belong to automatic publishing (later). */
+export const DESTINATION_STATUSES = ['draft', 'scheduled', 'publishing', 'published', 'failed', 'reconciling', 'cancelled', 'paused'] as const
+export type DestinationStatus = (typeof DESTINATION_STATUSES)[number]
+
+export interface PublishDestination {
+  id: string
+  contentId: string
+  platform: Platform
+  /** null = the post's caption; '' = deliberately no caption on this platform. */
+  captionOverride: string | null
+  /** null = all of the post's images in order; otherwise these image ids, in this order. */
+  mediaOverrideIds: string[] | null
+  /** UTC; null = the post's date and time. */
+  scheduledAt: ISODateTime | null
+  timezone: string
+  mode: 'manual' | 'auto'
+  status: DestinationStatus
+  revision: number
+  externalPostUrl: string | null
+  publishedAt: ISODateTime | null
+  lastErrorCode: string | null
+  updatedAt: ISODateTime
+}
+
+export type DestinationInput = Pick<PublishDestination, 'platform'> & Partial<Pick<PublishDestination, 'captionOverride' | 'mediaOverrideIds' | 'scheduledAt' | 'timezone'>>
+
+/** Content fields that move when a destination change changes the whole post (status, version…). */
+export type ContentStatePatch = Pick<Content, 'status' | 'version' | 'publishedAt' | 'postUrl' | 'platform'>
+
+export interface DestinationResult<T> {
+  data: T
+  /** Present when the post itself changed (e.g. every platform is now published). */
+  content: ContentStatePatch | null
 }
 
 export type ContentInput = Partial<Omit<Content, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'jobItemId' | 'source'>> & {

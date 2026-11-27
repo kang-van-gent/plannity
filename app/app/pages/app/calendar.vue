@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AlertTriangle, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Inbox, List, LoaderCircle, Plus, Star, Trash2, ExternalLink } from '@lucide/vue'
 import { gsap } from 'gsap'
-import type { Content, ContentFormModel, ContentStatus, Holiday } from '~/types'
+import type { Content, ContentFormModel, ContentStatus, Holiday, Platform } from '~/types'
 import { CONTENT_STATUSES, PLATFORMS } from '~/types'
 import { isApiError } from '~/services/api/contract'
 
@@ -70,7 +70,7 @@ const trayLoading = computed(() => !ready.value && trayBrand !== brands.currentB
 /** Full reload including the tray (after a conflict or an error). */
 function reloadAll() { trayBrand = undefined; return q.refresh() }
 
-const visible = computed(() => items.value.filter((c) => (!filters.platform || c.platform === filters.platform) && (!filters.status || c.status === filters.status)))
+const visible = computed(() => items.value.filter((c) => (!filters.platform || platformsOf(c).includes(filters.platform as Platform)) && (!filters.status || c.status === filters.status)))
 const byDate = computed(() => {
   const m = new Map<string, Content[]>()
   for (const c of visible.value) {
@@ -423,7 +423,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
                   class="flex w-full cursor-grab items-center gap-1 rounded-lg border-l-[3px] bg-surface px-1.5 py-1 text-left text-[11px] font-medium shadow-soft transition hover:-translate-y-px hover:shadow-pop active:cursor-grabbing"
                   :class="dragId === c.id && 'opacity-40'" :style="{ borderLeftColor: brandColor(c) }" :title="`${c.title} — ${t('calendar.dragHint')}`"
                   @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)" @keydown="onChipKey($event, c)">
-                  <UiPlatformBadge :platform="c.platform" size="xs" />
+                  <UiPlatformStack :content="c" size="xs" :max="3" />
                   <span class="min-w-0 flex-1 truncate">{{ c.title }}</span>
                   <UiImageCount :count="c.imageCount" compact />
                   <span class="size-1.5 shrink-0 rounded-full" :class="STATUS_META[c.status].dot" />
@@ -446,7 +446,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
           <div v-if="byDate.get(selectedDay)?.length" class="card divide-y divide-line overflow-hidden">
             <button v-for="c in byDate.get(selectedDay)" :key="c.id" data-agenda type="button" class="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-surface-2" @click="openQuick(c)">
               <span class="h-9 w-1 shrink-0 rounded-full" :style="{ background: brandColor(c) }" />
-              <UiPlatformBadge :platform="c.platform" />
+              <UiPlatformStack :content="c" :max="3" />
               <span class="min-w-0 flex-1">
                 <span class="block truncate font-semibold">{{ c.title }}</span>
                 <span class="flex items-center gap-2 text-xs text-muted">{{ c.scheduledTime ?? t('content.unscheduled') }}<UiImageCount :count="c.imageCount" /></span>
@@ -471,7 +471,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
             <div class="space-y-1.5">
               <button v-for="c in byDate.get(d) ?? []" :key="c.id" :data-chip="c.id" type="button" :draggable="canMove(c)" class="block w-full cursor-grab rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
                 :style="{ borderLeftColor: brandColor(c) }" @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)" @keydown="onChipKey($event, c)">
-                <span class="flex items-center gap-1.5 text-[10px] text-muted"><UiPlatformBadge :platform="c.platform" size="xs" />{{ c.scheduledTime ?? '' }}<UiImageCount class="ml-auto" :count="c.imageCount" compact /></span>
+                <span class="flex items-center gap-1.5 text-[10px] text-muted"><UiPlatformStack :content="c" size="xs" :max="3" />{{ c.scheduledTime ?? '' }}<UiImageCount class="ml-auto" :count="c.imageCount" compact /></span>
                 <span class="mt-1 line-clamp-3 font-semibold">{{ c.title }}</span>
                 <UiStatusBadge :status="c.status" small class="mt-1.5" />
               </button>
@@ -491,7 +491,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
             <button v-for="c in byDate.get(d) ?? []" :key="c.id" type="button" class="flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left last:border-0 hover:bg-surface-2 active:bg-surface-2 sm:py-3" @click="openQuick(c)">
               <span class="w-12 shrink-0 text-xs font-semibold text-muted">{{ c.scheduledTime ?? '—' }}</span>
               <span class="h-8 w-1 shrink-0 rounded-full" :style="{ background: brandColor(c) }" />
-              <UiPlatformBadge :platform="c.platform" />
+              <UiPlatformStack :content="c" :max="3" />
               <span class="min-w-0 flex-1 truncate font-medium">{{ c.title }}</span>
               <UiImageCount :count="c.imageCount" />
               <UiStatusBadge :status="c.status" small />
@@ -510,7 +510,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
           <template v-if="trayLoading"><div v-for="i in 4" :key="i" class="skeleton h-9 rounded-xl" aria-hidden="true" /></template>
           <button v-for="c in unscheduled" v-else :key="c.id" :data-chip="c.id" data-tray type="button" :draggable="canMove(c)" class="flex w-full cursor-grab items-center gap-2 rounded-xl border-l-4 bg-surface-2 p-2 text-left text-xs transition hover:shadow-pop"
             :style="{ borderLeftColor: brandColor(c) }" @dragstart="onDragStart($event, c)" @dragend="onDragEnd" @click="openQuick(c)">
-            <UiPlatformBadge :platform="c.platform" size="xs" />
+            <UiPlatformStack :content="c" size="xs" :max="3" />
             <span class="min-w-0 flex-1 truncate font-medium">{{ c.title }}</span>
           </button>
           <p v-if="!trayLoading && !unscheduled.length" class="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted">{{ t('calendar.trayEmpty') }}</p>
@@ -521,7 +521,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
 
     <SidePanel :open="!!selected" size="sm" :title="selected?.title" :subtitle="brands.byId(selected?.brandId)?.name" @close="selected = null">
       <template v-if="selected">
-        <div class="flex flex-wrap items-center gap-2"><UiPlatformBadge :platform="selected.platform" with-label /><UiStatusBadge :status="selected.status" /><span class="chip bg-pink/10 text-pink">{{ selected.pillar }}</span></div>
+        <div class="flex flex-wrap items-center gap-2"><UiPlatformBadge v-if="(selected.destinations?.length ?? 1) <= 1" :platform="selected.platform" with-label /><UiPlatformStack v-else :content="selected" with-progress /><UiStatusBadge :status="selected.status" /><span class="chip bg-pink/10 text-pink">{{ selected.pillar }}</span></div>
         <p class="rounded-2xl bg-surface-2 p-3 text-sm">{{ selected.hook || selected.caption.slice(0, 160) }}</p>
         <fieldset :disabled="!canMove(selected)" class="contents">
         <div class="grid grid-cols-2 gap-3">

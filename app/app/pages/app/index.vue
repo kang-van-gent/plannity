@@ -86,7 +86,7 @@ const brandOf = (id: string) => brands.byId(id)
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="truncate font-semibold">{{ c.title }}</p>
-                    <p class="mt-0.5 flex items-center gap-2 text-xs text-muted"><UiPlatformBadge :platform="c.platform" size="xs" />{{ brandOf(c.brandId)?.name }}<span v-if="c.scheduledTime">· {{ c.scheduledTime }}</span></p>
+                    <p class="mt-0.5 flex items-center gap-2 text-xs text-muted"><UiPlatformStack :content="c" size="xs" :max="3" />{{ brandOf(c.brandId)?.name }}<span v-if="c.scheduledTime">· {{ c.scheduledTime }}</span></p>
                   </div>
                   <UiStatusBadge :status="c.status" small />
                 </NuxtLink>

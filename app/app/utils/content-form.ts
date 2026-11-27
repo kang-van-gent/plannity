@@ -11,7 +11,7 @@ export function emptyContentForm(brand: Brand | undefined, date = ''): ContentFo
 export function contentToForm(c: Content): ContentFormModel {
   return {
     brandId: c.brandId, title: c.title, concept: c.concept, pillar: c.pillar, objective: c.objective, platform: c.platform, format: c.format,
-    hook: c.hook, caption: c.caption, cta: c.cta, hashtags: c.hashtags.join(' '), visualBrief: c.visualBrief, videoScript: c.videoScript ?? '',
+    hook: c.hook, caption: c.caption, cta: c.cta, hashtags: (c.hashtags ?? []).join(' '), visualBrief: c.visualBrief, videoScript: c.videoScript ?? '',
     scheduledDate: c.scheduledDate ?? '', scheduledTime: c.scheduledTime ?? '',
   }
 }
