@@ -51,6 +51,10 @@ jobs:
           script: |
             set -e
             cd "${{ vars.APP_DIR }}"
+            # APP_DIR may point at the repo or a folder inside it (e.g. …/plannity/app): use the repo root.
+            ROOT="$(git rev-parse --show-toplevel)"
+            cd "$ROOT"
+            echo "Repo root: $ROOT"
             git fetch --prune origin main && git reset --hard origin/main
-            APP_DIR="${{ vars.APP_DIR }}" WEB_PM2="${{ vars.WEB_PM2 }}" API_PM2="${{ vars.API_PM2 }}" \
-              BACKUP_DB_URL="${{ secrets.BACKUP_DB_URL }}" bash deploy/deploy.sh
+            APP_DIR="$ROOT" WEB_PM2="${{ vars.WEB_PM2 }}" API_PM2="${{ vars.API_PM2 }}" \
+              BACKUP_DB_URL="${{ secrets.BACKUP_DB_URL }}" bash "$ROOT/deploy/deploy.sh"
