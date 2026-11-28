@@ -55,6 +55,7 @@ test('tiktok: OAuth and API errors map to actionable kinds', () => {
   assert.equal(tiktok.classify(400, { error: 'invalid_grant', error_description: 'x' }).kind, 'auth');
   assert.equal(tiktok.classify(401, { error: { code: 'access_token_invalid' } }).kind, 'auth');
   assert.equal(tiktok.classify(403, { error: { code: 'scope_not_authorized' } }).kind, 'permission');
+  assert.equal(tiktok.classify(401, { error: { code: 'scope_not_authorized' } }).kind, 'permission');
   assert.equal(tiktok.classify(429, { error: { code: 'rate_limit_exceeded' } }).kind, 'rate_limited');
   assert.equal(tiktok.classify(200, { data: {}, error: { code: 'ok' } }), null);
 });

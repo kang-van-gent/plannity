@@ -29,8 +29,9 @@ function classify(status, body) {
   const e = body?.error;
   if (e && typeof e === 'object' && e.code && e.code !== 'ok') {
     const id = `tiktok_${e.code}`;
-    if (['access_token_invalid', 'token_not_authorized_for_specified_open_id'].includes(e.code) || status === 401) return new SocialError('auth', id, e.message);
+    // Scope errors first: TikTok sends them as 401 too, and they aren't an expired login.
     if (e.code === 'scope_not_authorized' || e.code === 'scope_permission_missed') return new SocialError('permission', id, e.message);
+    if (['access_token_invalid', 'token_not_authorized_for_specified_open_id'].includes(e.code) || status === 401) return new SocialError('auth', id, e.message);
     if (e.code === 'rate_limit_exceeded' || status === 429) return new SocialError('rate_limited', id, e.message);
     if (status >= 500) return new SocialError('unavailable', id, e.message);
     return new SocialError('invalid', id, e.message);
@@ -55,16 +56,21 @@ const tokens = (r) => ({
   scopes: String(r.scope || '').split(',').map((s) => s.trim()).filter(Boolean), openId: r.open_id,
 });
 
+// Only user.info.basic fields: `username` needs user.info.profile, which we don't request.
 async function userInfo(accessToken) {
-  const r = await request(`${API}/v2/user/info/?fields=open_id,avatar_url,display_name,username`, { headers: { authorization: `Bearer ${accessToken}` }, classify });
+  const r = await request(`${API}/v2/user/info/?fields=open_id,avatar_url,display_name`, { headers: { authorization: `Bearer ${accessToken}` }, classify });
   const u = r?.data?.user || {};
-  return { openId: u.open_id, displayName: u.display_name ?? null, username: u.username ?? null, avatarUrl: u.avatar_url ?? null };
+  return { openId: u.open_id, displayName: u.display_name ?? null, username: null, avatarUrl: u.avatar_url ?? null };
 }
+
+const creatorInfo = async (accessToken) => (await request(`${API}/v2/post/publish/creator_info/query/`, { method: 'POST', json: {}, headers: { authorization: `Bearer ${accessToken}` }, classify }))?.data || {};
 
 /** Code → tokens + the account they belong to. */
 async function exchange({ code, redirectUri }) {
   const t = tokens(await tokenCall({ code, grant_type: 'authorization_code', redirect_uri: redirectUri }));
   const user = await userInfo(t.accessToken);
+  // Best effort: the @username comes from creator_info (video.publish), not user.info.basic.
+  try { user.username = (await creatorInfo(t.accessToken)).creator_username ?? null; } catch { /* shown after "Test connection" */ }
   return { ...t, user: { ...user, openId: user.openId || t.openId } };
 }
 
@@ -75,8 +81,7 @@ async function test(conn, accessToken) {
   const checks = [{ key: 'token', ok: true }];
   const missing = NEEDED.filter((s) => !(conn.scopes || []).includes(s));
   checks.push({ key: 'permissions', ok: !missing.length, missing });
-  const r = await request(`${API}/v2/post/publish/creator_info/query/`, { method: 'POST', json: {}, headers: { authorization: `Bearer ${accessToken}` }, classify });
-  const d = r?.data || {};
+  const d = await creatorInfo(accessToken);
   checks.push({ key: 'account', ok: true, name: d.creator_username ? `@${d.creator_username}` : d.creator_nickname });
   const options = Array.isArray(d.privacy_level_options) ? d.privacy_level_options : [];
   checks.push({ key: 'canPost', ok: options.length > 0, privacyOptions: options, privateOnly: !audited() });
