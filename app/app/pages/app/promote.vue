@@ -74,7 +74,7 @@ async function submit() {
       <div v-parallax="-20" class="absolute -bottom-24 left-10 size-64 rounded-full bg-pink/40 blur-3xl" />
       <div class="relative max-w-2xl">
         <span class="eyebrow bg-white/10 text-sun"><Megaphone class="size-3.5" />Upstify</span>
-        <h1 class="mt-3 font-display text-[28px] font-bold leading-tight sm:text-4xl">{{ t('promote.title') }}</h1>
+        <h1 class="mt-3 font-display text-[1.75rem] font-bold leading-tight sm:text-4xl">{{ t('promote.title') }}</h1>
         <p class="mt-2 text-white/75">{{ t('promote.subtitle') }}</p>
         <ul class="mt-4 flex flex-wrap gap-2 text-xs">
           <li v-for="(x, i) in [t('promote.point1'), t('promote.point2'), t('promote.point3')]" :key="i" class="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5"><ShieldCheck class="size-3.5 text-lime" />{{ x }}</li>

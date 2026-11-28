@@ -81,7 +81,7 @@ const brandOf = (id: string) => brands.byId(id)
               <li v-for="(c, i) in q.data.value.upcoming" :key="c.id" v-anim="i">
                 <NuxtLink :to="`/app/content/${c.id}`" class="pressable -mx-2 flex items-center gap-3 rounded-2xl px-2 py-3 hover:bg-surface-2 active:bg-surface-2">
                   <div class="w-14 shrink-0 rounded-2xl bg-surface-2 py-1.5 text-center">
-                    <p class="text-[10px] font-bold uppercase text-muted">{{ formatDate(c.scheduledDate, locale, { weekday: 'short' }) }}</p>
+                    <p class="text-[0.625rem] font-bold uppercase text-muted">{{ formatDate(c.scheduledDate, locale, { weekday: 'short' }) }}</p>
                     <p class="font-display text-lg font-bold leading-none">{{ formatDate(c.scheduledDate, locale, { day: 'numeric' }) }}</p>
                   </div>
                   <div class="min-w-0 flex-1">

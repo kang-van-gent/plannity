@@ -21,6 +21,6 @@ watch(() => wallet.value?.available, (v, old) => {
     <span class="grid size-7 place-items-center rounded-full bg-surface/80 sm:contents"><Coins class="size-4 text-amber-600 dark:text-sun" /></span>
     <span class="tabular-nums">{{ wallet ? formatNumber(shown, locale) : '–' }}</span>
     <span class="hidden font-medium text-muted sm:inline">{{ t('credits.unit') }}</span>
-    <span v-if="wallet?.reserved" class="hidden rounded-lg bg-surface/70 px-1.5 py-0.5 text-[10px] font-semibold text-muted md:inline">{{ t('credits.reservedShort', { n: wallet.reserved }) }}</span>
+    <span v-if="wallet?.reserved" class="hidden rounded-lg bg-surface/70 px-1.5 py-0.5 text-[0.625rem] font-semibold text-muted md:inline">{{ t('credits.reservedShort', { n: wallet.reserved }) }}</span>
   </NuxtLink></span>
 </template>

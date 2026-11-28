@@ -34,7 +34,7 @@ const canUpload = (x: Task) => x.caps.assignee && ['todo', 'in_progress', 'chang
       <div class="h-scroll flex-1" role="tablist" :aria-label="t('tasks.title')">
         <button v-for="f in FILTERS" :key="f" type="button" role="tab" :aria-selected="filter === f" class="chip shrink-0 gap-1.5 px-3.5 py-2 text-sm"
           :class="filter === f ? 'bg-brand-500 text-white shadow-pop' : 'bg-surface text-muted hover:text-fg'" @click="filter = f">
-          {{ t(`tasks.filters.${f}`) }}<span class="rounded-full px-1.5 text-[11px]" :class="filter === f ? 'bg-white/25' : 'bg-surface-2'">{{ count(f) }}</span>
+          {{ t(`tasks.filters.${f}`) }}<span class="rounded-full px-1.5 text-[0.6875rem]" :class="filter === f ? 'bg-white/25' : 'bg-surface-2'">{{ count(f) }}</span>
         </button>
       </div>
       <UiSelect v-if="brandsInList.length > 1" v-model="brandFilter" size="pill" :active="brandFilter !== 'all'" :aria-label="t('tasks.allBrands')"

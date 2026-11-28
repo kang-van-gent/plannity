@@ -128,7 +128,7 @@ const answer = (ok: boolean) => confirmReq.value?.resolve(ok)
         <div class="relative flex items-start gap-3">
           <ResultIcon :type="n.type" :size="42" :delay="0.3" />
           <div class="min-w-0 flex-1 pt-0.5">
-            <p class="font-display text-[15px] font-semibold leading-snug">{{ n.title }}</p>
+            <p class="font-display text-[0.9375rem] font-semibold leading-snug">{{ n.title }}</p>
             <p v-if="n.message" class="mt-0.5 text-sm leading-relaxed text-muted">{{ n.message }}</p>
             <button v-if="n.action" type="button" class="btn-secondary btn-sm mt-2.5" @click="runAction(n)">{{ n.action.label }}</button>
           </div>
@@ -144,7 +144,7 @@ const answer = (ok: boolean) => confirmReq.value?.resolve(ok)
   <SidePanel :open="confirmOpen" size="sm" :title="lastConfirm?.title" @close="answer(false)">
     <div class="flex flex-col items-center pt-4 text-center">
       <ResultIcon v-if="confirmOpen" :key="lastConfirm?.id" :type="iconType" :size="84" :delay="0.35" />
-      <p v-if="lastConfirm?.message" class="mt-5 max-w-sm text-[15px] leading-relaxed text-muted">{{ lastConfirm.message }}</p>
+      <p v-if="lastConfirm?.message" class="mt-5 max-w-sm text-[0.9375rem] leading-relaxed text-muted">{{ lastConfirm.message }}</p>
     </div>
     <dl v-if="lastConfirm?.details?.length" class="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface-2">
       <div v-for="d in lastConfirm.details" :key="d.label" class="flex items-center justify-between gap-4 px-4 py-3 text-sm">

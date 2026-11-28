@@ -17,6 +17,9 @@ const route = useRoute()
 watch(() => route.fullPath, () => { navOpen.value = false })
 
 useSeoMeta({ robots: 'noindex, nofollow' })
+// The person's text size (Settings → Appearance), only inside the app panel.
+const fontSize = useFontSize()
+useHead({ htmlAttrs: { 'data-font-size': computed(() => (fontSize.pref.value === 'md' ? undefined : fontSize.pref.value)) } })
 
 onMounted(async () => {
   refresh()
@@ -70,7 +73,7 @@ onBeforeUnmount(() => { clearInterval(coverTimer); window.removeEventListener('f
         <button type="button" class="btn-ghost w-full" :class="collapsed ? 'justify-center px-0' : 'justify-start'" :title="collapsed ? t('feedback.title') : undefined" :aria-label="collapsed ? t('feedback.title') : undefined" @click="feedbackOpen = true">
           <MessageSquareHeart class="size-4" /><span v-if="!collapsed">{{ t('feedback.title') }}</span>
         </button>
-        <p v-if="isMock" class="flex items-center gap-1.5 rounded-xl bg-sun/15 py-2 text-[11px] font-semibold text-amber-700 dark:text-sun" :class="collapsed ? 'justify-center px-0' : 'px-3'" :title="collapsed ? t('common.mockBadge') : undefined">
+        <p v-if="isMock" class="flex items-center gap-1.5 rounded-xl bg-sun/15 py-2 text-[0.6875rem] font-semibold text-amber-700 dark:text-sun" :class="collapsed ? 'justify-center px-0' : 'px-3'" :title="collapsed ? t('common.mockBadge') : undefined">
           <FlaskConical class="size-3.5" /><span v-if="!collapsed">{{ t('common.mockBadge') }}</span>
         </p>
       </div>

@@ -42,7 +42,7 @@ function isActive(i: { to: string; exact?: boolean; also?: string }) {
   <nav class="grid gap-1" :aria-label="t('nav.main')">
     <template v-for="(sec, si) in sections" :key="sec.key">
     <!-- Section label; collapsed sidebar shows a thin divider instead -->
-    <p v-if="!collapsed" :id="`nav-sec-${sec.key}`" class="px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted/70" :class="si === 0 ? 'pt-0' : 'pt-4'">{{ t(`nav.sections.${sec.key}`) }}</p>
+    <p v-if="!collapsed" :id="`nav-sec-${sec.key}`" class="px-3.5 pb-1 text-[0.6875rem] font-bold uppercase tracking-wider text-muted/70" :class="si === 0 ? 'pt-0' : 'pt-4'">{{ t(`nav.sections.${sec.key}`) }}</p>
     <span v-else-if="si > 0" class="mx-auto my-2 block h-px w-8 bg-line" role="separator" :aria-label="t(`nav.sections.${sec.key}`)" />
     <template v-for="i in sec.items" :key="i.to">
       <button v-if="i.locked" type="button" aria-disabled="true" :title="`${i.label} · ${t('nav.lockedTitle')}`"
@@ -54,7 +54,7 @@ function isActive(i: { to: string; exact?: boolean; also?: string }) {
         </span>
         <template v-if="!collapsed">
           {{ i.label }}
-          <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted"><Lock class="size-3" />{{ t('nav.comingSoon') }}</span>
+          <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-muted"><Lock class="size-3" />{{ t('nav.comingSoon') }}</span>
         </template>
       </button>
       <NuxtLink v-else :to="i.to" :aria-current="isActive(i) ? 'page' : undefined"
@@ -65,7 +65,7 @@ function isActive(i: { to: string; exact?: boolean; also?: string }) {
         <component :is="i.icon" class="size-[18px] shrink-0 transition-transform group-hover:scale-110 group-hover:-rotate-6" />
         <template v-if="!collapsed">
           {{ i.label }}
-          <span v-if="i.badge" class="ml-auto rounded-full px-1.5 text-[11px] font-bold" :class="isActive(i) ? 'bg-white/25' : 'bg-pink/15 text-pink'">{{ i.badge }}</span>
+          <span v-if="i.badge" class="ml-auto rounded-full px-1.5 text-[0.6875rem] font-bold" :class="isActive(i) ? 'bg-white/25' : 'bg-pink/15 text-pink'">{{ i.badge }}</span>
           <Doodle v-else-if="isActive(i)" variant="spark" class="ml-auto size-3.5 text-sun" />
         </template>
       </NuxtLink>

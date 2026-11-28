@@ -100,7 +100,7 @@ const dueText = (task: Task) => !task.dueDate ? t('tasks.noDue')
         <div class="flex items-center gap-3">
           <span class="grid size-10 shrink-0 place-items-center rounded-full font-display text-sm font-bold text-white" :class="open.assignee?.active ? 'bg-gradient-to-br from-pink to-sun' : 'bg-slate-400'">{{ initials(open.assignee?.name ?? '?') }}</span>
           <div class="min-w-0 flex-1">
-            <p class="truncate font-semibold">{{ open.assignee?.name ?? '—' }} <span v-if="open.isMine" class="chip bg-brand-500/10 py-0 text-[10px] text-brand-600 dark:text-brand-300">{{ t('team.you') }}</span></p>
+            <p class="truncate font-semibold">{{ open.assignee?.name ?? '—' }} <span v-if="open.isMine" class="chip bg-brand-500/10 py-0 text-[0.625rem] text-brand-600 dark:text-brand-300">{{ t('team.you') }}</span></p>
             <p class="truncate text-xs text-muted">{{ t(`positions.${open.positionKey}`) }} · {{ t('tasks.card.by', { name: open.assignedByName }) }}</p>
           </div>
         </div>

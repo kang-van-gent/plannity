@@ -259,7 +259,7 @@ onBeforeRouteLeave(async () => {
       <!-- Status pipeline: draft → in_review → approved → scheduled → published (user-confirmed) -->
       <div v-anim class="card mb-5 p-1.5 sm:p-2">
         <div class="grid grid-cols-5 gap-0.5 sm:gap-1">
-          <button v-for="(s, i) in CONTENT_STATUSES" :key="s" type="button" class="relative flex flex-col items-center gap-1 rounded-2xl px-0.5 py-2.5 text-center text-[10.5px] font-semibold leading-tight transition active:scale-95 sm:px-1 sm:text-sm"
+          <button v-for="(s, i) in CONTENT_STATUSES" :key="s" type="button" class="relative flex flex-col items-center gap-1 rounded-2xl px-0.5 py-2.5 text-center text-[0.6562rem] font-semibold leading-tight transition active:scale-95 sm:px-1 sm:text-sm"
             :class="content.status === s ? 'bg-brand-500 text-white shadow-pop' : CONTENT_STATUSES.indexOf(content.status) > i ? 'text-success hover:bg-surface-2' : 'text-muted hover:bg-surface-2'"
             :aria-pressed="content.status === s" :disabled="saving || !canEdit" @click="setStatus(s)">
             <span class="grid size-6 place-items-center rounded-full" :class="content.status === s ? 'bg-white/25' : CONTENT_STATUSES.indexOf(content.status) > i ? 'bg-success/15' : 'bg-surface-2'">
