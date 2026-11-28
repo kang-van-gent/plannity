@@ -24,6 +24,11 @@ const next = computed(() => safeNextPath(route.query.next))
 
 // Back from a failed/cancelled social sign-in (/auth/callback → /login?oauth=…).
 onMounted(() => {
+  // Strapi sends people here after the link in the sign-up email (?confirmed=1).
+  if (route.query.confirmed === '1') {
+    notify.success(t('auth.emailConfirmed'), t('auth.emailConfirmedBody'))
+    navigateTo({ query: { ...route.query, confirmed: undefined } }, { replace: true })
+  }
   const reason = route.query.oauth
   if (typeof reason !== 'string') return
   const provider = ({ google: 'Google', facebook: 'Facebook', apple: 'Apple' } as Record<string, string>)[String(route.query.provider)] ?? ''

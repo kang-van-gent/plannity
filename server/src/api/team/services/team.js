@@ -131,7 +131,7 @@ module.exports = ({ strapi }) => {
 
   async function notify(brand, inviter, invitation, token) {
     const link = `${frontendUrl()}/invite/${token}`;
-    const emailSent = await sendInvitation(strapi, { to: invitation.email, brandName: brand.name, inviterName: displayName(inviter), role: invitation.role, link, expiresAt: invitation.expiresAt });
+    const emailSent = await sendInvitation(strapi, { to: invitation.email, brandName: brand.name, inviterName: displayName(inviter), inviterLocale: inviter?.locale, role: invitation.role, link, expiresAt: invitation.expiresAt });
     return { invitation: inviteView({ ...invitation, invitedBy: inviter }), inviteUrl: link, emailSent };
   }
 

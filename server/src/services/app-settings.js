@@ -5,7 +5,7 @@
  *
  * A filled field wins; an empty field falls back to the value .env had when the
  * server started. Applied to process.env at boot and right after every save,
- * so the existing readers (Slip2Go, PromptPay, Meta/TikTok) pick them up with
+ * so the existing readers (Slip2Go, PromptPay, Meta/TikTok, mail) pick them up with
  * no restart. Secret fields are encrypted with SOCIAL_TOKEN_KEY (utils/secret-box)
  * before they are stored and decrypted only here, in memory.
  * SOCIAL_TOKEN_KEY itself must stay in .env: it can't protect the database from inside it.
@@ -38,8 +38,13 @@ const MAP = {
   slip2goAutoApprove: 'SLIP2GO_AUTO_APPROVE',
   slip2goGenerateQr: 'SLIP2GO_GENERATE_QR',
   paymentOrderTtlMinutes: 'PAYMENT_ORDER_TTL_MINUTES',
+  mailEnabled: 'MAIL_ENABLED',
+  brevoApiKey: 'BREVO_API_KEY',
+  mailFromEmail: 'MAIL_FROM_EMAIL',
+  mailFromName: 'MAIL_FROM_NAME',
+  mailReplyTo: 'MAIL_REPLY_TO',
 };
-const SECRETS = ['metaAppSecret', 'tiktokClientSecret', 'slip2goSecretKey'];
+const SECRETS = ['metaAppSecret', 'tiktokClientSecret', 'slip2goSecretKey', 'brevoApiKey'];
 
 // .env as it was at startup, so clearing a field in the admin restores it.
 const BOOT_ENV = Object.fromEntries(Object.values(MAP).map((k) => [k, process.env[k]]));

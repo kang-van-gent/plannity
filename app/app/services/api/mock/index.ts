@@ -521,6 +521,18 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         // Always succeeds so the response never reveals whether an account exists.
         await net({ canFail: false })
       },
+      async resetPassword(code, password) {
+        // Demo: any code except "used" resets the first account's password.
+        await net({ canFail: false })
+        if (code === 'used') throw new ApiError(400, 'INVALID_INPUT', 'Incorrect code provided')
+        const d = load()
+        const u = d.users[0]
+        if (!u) throw new ApiError(400, 'INVALID_INPUT', 'Incorrect code provided')
+        u.password = password
+        persist()
+        const { password: _p, ...user } = clone(u)
+        return { user, token: u.id }
+      },
       async logout() { await net({ canFail: false, latency: 120 }) },
       async me() {
         await net({ canFail: false, latency: 60 })

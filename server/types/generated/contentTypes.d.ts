@@ -530,7 +530,7 @@ export interface ApiActivityLogActivityLog extends Struct.CollectionTypeSchema {
 export interface ApiAppSettingAppSetting extends Struct.SingleTypeSchema {
   collectionName: 'app_settings';
   info: {
-    description: 'Integration settings managed here instead of server/.env: Social channels (Meta, TikTok), PromptPay and Slip2Go. A filled field overrides .env; an empty field uses .env. Saved changes apply within seconds, no restart. Secret fields are encrypted when saved (they then show as v1.\u2026): to change one, clear it and paste the new value. Server-only settings (database, JWT, SOCIAL_TOKEN_KEY, PUBLIC_URL) stay in .env.';
+    description: 'Integration settings managed here instead of server/.env: Social channels (Meta, TikTok), PromptPay, Slip2Go and the mail server (Brevo). A filled field overrides .env; an empty field uses .env. Saved changes apply within seconds, no restart. Secret fields are encrypted when saved (they then show as v1.\u2026): to change one, clear it and paste the new value. Server-only settings (database, JWT, SOCIAL_TOKEN_KEY, PUBLIC_URL) stay in .env.';
     displayName: 'App settings';
     pluralName: 'app-settings';
     singularName: 'app-setting';
@@ -539,6 +539,7 @@ export interface ApiAppSettingAppSetting extends Struct.SingleTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    brevoApiKey: Schema.Attribute.Text & Schema.Attribute.Private;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -548,6 +549,19 @@ export interface ApiAppSettingAppSetting extends Struct.SingleTypeSchema {
       'api::app-setting.app-setting'
     > &
       Schema.Attribute.Private;
+    mailEnabled: Schema.Attribute.Boolean;
+    mailFromEmail: Schema.Attribute.Email &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    mailFromName: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    mailReplyTo: Schema.Attribute.Email &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
     metaAppId: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 40;

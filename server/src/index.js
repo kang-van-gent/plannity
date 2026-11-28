@@ -7,6 +7,7 @@ const { invalidate } = require('./services/entitlements');
 const createPayments = require('./services/payments');
 const destinations = require('./services/destinations');
 const appSettings = require('./services/app-settings');
+const mail = require('./services/mail');
 const { resetWarning: resetSlip2goWarning } = require('./services/slip2go');
 
 /**
@@ -93,6 +94,11 @@ module.exports = {
     // Admin-managed settings (Content Manager → App settings) override .env; applied before anything reads them.
     const fromAdmin = await appSettings.apply(strapi);
     if (fromAdmin.length) strapi.log.info(`[settings] from App settings: ${fromAdmin.join(', ')}`);
+    // Every email (ours and Strapi's sign-up / forgot-password ones) goes out through Brevo with Plannity's design.
+    strapi.plugin('email').provider = mail.provider(strapi);
+    try { await mail.syncAuthTemplates(strapi); } catch (e) { strapi.log.error(`[mail] could not update the sign-up/reset email templates: ${e.message}`); }
+    const c = mail.config();
+    if (c.enabled && !mail.ready(c)) strapi.log.warn('[mail] mail is on but the Brevo API key or sender address is missing — emails are only logged');
     const payments = createPayments({ strapi });
     strapi.db.lifecycles.subscribe({
       models: [appSettings.UID],

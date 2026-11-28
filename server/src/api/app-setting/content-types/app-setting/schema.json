@@ -5,7 +5,7 @@
     "singularName": "app-setting",
     "pluralName": "app-settings",
     "displayName": "App settings",
-    "description": "Integration settings managed here instead of server/.env: Social channels (Meta, TikTok), PromptPay and Slip2Go. A filled field overrides .env; an empty field uses .env. Saved changes apply within seconds, no restart. Secret fields are encrypted when saved (they then show as v1.…): to change one, clear it and paste the new value. Server-only settings (database, JWT, SOCIAL_TOKEN_KEY, PUBLIC_URL) stay in .env."
+    "description": "Integration settings managed here instead of server/.env: Social channels (Meta, TikTok), PromptPay, Slip2Go and the mail server (Brevo). A filled field overrides .env; an empty field uses .env. Saved changes apply within seconds, no restart. Secret fields are encrypted when saved (they then show as v1.…): to change one, clear it and paste the new value. Server-only settings (database, JWT, SOCIAL_TOKEN_KEY, PUBLIC_URL) stay in .env."
   },
   "options": { "draftAndPublish": false },
   "pluginOptions": {},
@@ -31,6 +31,11 @@
     "slip2goTimeoutMs": { "type": "integer", "min": 2000, "max": 60000, "description": "SLIP2GO_TIMEOUT_MS. Empty = .env or 15000." },
     "slip2goAutoApprove": { "type": "boolean", "description": "SLIP2GO_AUTO_APPROVE. On = slips Slip2Go verifies are approved automatically; off = they still wait for staff. Empty = .env." },
     "slip2goGenerateQr": { "type": "boolean", "description": "SLIP2GO_GENERATE_QR. On = checkout QR from Slip2Go (checked: our receiver + exact amount); off = built locally. Empty = .env." },
-    "paymentOrderTtlMinutes": { "type": "integer", "min": 5, "max": 1440, "description": "PAYMENT_ORDER_TTL_MINUTES. Payment window: only transfers made inside it are approved automatically. Empty = .env." }
+    "paymentOrderTtlMinutes": { "type": "integer", "min": 5, "max": 1440, "description": "PAYMENT_ORDER_TTL_MINUTES. Payment window: only transfers made inside it are approved automatically. Empty = .env." },
+    "mailEnabled": { "type": "boolean", "description": "MAIL_ENABLED. Mail server (Brevo): on = Plannity really sends email (team invitations, sign-up confirmation, password reset); off = emails are only logged and inviters get a link to share. Empty = .env." },
+    "brevoApiKey": { "type": "text", "private": true, "description": "BREVO_API_KEY (secret, encrypted on save). Brevo → SMTP & API → API keys → Generate a new API key (starts with xkeysib-)." },
+    "mailFromEmail": { "type": "email", "maxLength": 120, "description": "MAIL_FROM_EMAIL. Sender address, e.g. no-reply@plannity.space. Must be a verified sender, or on a domain authenticated in Brevo → Senders, domains & dedicated IPs." },
+    "mailFromName": { "type": "string", "maxLength": 80, "description": "MAIL_FROM_NAME. Sender name shown in the inbox. Empty = .env or Plannity." },
+    "mailReplyTo": { "type": "email", "maxLength": 120, "description": "MAIL_REPLY_TO (optional). Where replies go, e.g. support@plannity.space." }
   }
 }
