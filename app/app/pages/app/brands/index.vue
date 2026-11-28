@@ -75,7 +75,7 @@ function focus(b: Brand) {
         <div class="relative z-10 -mt-10 flex flex-1 flex-col px-4 pb-4 sm:px-5 sm:pb-5">
           <div class="flex items-end justify-between gap-3">
             <span class="rounded-[1.6rem] bg-surface p-1.5 shadow-soft transition group-hover:-rotate-3">
-              <UiBrandDot :name="b.name" :color="b.color" :size="64" />
+              <UiBrandDot :name="b.name" :logo="b.logoUrl" :color="b.color" :size="64" />
             </span>
             <span class="mb-1 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-bold tabular-nums text-muted">
               <FileText class="size-3.5" />{{ t('brands.contentCount', { n: b.contentCount ?? 0 }) }}

@@ -77,6 +77,10 @@ export interface DataSource {
     update(id: string, input: Partial<BrandInput>): Promise<Brand>
     archive(id: string): Promise<Brand>
     restore(id: string): Promise<Brand>
+    /** Uploads the brand logo (JPG/PNG/WEBP/GIF ≤ 5 MB; made square, transparency kept). Owners and admins. */
+    uploadLogo(id: string, file: File): Promise<{ logoUrl: string | null }>
+    /** Back to the coloured initials. */
+    removeLogo(id: string): Promise<{ logoUrl: string | null }>
   }
 
   contents: {

@@ -21,6 +21,7 @@ const publisher = require('./services/publisher');
  */
 const AUTHENTICATED_ACTIONS = {
   'api::brand.brand': ['find', 'findOne', 'create', 'update'],
+  'api::brand.brand-logo': ['upload', 'remove'],
   'api::content.content': ['find', 'findOne', 'create', 'update'],
   'api::content-revision.content-revision': ['find', 'findOne'],
   'api::holiday.holiday': ['find', 'findOne', 'create', 'delete'],

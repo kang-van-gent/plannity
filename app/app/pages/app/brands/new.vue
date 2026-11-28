@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Coins } from '@lucide/vue'
-import type { BrandInput } from '~/types'
+import type { BrandInput, LogoChange } from '~/types'
 import { isApiError } from '~/services/api/contract'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
@@ -17,10 +17,14 @@ const { ent, load: loadEnt, canCreateBrand } = useEntitlements()
 onMounted(() => { loadEnt(true) })
 const serverErrors = ref<Record<string, string>>()
 
-async function save(input: BrandInput) {
+async function save(input: BrandInput, logo: LogoChange) {
   saving.value = true
   try {
     const b = await api.brands.create(input)
+    if (logo && 'file' in logo) {
+      // The brand exists now; a failed logo upload doesn't undo it.
+      try { await api.brands.uploadLogo(b.id, logo.file) } catch { notify.warning(t('brands.logo.notSaved'), t('brands.logo.notSavedBody')) }
+    }
     await brands.load(true)
     loadEnt(true) // one slot fewer now
     brands.setScope(b.id)

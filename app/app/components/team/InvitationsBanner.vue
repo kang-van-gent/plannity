@@ -42,7 +42,7 @@ async function respond(inv: MyInvitation, accept: boolean) {
   <TransitionGroup v-if="list.length" tag="div" class="mb-5 space-y-2" enter-from-class="opacity-0 -translate-y-2" leave-to-class="opacity-0 scale-95" enter-active-class="transition duration-300" leave-active-class="transition duration-200">
     <article v-for="inv in list" :key="inv.id" class="flex flex-wrap items-center gap-3 rounded-[1.5rem] border border-brand-300/60 bg-brand-500/5 p-3 sm:flex-nowrap sm:p-4">
       <span class="relative shrink-0">
-        <UiBrandDot :name="inv.brandName" :color="inv.brandColor" :size="44" />
+        <UiBrandDot :name="inv.brandName" :logo="inv.brandLogoUrl" :color="inv.brandColor" :size="44" />
         <span class="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-brand-500 text-white ring-2 ring-surface"><MailOpen class="size-3" /></span>
       </span>
       <div class="min-w-0 flex-1">

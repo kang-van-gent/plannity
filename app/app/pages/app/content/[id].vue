@@ -221,7 +221,7 @@ onBeforeRouteLeave(async () => {
       <div class="mb-5 flex flex-col gap-3 sm:mb-6 sm:gap-4 lg:flex-row lg:items-start">
         <div class="min-w-0 flex-1">
           <div v-anim class="flex flex-wrap items-center gap-2 text-sm">
-            <UiBrandDot :name="brand?.name" :color="brand?.color" :size="22" /><span class="font-semibold">{{ brand?.name }}</span>
+            <UiBrandDot :name="brand?.name" :logo="brand?.logoUrl" :color="brand?.color" :size="22" /><span class="font-semibold">{{ brand?.name }}</span>
             <UiPlatformBadge v-if="dests.length <= 1" :platform="content.platform" with-label />
             <button v-else type="button" class="rounded-full" :aria-label="t('publishing.title')" @click="focusPlatforms"><UiPlatformStack :content="{ ...content, destinations: dests }" with-progress /></button>
             <span v-if="content.source === 'ai'" class="chip bg-sun/15 text-amber-700 dark:text-sun"><Sparkles class="size-3" />AI · v{{ content.version }}</span>

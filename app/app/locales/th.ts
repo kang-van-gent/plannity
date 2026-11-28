@@ -89,7 +89,7 @@ const th = {
       title: 'ชื่อ', concept: 'คอนเซ็ปต์', pillar: 'Pillar', objective: 'เป้าหมาย', platform: 'แพลตฟอร์ม', format: 'รูปแบบ', hook: 'Hook',
       caption: 'แคปชั่น', cta: 'CTA', hashtags: 'แฮชแท็ก', visualBrief: 'บรีฟภาพ', videoScript: 'สคริปต์วิดีโอ', status: 'สถานะ',
       scheduledDate: 'วันโพสต์', scheduledTime: 'เวลา', publishedAt: 'เผยแพร่เมื่อ', postedAt: 'เผยแพร่เมื่อ', postUrl: 'ลิงก์โพสต์', archivedAt: 'เก็บถาวร',
-      images: 'รูปภาพ', role: 'บทบาท', source: 'ทำสำเนาจาก', name: 'ชื่อแบรนด์', color: 'สีแบรนด์',
+      logo: 'โลโก้', images: 'รูปภาพ', role: 'บทบาท', source: 'ทำสำเนาจาก', name: 'ชื่อแบรนด์', color: 'สีแบรนด์',
       profile_industry: 'ประเภทธุรกิจ', profile_description: 'รายละเอียดธุรกิจ', profile_products: 'สินค้า/บริการ', profile_usp: 'จุดขาย',
       profile_audience: 'กลุ่มเป้าหมาย', profile_painPoints: 'ปัญหาของลูกค้า', profile_tone: 'โทนการสื่อสาร', profile_language: 'ภาษาคอนเทนต์',
       profile_platforms: 'แพลตฟอร์ม', profile_guidelines: 'แนวทางแบรนด์', profile_forbiddenWords: 'คำต้องห้าม', profile_competitors: 'คู่แข่ง',
@@ -557,6 +557,12 @@ const th = {
   },
 
   brands: {
+    logo: {
+      title: 'โลโก้', hint: 'ไฟล์ JPG, PNG, WEBP หรือ GIF ไม่เกิน 5 MB แสดงทุกที่ที่มีแบรนด์นี้ พื้นหลังโปร่งใสจะคงไว้',
+      upload: 'อัปโหลดโลโก้', change: 'เปลี่ยนโลโก้', remove: 'ลบ', unsaved: 'บันทึกพร้อมแบรนด์',
+      notSaved: 'สร้างแบรนด์แล้ว แต่บันทึกโลโก้ไม่สำเร็จ', notSavedBody: 'เพิ่มโลโก้อีกครั้งได้ในหน้าโปรไฟล์แบรนด์',
+      errors: { file_type: 'ใช้ไฟล์ JPG, PNG, WEBP หรือ GIF', too_large: 'โลโก้ต้องมีขนาดไม่เกิน 5 MB', unreadable: 'อ่านรูปนี้ไม่ได้ — ลองรูปอื่น', required: 'เลือกรูป' },
+    },
     lockedCount: 'ถูกล็อก {n}',
     locked: 'ถูกล็อก', lockedTitle: 'แบรนด์นี้ถูกล็อก', lockedOwner: 'พื้นที่ของแบรนด์นี้สิ้นสุดแล้ว ทุกคนจึงดูได้อย่างเดียว ต่ออายุเพื่อแก้ไขได้อีกครั้ง ข้อมูลไม่ถูกลบ', lockedMember: 'เจ้าของต้องต่ออายุแบรนด์นี้ คุณยังดูข้อมูลได้ทั้งหมด', renewBrand: 'ต่ออายุแบรนด์', paidUntil: 'ชำระถึง {date}',
     slotsUsed: '{used} จาก {max} แบรนด์', limitTitle: 'พื้นที่แบรนด์เต็มแล้ว', limitBody: 'แพ็กเกจ {plan} ของคุณรองรับแบรนด์ที่เป็นเจ้าของได้ {max} แบรนด์ (รวมพื้นที่ที่ซื้อเพิ่ม) และใช้ครบแล้ว เพิ่มพื้นที่สำหรับแบรนด์นี้ หรือเปลี่ยนเป็น Studio เพื่อสร้างแบรนด์ได้ไม่จำกัด', addSlot: 'เพิ่มพื้นที่แบรนด์ · {price}/เดือน', upgradeStudio: 'ดู Studio — แบรนด์ไม่จำกัด', limitArchived: 'แบรนด์ที่เก็บถาวรยังนับเป็นหนึ่งพื้นที่ ส่วนแบรนด์ที่คุณเข้าร่วมในฐานะสมาชิกไม่นับ',

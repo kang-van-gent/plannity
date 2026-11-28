@@ -155,7 +155,7 @@ async function demoExpire() {
               <span class="font-semibold tabular-nums">{{ money(ent.pricing.plans[renewPlanKey].monthlySatang) }}</span>
             </li>
             <li v-for="b in renewBrands" :key="b.id" class="flex flex-wrap items-center gap-3 px-5 py-3 sm:px-6">
-              <UiBrandDot :name="b.name" :color="b.color" :size="28" />
+              <UiBrandDot :name="b.name" :logo="brands.byId(b.id)?.logoUrl" :color="b.color" :size="28" />
               <span class="min-w-0 flex-1">
                 <span class="block truncate font-semibold">{{ t('plan.renewBrandLine', { name: b.name }) }}</span>
                 <span class="text-xs" :class="b.locked ? 'text-danger' : soon(b.until) ? 'font-semibold text-amber-700 dark:text-sun' : 'text-muted'">
@@ -183,7 +183,7 @@ async function demoExpire() {
         </div>
         <ul class="divide-y divide-line">
           <li v-for="b in ent.brands" :key="b.id" class="flex flex-wrap items-center gap-3 px-5 py-3 sm:flex-nowrap sm:px-6" :class="b.locked && 'bg-danger/[0.04]'">
-            <UiBrandDot :name="b.name" :color="b.color" :size="32" />
+            <UiBrandDot :name="b.name" :logo="brands.byId(b.id)?.logoUrl" :color="b.color" :size="32" />
             <div class="min-w-0 flex-1">
               <NuxtLink :to="`/app/brands/${b.id}`" class="block truncate font-semibold hover:underline">{{ b.name }}</NuxtLink>
               <p class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">

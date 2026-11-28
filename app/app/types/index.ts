@@ -57,7 +57,12 @@ export interface BrandProfile {
   goals: string
 }
 
+/** Brand form: what happens to the logo on save (the page uploads it once the brand exists). */
+export type LogoChange = { file: File } | { remove: true } | null
+
 export interface Brand {
+  /** Brand logo (absolute URL); null/absent = coloured initials. */
+  logoUrl?: string | null
   id: string
   name: string
   color: string
@@ -162,6 +167,7 @@ export interface Task {
   brandId: string
   brandName: string
   brandColor: string
+  brandLogoUrl?: string | null
   contentId: string
   contentTitle: string
   contentScheduledDate: ISODate | null
@@ -249,6 +255,7 @@ export interface InvitationPreview {
   status: InvitationStatus
   brandName: string
   brandColor: string
+  brandLogoUrl?: string | null
   inviterName: string
   email: string
   role: BrandRole
@@ -262,6 +269,7 @@ export interface MyInvitation {
   brandId: string
   brandName: string
   brandColor: string
+  brandLogoUrl?: string | null
   inviterName: string
   role: BrandRole
   expiresAt: ISODateTime

@@ -156,7 +156,7 @@ async function submit() {
               <div class="mt-4 grid gap-2 sm:grid-cols-2 sm:gap-3">
                 <button v-for="b in brands.active.value" :key="b.id" type="button" class="pressable flex items-center gap-3 rounded-2xl border-2 p-3 text-left"
                   :class="form.brandId === b.id ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="form.brandId === b.id" @click="selectBrand(b.id)">
-                  <UiBrandDot :name="b.name" :color="b.color" :size="40" />
+                  <UiBrandDot :name="b.name" :logo="b.logoUrl" :color="b.color" :size="40" />
                   <span class="min-w-0 flex-1"><span class="block truncate font-semibold">{{ b.name }}</span><span class="block truncate text-xs text-muted">{{ b.profile.industry }}</span></span>
                 </button>
               </div>
@@ -257,7 +257,7 @@ async function submit() {
             <section v-anim="enter" class="card card-pad">
               <h2 class="font-display text-lg font-bold">{{ t('generate.summary') }}</h2>
               <dl class="mt-4 grid grid-cols-2 gap-2 text-sm sm:gap-3">
-                <div class="rounded-2xl bg-surface-2 p-3"><dt class="text-muted">{{ t('generate.brand') }}</dt><dd class="mt-1 flex items-center gap-2 font-semibold"><UiBrandDot :name="brand?.name" :color="brand?.color" :size="22" />{{ brand?.name }}</dd></div>
+                <div class="rounded-2xl bg-surface-2 p-3"><dt class="text-muted">{{ t('generate.brand') }}</dt><dd class="mt-1 flex items-center gap-2 font-semibold"><UiBrandDot :name="brand?.name" :logo="brand?.logoUrl" :color="brand?.color" :size="22" />{{ brand?.name }}</dd></div>
                 <div class="rounded-2xl bg-surface-2 p-3"><dt class="text-muted">{{ t('generate.dateRange') }}</dt><dd class="mt-1 font-semibold">{{ formatDate(form.dateFrom, locale) }} – {{ formatDate(form.dateTo, locale) }}</dd></div>
                 <div class="rounded-2xl bg-surface-2 p-3"><dt class="text-muted">{{ t('generate.objective') }}</dt><dd class="mt-1 font-semibold">{{ t(`objectives.${form.objective}`) }}</dd></div>
                 <div class="rounded-2xl bg-surface-2 p-3"><dt class="text-muted">{{ t('generate.formats') }}</dt><dd class="mt-1 font-semibold">{{ form.formats.map((f) => t(`formats.${f}`)).join(', ') }}</dd></div>

@@ -253,7 +253,7 @@ module.exports = ({ strapi }) => {
   async function byToken(token) {
     const inv = await docs(INVITATION).findFirst({
       filters: { tokenHash: hashToken(token) },
-      populate: { brand: { fields: ['name', 'color'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
+      populate: { brand: { fields: ['name', 'color', 'logoUrl'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
     });
     if (!inv) throw new TeamError(404, 'INVITE_INVALID', 'This invitation link is not valid.');
     return inv;
@@ -261,7 +261,7 @@ module.exports = ({ strapi }) => {
   async function mineById(user, id) {
     const inv = await docs(INVITATION).findFirst({
       filters: { documentId: id, email: normEmail(user.email) },
-      populate: { brand: { fields: ['name', 'color'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
+      populate: { brand: { fields: ['name', 'color', 'logoUrl'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
     });
     if (!inv) throw new TeamError(404, 'INVITE_INVALID', 'This invitation is no longer available.');
     return inv;
@@ -308,7 +308,7 @@ module.exports = ({ strapi }) => {
   function preview(inv) {
     const expired = inv.status === 'pending' && new Date(inv.expiresAt) < new Date();
     return {
-      status: expired ? 'expired' : inv.status, brandName: inv.brand?.name ?? '—', brandColor: inv.brand?.color ?? '#6C4CF5',
+      status: expired ? 'expired' : inv.status, brandName: inv.brand?.name ?? '—', brandColor: inv.brand?.color ?? '#6C4CF5', brandLogoUrl: inv.brand?.logoUrl ?? null,
       inviterName: displayName(inv.invitedBy), email: inv.email, role: inv.role, positionKeys: Array.isArray(inv.positionKeys) ? inv.positionKeys : [], expiresAt: inv.expiresAt,
     };
   }
@@ -317,11 +317,11 @@ module.exports = ({ strapi }) => {
     await expireStale(null);
     const rows = await docs(INVITATION).findMany({
       filters: { email: normEmail(user.email), status: 'pending' },
-      populate: { brand: { fields: ['name', 'color'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
+      populate: { brand: { fields: ['name', 'color', 'logoUrl'] }, invitedBy: { fields: ['username', 'name', 'email'] } },
       limit: 100,
     });
     return rows.filter((i) => i.brand).map((i) => ({
-      id: i.documentId, brandId: i.brand.documentId, brandName: i.brand.name, brandColor: i.brand.color,
+      id: i.documentId, brandId: i.brand.documentId, brandName: i.brand.name, brandColor: i.brand.color, brandLogoUrl: i.brand.logoUrl ?? null,
       inviterName: displayName(i.invitedBy), role: i.role, expiresAt: i.expiresAt,
     }));
   }

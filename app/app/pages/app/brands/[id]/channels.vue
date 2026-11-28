@@ -150,7 +150,7 @@ const igMissing = computed(() => !!connOf('facebook') && !connOf('instagram'))
     <UiSkeletonList v-else-if="!brand || !brandQ.ready.value" :rows="3" />
     <template v-else>
       <div class="mb-5 flex items-center gap-4">
-        <UiBrandDot v-anim="{ from: 'pop' }" :name="brand.name" :color="brand.color" :size="56" />
+        <UiBrandDot v-anim="{ from: 'pop' }" :name="brand.name" :logo="brand.logoUrl" :color="brand.color" :size="56" />
         <div class="min-w-0 flex-1">
           <h1 v-anim="1" class="truncate font-display text-[1.625rem] font-bold sm:text-3xl">{{ brand.name }}</h1>
           <p v-anim="2" class="text-sm text-muted">{{ t('channels.subtitle') }}</p>

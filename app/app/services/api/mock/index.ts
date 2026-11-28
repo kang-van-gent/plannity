@@ -376,6 +376,17 @@ export function createMockSource(getToken: () => string | null | undefined, limi
       img.src = url
     })
   }
+  async function containDataUrl(file: File, size: number): Promise<string> {
+    const bmp = await createImageBitmap(file)
+    const scale = Math.min(size / bmp.width, size / bmp.height)
+    const w = Math.round(bmp.width * scale)
+    const h = Math.round(bmp.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    canvas.getContext('2d')!.drawImage(bmp, (size - w) / 2, (size - h) / 2, w, h)
+    return canvas.toDataURL('image/png')
+  }
   async function squareDataUrl(file: File, size: number): Promise<string> {
     const bmp = await createImageBitmap(file)
     const side = Math.min(bmp.width, bmp.height)
@@ -761,6 +772,26 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         persist()
         return brandView(b)
       },
+      async uploadLogo(id, file) {
+        await net({ canFail: false, latency: 500 })
+        const b = brandAccess(id, 'brand.update')
+        if (!(await sniffFile(file))) fieldError({ file: 'file_type' })
+        if (file.size > 5 * 1024 * 1024) fieldError({ file: 'too_large' })
+        const had = !!b.logoUrl
+        // Demo: fitted into a square in the browser (transparency kept), stored as a small data URL.
+        b.logoUrl = await containDataUrl(file, 256)
+        logActivity(b.id, 'brand.updated', 'brand', b.id, b.name, [{ field: 'logo', from: had ? 'logo' : null, to: 'logo' }])
+        persist()
+        return { logoUrl: b.logoUrl }
+      },
+      async removeLogo(id) {
+        await net({ canFail: false })
+        const b = brandAccess(id, 'brand.update')
+        if (b.logoUrl) logActivity(b.id, 'brand.updated', 'brand', b.id, b.name, [{ field: 'logo', from: 'logo', to: null }])
+        b.logoUrl = null
+        persist()
+        return { logoUrl: null }
+      },
     },
 
     contents: {
@@ -1044,7 +1075,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const d = load()
         const b = d.brands.find((x) => x.id === inv.brandId)
         return {
-          status: inv.status, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5',
+          status: inv.status, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5', brandLogoUrl: b?.logoUrl ?? null,
           inviterName: d.users.find((u) => u.id === inv.invitedByUserId)?.name ?? '—', email: inv.email, role: inv.role, positionKeys: inv.positionKeys, expiresAt: inv.expiresAt,
         }
       },
@@ -1063,7 +1094,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const email = currentUser().email
         return d.invitations.filter((i) => i.email === email && i.status === 'pending' && !activeMember(i.brandId, uidOf())).map((i) => {
           const b = d.brands.find((x) => x.id === i.brandId)
-          return { id: i.id, brandId: i.brandId, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5', inviterName: d.users.find((u) => u.id === i.invitedByUserId)?.name ?? '—', role: i.role, expiresAt: i.expiresAt }
+          return { id: i.id, brandId: i.brandId, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5', brandLogoUrl: b?.logoUrl ?? null, inviterName: d.users.find((u) => u.id === i.invitedByUserId)?.name ?? '—', role: i.role, expiresAt: i.expiresAt }
         })
       },
       async acceptMine(id) {
@@ -1944,7 +1975,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     const u = d.users.find((x) => x.id === m?.userId)
     const { assigneeMemberId: _a, assignedByUserId, activeKey: _k, ...rest } = clone(t)
     return {
-      ...rest, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5', contentTitle: c?.title ?? '—', contentScheduledDate: c?.scheduledDate ?? null,
+      ...rest, brandName: b?.name ?? '—', brandColor: b?.color ?? '#6C4CF5', brandLogoUrl: b?.logoUrl ?? null, contentTitle: c?.title ?? '—', contentScheduledDate: c?.scheduledDate ?? null,
       imageCount: imagesOf(t.contentId).length,
       assignee: m ? { memberId: m.id, userId: m.userId, name: u?.name ?? '—', positionKeys: [...m.positionKeys], active: m.status === 'active' } : null,
       assignedByName: d.users.find((x) => x.id === assignedByUserId)?.name ?? '—',
