@@ -4,11 +4,17 @@
  * Account-level endpoints the app needs besides the collections:
  *   GET  /dashboard?brandId   home summary for the brands the user belongs to
  *   POST /auth/verify          trial credits once the account's email is confirmed (idempotent)
+ *   GET  /me                   the signed-in user (app shape)
  *   PUT  /me                   name / locale
+ *   POST /me/avatar            upload a profile photo (multipart "file")
+ *   PUT  /me/avatar            { source: 'gravatar' | 'google' | 'none' }
  *   GET  /contents/export      CSV of the user's content (same filters as the library)
  * Everything is scoped to the signed-in user's active memberships.
  */
+const fs = require('node:fs');
 const { walletFor, grantTrial } = require('../../../services/credits');
+const avatar = require('../../../services/avatar');
+const { sniffImageType } = require('../../../utils/image-type');
 const { MEMBERSHIP } = require('../../../utils/brand-access');
 
 const CONTENT = 'api::content.content';
@@ -20,8 +26,17 @@ function appUser(u) {
   return {
     id: String(u.documentId ?? u.id), email: u.email, name: u.name || u.username || '', verifiedAt: u.confirmed ? u.updatedAt ?? u.createdAt : null,
     locale: u.locale === 'en' ? 'en' : 'th', timezone: 'Asia/Bangkok', createdAt: u.createdAt,
+    avatarUrl: u.avatarUrl || null, avatarSource: u.avatarSource || null, hasGooglePhoto: !!u.googleAvatarUrl,
+    // Password sign-in only exists for email accounts; Google/Apple accounts sign in with their provider.
+    signInMethod: u.provider || 'local',
   };
 }
+
+const USER = 'plugin::users-permissions.user';
+const bad = (ctx, status, code, message, fieldErrors = {}) => {
+  ctx.status = status;
+  ctx.body = { data: null, error: { status, code, message, fieldErrors } };
+};
 
 /** documentIds of active brands the user is a member of. */
 async function myBrandIds(strapi, userId, includeArchived = false) {
@@ -81,6 +96,43 @@ module.exports = ({ strapi }) => ({
     }
     const granted = await grantTrial(strapi, user.id);
     ctx.body = { granted, user: appUser(user) };
+  },
+
+  async me(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+    ctx.body = appUser(await strapi.db.query(USER).findOne({ where: { id: user.id } }));
+  },
+
+  async avatarUpload(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+    const f = ctx.request.files?.file;
+    const file = Array.isArray(f) ? f[0] : f;
+    if (!file) return bad(ctx, 400, 'INVALID_INPUT', 'No image received', { file: 'required' });
+    const head = Buffer.alloc(16);
+    const fd = fs.openSync(file.filepath, 'r');
+    try { fs.readSync(fd, head, 0, 16, 0); } finally { fs.closeSync(fd); }
+    if (!sniffImageType(head)) return bad(ctx, 400, 'FILE_TYPE', 'Use a JPG, PNG, WEBP or GIF image', { file: 'file_type' });
+    if (file.size > avatar.MAX_BYTES) return bad(ctx, 400, 'FILE_TOO_LARGE', 'The photo must be 5 MB or smaller', { file: 'too_large' });
+    try {
+      ctx.body = appUser(await avatar.saveUpload(strapi, user, file));
+    } catch (e) {
+      strapi.log.error(`[avatar] upload failed for user ${user.id}: ${e.message}`);
+      return bad(ctx, 400, 'FILE_TYPE', 'This image could not be read', { file: 'unreadable' });
+    }
+  },
+
+  async avatarSet(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+    const source = (ctx.request.body?.data ?? ctx.request.body ?? {}).source;
+    const out = await avatar.useSource(strapi, user, source);
+    if (out.error) {
+      const msg = { no_gravatar: 'There is no Gravatar photo for this email', gravatar_unreachable: 'Gravatar can’t be reached right now', no_google_photo: 'Sign in with Google once to use your Google photo', invalid: 'Unknown photo source' }[out.error];
+      return bad(ctx, out.error === 'gravatar_unreachable' ? 503 : 400, out.error === 'gravatar_unreachable' ? 'PROVIDER_UNAVAILABLE' : 'INVALID_INPUT', msg, { avatar: out.error });
+    }
+    ctx.body = appUser(out.user);
   },
 
   async updateMe(ctx) {

@@ -1,7 +1,7 @@
 'use strict';
 
 const holidays = require('./seed/holidays.json');
-const { configureBuiltInProviders, registerAppleProvider } = require('./auth/social-providers');
+const { configureBuiltInProviders, registerAppleProvider, registerGooglePhoto } = require('./auth/social-providers');
 const { fulfillOrder } = require('./services/billing');
 const { invalidate } = require('./services/entitlements');
 const createPayments = require('./services/payments');
@@ -34,7 +34,7 @@ const AUTHENTICATED_ACTIONS = {
   'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip', 'createHandoff'],
   'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
   'api::subscription.subscription': ['me'],
-  'api::account.account': ['dashboard', 'verify', 'updateMe', 'exportCsv'],
+  'api::account.account': ['dashboard', 'verify', 'me', 'updateMe', 'avatarUpload', 'avatarSet', 'exportCsv'],
   'api::task.task': ['forContent', 'create', 'mine', 'forBrand', 'updateAssignment', 'transition'],
 };
 
@@ -89,6 +89,7 @@ async function backfillOwnerMemberships(strapi) {
 module.exports = {
   register({ strapi }) {
     registerAppleProvider(strapi);
+    registerGooglePhoto(strapi);
   },
 
   async bootstrap({ strapi }) {

@@ -22,6 +22,12 @@ export interface DataSource {
     logout(): Promise<void>
     me(): Promise<User>
     updateProfile(input: Partial<Pick<User, 'name' | 'locale'>>): Promise<User>
+    /** Uploads a profile photo (JPG/PNG/WEBP/GIF, up to 5 MB; cropped square on the server). */
+    uploadAvatar(file: File): Promise<User>
+    /** Uses the email's Gravatar, the Google account photo, or initials ('none'). */
+    setAvatar(source: 'gravatar' | 'google' | 'none'): Promise<User>
+    /** Changes the password (email accounts); other sessions are signed out. */
+    changePassword(currentPassword: string, password: string): Promise<void>
   }
 
   dashboard(brandId: string | null): Promise<DashboardSummary>

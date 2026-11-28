@@ -85,6 +85,9 @@ export function toAppUser(u: Record<string, unknown>) {
     locale: (u.locale === 'en' ? 'en' : 'th') as 'th' | 'en',
     timezone: 'Asia/Bangkok' as const,
     createdAt: String(u.createdAt ?? ''),
+    avatarUrl: typeof u.avatarUrl === 'string' && u.avatarUrl ? u.avatarUrl : null,
+    avatarSource: (['upload', 'gravatar', 'google'].includes(String(u.avatarSource)) ? u.avatarSource : null) as 'upload' | 'gravatar' | 'google' | null,
+    signInMethod: String(u.provider ?? 'local'),
   }
 }
 

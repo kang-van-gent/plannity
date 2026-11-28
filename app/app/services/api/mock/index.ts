@@ -361,6 +361,31 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     if (changed) persist()
   }
 
+  // ---- profile photo helpers (demo only) ----
+  async function sha256Hex(s: string): Promise<string> {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+  function imageLoads(url: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const img = new Image()
+      const done = (ok: boolean) => { clearTimeout(timer); resolve(ok) }
+      const timer = setTimeout(() => done(false), 6000)
+      img.onload = () => done(true)
+      img.onerror = () => done(false)
+      img.src = url
+    })
+  }
+  async function squareDataUrl(file: File, size: number): Promise<string> {
+    const bmp = await createImageBitmap(file)
+    const side = Math.min(bmp.width, bmp.height)
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    canvas.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size)
+    return canvas.toDataURL('image/jpeg', 0.85)
+  }
+
   function wallet(userId: string) {
     const d = load()
     return (d.wallets[userId] ??= { available: 0, reserved: 0 })
@@ -604,7 +629,42 @@ export function createMockSource(getToken: () => string | null | undefined, limi
       async me() {
         await net({ canFail: false, latency: 60 })
         const { password: _p, ...user } = clone(currentUser())
-        return user
+        return { ...user, signInMethod: 'local', hasGooglePhoto: false }
+      },
+      async uploadAvatar(file) {
+        await net({ canFail: false, latency: 500 })
+        const type = await sniffFile(file)
+        if (!type) fieldError({ file: 'file_type' })
+        if (file.size > 5 * 1024 * 1024) fieldError({ file: 'too_large' })
+        const u = currentUser()
+        // Demo: cropped square and shrunk in the browser, kept as a small data URL.
+        Object.assign(u, { avatarUrl: await squareDataUrl(file, 256), avatarSource: 'upload' })
+        persist()
+        const { password: _p, ...user } = clone(u)
+        return { ...user, signInMethod: 'local', hasGooglePhoto: false }
+      },
+      async setAvatar(source) {
+        await net({ canFail: false })
+        const u = currentUser()
+        if (source === 'google') fieldError({ avatar: 'no_google_photo' })
+        if (source === 'gravatar') {
+          const hash = await sha256Hex(u.email.trim().toLowerCase())
+          const url = `https://gravatar.com/avatar/${hash}?s=400&d=404`
+          if (!(await imageLoads(url))) fieldError({ avatar: 'no_gravatar' })
+          Object.assign(u, { avatarUrl: url, avatarSource: 'gravatar' })
+        } else Object.assign(u, { avatarUrl: null, avatarSource: null })
+        persist()
+        const { password: _p, ...user } = clone(u)
+        return { ...user, signInMethod: 'local', hasGooglePhoto: false }
+      },
+      async changePassword(currentPassword, password) {
+        await net({ canFail: false })
+        const u = currentUser()
+        if (u.password !== currentPassword) fieldError({ currentPassword: 'wrong_password' })
+        if (password.length < 8) fieldError({ password: 'password_short' })
+        if (password === currentPassword) fieldError({ password: 'same_password' })
+        u.password = password
+        persist()
       },
       async updateProfile(input) {
         await net()
@@ -855,7 +915,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const members: BrandMember[] = d.memberships.filter((m) => m.brandId === b.id && m.status === 'active')
           .map((m) => {
             const u = d.users.find((x) => x.id === m.userId)
-            return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, positionKeys: [...m.positionKeys], joinedAt: m.joinedAt, isYou: m.userId === me }
+            return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', avatarUrl: u?.avatarUrl ?? null, role: m.role, positionKeys: [...m.positionKeys], joinedAt: m.joinedAt, isYou: m.userId === me }
           })
           .sort((x, y) => ROLE_ORDER[x.role] - ROLE_ORDER[y.role] || x.joinedAt.localeCompare(y.joinedAt))
         const invitations = d.invitations.filter((i) => i.brandId === b.id && i.status === 'pending').map(inviteView)
@@ -1774,7 +1834,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
   }
   function memberView(m: MockDB['memberships'][number]): BrandMember {
     const u = load().users.find((x) => x.id === m.userId)
-    return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', role: m.role, positionKeys: [...m.positionKeys], joinedAt: m.joinedAt, isYou: m.userId === uidOf() }
+    return { id: m.id, userId: m.userId, name: u?.name ?? '—', email: u?.email ?? '', avatarUrl: u?.avatarUrl ?? null, role: m.role, positionKeys: [...m.positionKeys], joinedAt: m.joinedAt, isYou: m.userId === uidOf() }
   }
   function inviteView(i: MockInvitation): BrandInvitation {
     const by = load().users.find((u) => u.id === i.invitedByUserId)

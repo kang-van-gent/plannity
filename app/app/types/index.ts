@@ -28,7 +28,16 @@ export interface User {
   locale: 'th' | 'en'
   timezone: 'Asia/Bangkok'
   createdAt: ISODateTime
+  /** Profile photo to show (absolute URL); null/absent = initials. */
+  avatarUrl?: string | null
+  avatarSource?: AvatarSource | null
+  /** A Google account photo was captured at a Google sign-in and can be used. */
+  hasGooglePhoto?: boolean
+  /** 'local' = email + password; otherwise the provider they sign in with (google, apple…). */
+  signInMethod?: string
 }
+
+export type AvatarSource = 'upload' | 'gravatar' | 'google'
 
 export interface BrandProfile {
   industry: string
@@ -196,6 +205,7 @@ export interface BrandMember {
   userId: string
   name: string
   email: string
+  avatarUrl?: string | null
   role: BrandRole
   positionKeys: PositionKey[]
   joinedAt: ISODateTime
