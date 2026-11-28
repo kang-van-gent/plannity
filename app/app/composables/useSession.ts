@@ -36,6 +36,14 @@ export function useSession() {
     return s.user
   }
 
+  /** New password from the reset email's code; signs in on success. */
+  async function resetPassword(code: string, password: string) {
+    const s = await api.auth.resetPassword(code, password)
+    set(s.token || '1')
+    user.value = s.user
+    return s.user
+  }
+
   async function register(input: RegisterInput) {
     const s = await api.auth.register(input)
     if (s.token) set(s.token)
@@ -69,5 +77,5 @@ export function useSession() {
     useState('wallet').value = null
   }
 
-  return { user, token, isLoggedIn: computed(() => !!token.value), ensure, login, register, socialLogin, verifyEmail, logout }
+  return { user, token, isLoggedIn: computed(() => !!token.value), ensure, login, resetPassword, register, socialLogin, verifyEmail, logout }
 }

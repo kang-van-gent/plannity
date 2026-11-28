@@ -133,6 +133,7 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       social: async (provider, next) => ({ redirect: `/auth/connect/${provider}${qs({ next })}` }),
       verifyEmail: () => call<{ granted: number; user: User }>(`${BFF}/auth/verify`, { method: 'POST' }),
       forgot: (email) => call<void>(`${BFF}/auth/forgot-password`, { method: 'POST', body: { email } }),
+      resetPassword: (code, password) => call<Session>('/api/auth/reset', { method: 'POST', body: { code, password } }),
       logout: () => call<void>('/api/auth/logout', { method: 'POST' }),
       me: () => call<User>(`${BFF}/users/me`),
       updateProfile: (input) => call<User>(`${BFF}/me`, { method: 'PUT', body: input }),

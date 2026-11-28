@@ -25,6 +25,8 @@ export interface DataSource {
     /** Verifies email and grants trial credits exactly once (idempotent). */
     verifyEmail(): Promise<{ granted: number; user: User }>
     forgot(email: string): Promise<void>
+    /** Sets a new password with the code from the reset email, and signs in. */
+    resetPassword(code: string, password: string): Promise<Session>
     logout(): Promise<void>
     me(): Promise<User>
     updateProfile(input: Partial<Pick<User, 'name' | 'locale'>>): Promise<User>
