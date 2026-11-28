@@ -244,7 +244,7 @@ const initials = (s: string) => s.split(/[\s@._()\[\]-]+/).filter(Boolean).slice
         <p v-if="!shownMembers.length" class="px-5 py-6 text-center text-sm text-muted">{{ t('team.noMatch') }}</p>
         <ul class="divide-y divide-line">
           <li v-for="m in shownMembers" :key="m.id" class="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:flex-nowrap sm:px-5">
-            <span class="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-pink font-display text-sm font-bold text-white">{{ initials(m.name || m.email) }}</span>
+            <UiAvatar :name="m.name || m.email" :url="m.avatarUrl" :size="40" />
             <div class="min-w-0 flex-1">
               <p class="flex items-center gap-2 truncate font-semibold">
                 {{ m.name }}

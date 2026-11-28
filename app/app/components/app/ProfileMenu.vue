@@ -30,14 +30,17 @@ async function signOut() {
 
 <template>
   <div ref="root" class="relative" @keydown.esc="open = false">
-    <button type="button" class="grid size-9 place-items-center rounded-full bg-gradient-to-br transition active:scale-95 sm:size-10 sm:rounded-2xl from-brand-500 to-pink font-display text-sm font-bold text-white shadow-pop"
+    <button type="button" class="grid size-9 place-items-center overflow-hidden rounded-full shadow-pop transition active:scale-95 sm:size-10 sm:rounded-2xl"
       :aria-label="t('nav.profile')" :aria-expanded="open" @click="open = !open">
-      {{ initials(user?.name ?? 'P').toUpperCase() }}
+      <UiAvatar :name="user?.name ?? 'P'" :url="user?.avatarUrl" :size="40" shape="square" class="!size-full" />
     </button>
     <div v-if="open" ref="menu" class="absolute right-0 top-full z-50 mt-2 w-64 rounded-3xl border border-line bg-surface p-2 shadow-panel">
-      <div class="px-3 py-2">
-        <p class="truncate font-semibold">{{ user?.name }}</p>
-        <p class="truncate text-xs text-muted">{{ user?.email }}</p>
+      <div class="flex items-center gap-3 px-3 py-2">
+        <UiAvatar :name="user?.name ?? 'P'" :url="user?.avatarUrl" :size="36" />
+        <div class="min-w-0">
+          <p class="truncate font-semibold">{{ user?.name }}</p>
+          <p class="truncate text-xs text-muted">{{ user?.email }}</p>
+        </div>
       </div>
       <div class="my-1 border-t border-line" />
       <NuxtLink to="/app/settings" class="flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-semibold hover:bg-surface-2" @click="open = false"><Settings class="size-4" />{{ t('nav.settings') }}</NuxtLink>

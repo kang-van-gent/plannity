@@ -88,7 +88,7 @@ module.exports = ({ strapi }) => {
   async function activeMembers(brandDocumentId) {
     return docs(MEMBERSHIP).findMany({
       filters: { brand: { documentId: brandDocumentId }, status: 'active' },
-      populate: { user: { fields: ['id', 'email', 'username', 'name'] } },
+      populate: { user: { fields: ['id', 'email', 'username', 'name', 'avatarUrl'] } },
       limit: 1000,
     });
   }
@@ -104,7 +104,7 @@ module.exports = ({ strapi }) => {
   const displayName = (u) => (u ? u.name || u.username || u.email : '—');
 
   function memberView(m, userId) {
-    return { id: m.documentId, userId: String(m.user?.id ?? ''), name: displayName(m.user), email: m.user?.email ?? '', role: m.role, positionKeys: Array.isArray(m.positionKeys) ? m.positionKeys : [], joinedAt: m.joinedAt ?? m.createdAt, isYou: m.user?.id === userId };
+    return { id: m.documentId, userId: String(m.user?.id ?? ''), name: displayName(m.user), email: m.user?.email ?? '', avatarUrl: m.user?.avatarUrl ?? null, role: m.role, positionKeys: Array.isArray(m.positionKeys) ? m.positionKeys : [], joinedAt: m.joinedAt ?? m.createdAt, isYou: m.user?.id === userId };
   }
   function inviteView(i) {
     return { id: i.documentId, email: i.email, role: i.role, positionKeys: Array.isArray(i.positionKeys) ? i.positionKeys : [], status: i.status, invitedByName: displayName(i.invitedBy), createdAt: i.createdAt, expiresAt: i.expiresAt };
@@ -192,7 +192,7 @@ module.exports = ({ strapi }) => {
   async function memberIn(brand, memberId) {
     const m = await docs(MEMBERSHIP).findFirst({
       filters: { documentId: memberId, brand: { documentId: brand.documentId }, status: 'active' },
-      populate: { user: { fields: ['id', 'email', 'username', 'name'] } },
+      populate: { user: { fields: ['id', 'email', 'username', 'name', 'avatarUrl'] } },
     });
     if (!m) throw new TeamError(404, 'NOT_FOUND', 'Member not found');
     return m;
@@ -220,7 +220,7 @@ module.exports = ({ strapi }) => {
         fail(roleChangeError(actorRole, m.role, m.role, owners));
         data.positionKeys = positionKeys;
       }
-      const updated = await docs(MEMBERSHIP).update({ documentId: m.documentId, data, populate: { user: { fields: ['id', 'email', 'username', 'name'] } } });
+      const updated = await docs(MEMBERSHIP).update({ documentId: m.documentId, data, populate: { user: { fields: ['id', 'email', 'username', 'name', 'avatarUrl'] } } });
       if (wantsRole && input.role !== m.role) await log(brand.documentId, actor, 'member.role_changed', m.documentId, displayName(m.user), [{ field: 'role', from: m.role, to: input.role }]);
       const before = Array.isArray(m.positionKeys) ? m.positionKeys : [];
       if (wantsPositions && before.join() !== positionKeys.join()) await log(brand.documentId, actor, 'member.positions_changed', m.documentId, displayName(m.user), [{ field: 'positions', from: before, to: positionKeys }]);

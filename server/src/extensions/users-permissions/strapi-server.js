@@ -18,6 +18,12 @@ module.exports = (plugin) => {
   const attrs = plugin.contentTypes.user.schema.attributes;
   attrs.name = { type: 'string', maxLength: 80 };
   attrs.locale = { type: 'enumeration', enum: ['th', 'en'], default: 'th' };
+  // Profile photo (Settings → Profile): an uploaded image, the email's Gravatar, or the Google account photo.
+  // avatarUrl is the resolved, absolute URL the app shows; null = initials.
+  attrs.avatar = { type: 'media', multiple: false, allowedTypes: ['images'] };
+  attrs.avatarUrl = { type: 'string', maxLength: 500 };
+  attrs.avatarSource = { type: 'enumeration', enum: ['upload', 'gravatar', 'google'] };
+  attrs.googleAvatarUrl = { type: 'string', maxLength: 500, private: true };
 
   const api = plugin.routes['content-api'];
   if (typeof api === 'function') {

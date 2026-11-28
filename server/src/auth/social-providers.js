@@ -115,6 +115,36 @@ function appleEnabled() {
   return Boolean(e.APPLE_SERVICE_ID && e.APPLE_TEAM_ID && e.APPLE_KEY_ID && e.APPLE_PRIVATE_KEY);
 }
 
+/**
+ * Google sign-in also remembers the Google account photo (offered in Settings →
+ * Profile; used automatically while the person has no photo). Strapi's own Google
+ * step only checks the email, so it is wrapped — its checks still run first.
+ * Must run in register().
+ */
+function registerGooglePhoto(strapi) {
+  const registry = strapi.plugin('users-permissions').service('providers-registry');
+  const google = registry.get('google');
+  if (!google || google.__plannityPhoto) return;
+  const { rememberGooglePhoto } = require('../services/avatar');
+  registry.add('google', {
+    ...google,
+    __plannityPhoto: true,
+    async authCallback(args) {
+      const out = await google.authCallback(args);
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { authorization: `Bearer ${args.accessToken}` }, signal: AbortSignal.timeout(5000) });
+        if (res.ok) {
+          const info = await res.json();
+          if (info?.picture && String(info.email || '').toLowerCase() === String(out.email || '').toLowerCase()) rememberGooglePhoto(strapi, out.email, info.picture);
+        }
+      } catch (e) {
+        strapi.log.warn(`[auth] Google photo not fetched: ${e.message}`);
+      }
+      return out;
+    },
+  });
+}
+
 /** Must run in register(): the providers registry is read when grant is set up. */
 function registerAppleProvider(strapi) {
   const enabled = appleEnabled();
@@ -146,4 +176,4 @@ function registerAppleProvider(strapi) {
   });
 }
 
-module.exports = { configureBuiltInProviders, registerAppleProvider };
+module.exports = { configureBuiltInProviders, registerAppleProvider, registerGooglePhoto };

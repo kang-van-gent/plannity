@@ -23,9 +23,13 @@ interface StrapiErrorBody {
 }
 
 function toApiError(e: unknown): ApiError {
-  const err = e as { status?: number; statusCode?: number; data?: StrapiErrorBody; message?: string }
+  const err = e as { status?: number; statusCode?: number; data?: StrapiErrorBody & { data?: StrapiErrorBody }; message?: string }
   const status = err.status ?? err.statusCode ?? 0
-  const body = err.data?.error
+  // Strapi errors (through the BFF proxy) arrive as { error: {...} }; errors thrown by
+  // the app's own server routes (login, register, password…) are wrapped by h3 as
+  // { error: true, data: { error: {...} } }.
+  const top = err.data?.error
+  const body = top && typeof top === 'object' ? top : (typeof err.data?.data?.error === 'object' ? err.data.data.error : undefined)
   if (!status) return new ApiError(0, 'NETWORK', 'Network error — check your connection')
   const fieldErrors: Record<string, string> = { ...(body?.fieldErrors ?? {}) }
   for (const fe of body?.details?.errors ?? []) if (fe.path?.length) fieldErrors[fe.path.join('.')] = fe.message ?? 'invalid'
@@ -131,7 +135,17 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       forgot: (email) => call<void>(`${BFF}/auth/forgot-password`, { method: 'POST', body: { email } }),
       resetPassword: (code, password) => call<Session>('/api/auth/reset', { method: 'POST', body: { code, password } }),
       logout: () => call<void>('/api/auth/logout', { method: 'POST' }),
-      me: () => call<User>(`${BFF}/users/me`),
+      me: () => call<User>(`${BFF}/me`),
+      async uploadAvatar(file) {
+        const form = new FormData()
+        form.append('file', file, file.name)
+        const res = await fetch(`${BFF}/me/avatar`, { method: 'POST', body: form, headers: { 'X-Requested-With': 'plannity' }, credentials: 'same-origin' })
+        const body = await res.json().catch(() => ({})) as User & StrapiErrorBody
+        if (!res.ok) throw toApiError({ status: res.status, data: body })
+        return body
+      },
+      setAvatar: (source) => call<User>(`${BFF}/me/avatar`, { method: 'PUT', body: { source } }),
+      changePassword: async (currentPassword, password) => { await call<unknown>('/api/auth/password', { method: 'POST', body: { currentPassword, password } }) },
       updateProfile: (input) => call<User>(`${BFF}/me`, { method: 'PUT', body: input }),
     },
 

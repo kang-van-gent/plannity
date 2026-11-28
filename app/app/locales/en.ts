@@ -708,6 +708,24 @@ const en: Messages = {
   },
 
   settings: {
+    photo: {
+      title: 'Profile photo', hint: 'Shown to your team', upload: 'Upload photo', useEmail: 'Use email photo', useGoogle: 'Use Google photo', remove: 'Remove',
+      saved: 'Profile photo updated', removed: 'Profile photo removed',
+      source: { none: 'Showing your initials', upload: 'Your uploaded photo', gravatar: 'Photo from your email (Gravatar)', google: 'Photo from your Google account' },
+      errors: {
+        file_type: 'Use a JPG, PNG, WEBP or GIF image', too_large: 'The photo must be 5 MB or smaller', unreadable: 'This image couldn’t be read — try another one',
+        no_gravatar: 'There’s no photo for your email yet — add one at gravatar.com', gravatar_unreachable: 'Gravatar can’t be reached right now — try again later',
+        no_google_photo: 'Sign in with Google once to use your Google photo', invalid: 'That photo option isn’t available',
+      },
+    },
+    password: {
+      title: 'Password', subtitle: 'Change the password you sign in with. Other devices are signed out.',
+      provider: 'You sign in with {provider}, so there’s no Plannity password to change.',
+      current: 'Current password', new: 'New password', save: 'Change password', forgot: 'Forgot it? Email me a reset link',
+      changed: 'Password changed', changedBody: 'Use the new password next time you sign in.',
+      wrong: 'That isn’t your current password', same: 'Choose a password different from the current one',
+      linkSent: 'Reset link sent', linkSentBody: 'Check {email} for a link to set a new password.',
+    },
     subtitle: 'Manage your profile, appearance and data', profile: 'Profile', timezone: 'Time zone', emailStatus: 'Email status',
     verified: 'Verified', unverified: 'Not verified', profileSaved: 'Profile saved', appearance: 'Appearance & language', theme: 'Theme',
     fontSize: 'Text size', fontSizes: { sm: 'Small', md: 'Default', lg: 'Large', xl: 'Extra large' }, fontSizeHint: 'Changes text size across the app on this device.', themes: { light: 'Light', dark: 'Dark', system: 'System' }, languageHint: 'Applies to menus and system text. Generated content follows each brand’s language setting.',
