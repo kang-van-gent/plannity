@@ -2,11 +2,7 @@
 // brand/content only in development). Dates are relative to "today" in
 // Asia/Bangkok so the calendar always looks alive.
 
-import type {
-  ActivityEntry, Brand, BrandRole, Content, ContentFormat, GenerationItem, GenerationJob, Holiday, InvitationStatus, LedgerEntry, LedgerType,
-  PaymentOrder, PlanKey, Platform, PositionKey, PromotionInquiry, Task, TaskEvent, User,
-  PublishDestination,
-} from '~/types'
+import type { ActivityEntry, Brand, BrandRole, Content, ContentFormat, GenerationItem, GenerationJob, Holiday, InvitationStatus, LedgerEntry, LedgerType, PaymentOrder, PlanKey, Platform, PositionKey, PromotionInquiry, Task, TaskEvent, User, PublishDestination, SocialConnection } from '~/types'
 import { addDays, todayISO } from '~/utils/date'
 import { mockGenerate, rng } from './llm'
 
@@ -62,6 +58,8 @@ export interface MockDB {
   contentImages: MockContentImage[]
   /** Multi-platform content: one row per post and platform (added later — may be missing in saved demo data). */
   destinations: (PublishDestination & { brandId: string })[]
+  /** Demo social accounts (connected instantly, never contact a real platform). May be missing in saved demo data. */
+  socialConnections?: (SocialConnection & { brandId: string })[]
   activity: ActivityEntry[]
   subscriptions: MockSubscription[]
   addons: MockAddon[]

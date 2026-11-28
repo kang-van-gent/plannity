@@ -20,14 +20,16 @@ const PAGES = [
 ];
 const SCOPES = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish'];
 
-async function respond(url, { headers = {}, form, classify }) {
+const fakeId = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+async function respond(url, { method = 'GET', headers = {}, form, json, classify }) {
   const u = new URL(url);
   const q = Object.fromEntries(u.searchParams);
   const fail = (status, body) => { throw classify(status, body) || new SocialError('invalid', `http_${status}`, 'fake error'); };
 
   if (u.hostname === 'graph.facebook.com') {
     const path = u.pathname.replace(/^\/v[\d.]+/, '');
-    const token = q.access_token || '';
+    const token = q.access_token || form?.access_token || '';
     if (path === '/oauth/access_token') return { access_token: q.fb_exchange_token ? 'fake-long-user-token' : 'fake-user-token', token_type: 'bearer', expires_in: 5183944 };
     if (path === '/debug_token') {
       const valid = !String(q.input_token).includes('revoked');
@@ -36,6 +38,18 @@ async function respond(url, { headers = {}, form, classify }) {
     if (token.includes('revoked')) fail(400, { error: { message: 'Error validating access token: The user has not authorized application.', type: 'OAuthException', code: 190, error_subcode: 458 } });
     if (path === '/me/permissions') return { data: SCOPES.map((permission) => ({ permission, status: 'granted' })) };
     if (path === '/me/accounts') return { data: PAGES, paging: {} };
+    // Publishing (Facebook Page posts, Instagram containers). An image URL containing "fail" is refused.
+    if (method === 'POST') {
+      if (String(form?.url || form?.image_url || '').includes('fail')) fail(400, { error: { message: 'The image could not be downloaded', type: 'OAuthException', code: 324, error_subcode: 2069019 } });
+      const feed = /^\/(\d+)\/feed$/.exec(path);
+      if (feed) return { id: `${feed[1]}_${fakeId()}` };
+      const photos = /^\/(\d+)\/photos$/.exec(path);
+      if (photos) { const id = fakeId(); return form?.published === 'false' ? { id } : { id, post_id: `${photos[1]}_${id}` }; }
+      if (/^\/\d+\/media$/.test(path)) return { id: fakeId() };
+      if (/^\/\d+\/media_publish$/.test(path)) return { id: fakeId() };
+    }
+    if (String(q.fields || '').includes('status_code')) return { status_code: 'FINISHED', status: 'Finished' };
+    if (q.fields === 'permalink') return { permalink: `https://www.instagram.com/p/FAKE${String(path).slice(-6)}/` };
     const quota = /^\/(\d+)\/content_publishing_limit$/.exec(path);
     if (quota) return { data: [{ quota_usage: 3, config: { quota_total: 50, quota_duration: 86400 } }] };
     const node = /^\/(\d+)$/.exec(path);
@@ -57,11 +71,13 @@ async function respond(url, { headers = {}, form, classify }) {
     if (u.pathname === '/v2/oauth/revoke/') return {};
     if (!bearer.startsWith('fake-tt-access')) fail(401, { error: { code: 'access_token_invalid', message: 'The access token is invalid or not found in the request.' } });
     if (u.pathname === '/v2/user/info/') return { data: { user: { open_id: 'fake-open-id-777', display_name: 'Demo Creator', username: 'democreator', avatar_url: null } }, error: ok };
+    if (u.pathname === '/v2/post/publish/content/init/') return { data: { publish_id: `p_pub_fake_${fakeId()}` }, error: ok };
+    if (u.pathname === '/v2/post/publish/status/fetch/') return { data: { status: 'PUBLISH_COMPLETE', publicaly_available_post_id: [Number(fakeId())] }, error: ok };
     if (u.pathname === '/v2/post/publish/creator_info/query/') {
       return { data: { creator_nickname: 'Demo Creator', creator_username: 'democreator', creator_avatar_url: null, privacy_level_options: ['FOLLOWER_OF_CREATOR', 'MUTUAL_FOLLOW_FRIENDS', 'SELF_ONLY'], comment_disabled: false, duet_disabled: false, stitch_disabled: true, max_video_post_duration_sec: 600 }, error: ok };
     }
   }
-  void form;
+  void form; void json;
   throw new SocialError('invalid', 'fake_unknown_call', `The fake provider has no answer for ${u.hostname}${u.pathname}`);
 }
 

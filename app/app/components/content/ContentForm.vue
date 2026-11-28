@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Brand, ContentFormModel } from '~/types'
+import { Check } from '@lucide/vue'
+import type { Brand, ContentFormModel, Platform } from '~/types'
 import { FORMATS, OBJECTIVES, PLATFORMS } from '~/types'
 
 
@@ -11,6 +12,19 @@ const opt = useSelectOptions()
 const brand = computed(() => props.brands.find((b) => b.id === model.value.brandId))
 const pillars = computed(() => [...new Set(brand.value?.profile.pillars ?? [])]) // the brand's pillars; anything else can still be typed
 const uid = useId()
+
+// Creating a post: it can go to several platforms at once (the first picked is its main platform).
+if (!Array.isArray(model.value.platforms) || !model.value.platforms.length) model.value.platforms = [model.value.platform]
+function togglePlatform(p: Platform) {
+  const list = model.value.platforms
+  if (list.includes(p)) {
+    if (list.length === 1) return
+    model.value.platforms = list.filter((x) => x !== p)
+  } else {
+    model.value.platforms = [...list, p]
+  }
+  model.value.platform = model.value.platforms[0]!
+}
 </script>
 
 <template>
@@ -26,15 +40,26 @@ const uid = useId()
         <p v-if="errors?.title" class="field-error">{{ errors.title }}</p>
       </div>
     </div>
-    <div class="grid gap-4 sm:grid-cols-2" :class="hidePlatform ? 'lg:grid-cols-3' : 'lg:grid-cols-4'">
-      <div v-if="!hidePlatform"><label class="label" :for="`${uid}-platform`">{{ t('content.fields.platform') }}</label><UiSelect :id="`${uid}-platform`" v-model="model.platform" :options="opt.platforms.value" /></div>
+    <div v-if="!hidePlatform">
+      <span :id="`${uid}-platforms`" class="label">{{ t('content.fields.platforms') }}</span>
+      <div class="flex flex-wrap gap-2" role="group" :aria-labelledby="`${uid}-platforms`">
+        <button v-for="p in PLATFORMS" :key="p" type="button"
+          class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition active:scale-95"
+          :class="model.platforms.includes(p) ? 'border-brand-400 bg-brand-500/10 text-fg' : 'border-line text-muted hover:bg-surface-2'"
+          :aria-pressed="model.platforms.includes(p)" @click="togglePlatform(p)">
+          <UiPlatformBadge :platform="p" size="xs" />{{ PLATFORM_META[p].label }}<Check v-if="model.platforms.includes(p)" class="size-3.5 text-brand-500" />
+        </button>
+      </div>
+      <p class="hint">{{ model.platforms.length > 1 ? t('content.platformsHintMany', { n: model.platforms.length }) : t('content.platformsHint') }}</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-3">
       <div><label class="label" :for="`${uid}-format`">{{ t('content.fields.format') }}</label><UiSelect :id="`${uid}-format`" v-model="model.format" :options="opt.formats.value" /></div>
       <div><label class="label" :for="`${uid}-pillar`">{{ t('content.fields.pillar') }}</label><UiCombobox :id="`${uid}-pillar`" v-model="model.pillar" :suggestions="pillars" /></div>
       <div><label class="label" :for="`${uid}-obj`">{{ t('content.fields.objective') }}</label><UiSelect :id="`${uid}-obj`" v-model="model.objective" :options="opt.objectives.value" /></div>
     </div>
     <div class="grid gap-4 sm:grid-cols-2">
-      <div><label class="label" :for="`${uid}-date`">{{ t('content.fields.scheduledDate') }}</label><input :id="`${uid}-date`" v-model="model.scheduledDate" type="date" class="input" :class="errors?.scheduledDate && 'input-error'"><p v-if="errors?.scheduledDate" class="field-error">{{ errors.scheduledDate }}</p></div>
-      <div><label class="label" :for="`${uid}-time`">{{ t('content.fields.scheduledTime') }}</label><input :id="`${uid}-time`" v-model="model.scheduledTime" type="time" class="input"><p class="hint">{{ t('content.tzHint') }}</p></div>
+      <div><label class="label" :for="`${uid}-date`">{{ t('content.fields.scheduledDate') }}</label><UiDatePicker :id="`${uid}-date`" v-model="model.scheduledDate" :invalid="!!errors?.scheduledDate" /><p v-if="errors?.scheduledDate" class="field-error">{{ errors.scheduledDate }}</p></div>
+      <div><label class="label" :for="`${uid}-time`">{{ t('content.fields.scheduledTime') }}</label><UiTimePicker :id="`${uid}-time`" v-model="model.scheduledTime" /><p class="hint">{{ t('content.tzHint') }}</p></div>
     </div>
     <div><label class="label" :for="`${uid}-hook`">Hook</label><input :id="`${uid}-hook`" v-model="model.hook" class="input" maxlength="300"></div>
     <div v-if="!compact"><label class="label" :for="`${uid}-concept`">{{ t('content.fields.concept') }}</label><textarea :id="`${uid}-concept`" v-model="model.concept" class="input" rows="2" /></div>

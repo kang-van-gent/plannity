@@ -170,8 +170,8 @@ async function submit() {
                 <button type="button" class="chip-toggle" @click="setRange('nextMonth')">{{ t('generate.ranges.nextMonth') }}</button>
               </div>
               <div class="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
-                <div><label class="label" for="g-from">{{ t('generate.from') }}</label><input id="g-from" v-model="form.dateFrom" type="date" class="input" :class="errors.dateFrom && 'input-error'"><p v-if="errors.dateFrom" class="field-error">{{ errors.dateFrom }}</p></div>
-                <div><label class="label" for="g-to">{{ t('generate.to') }}</label><input id="g-to" v-model="form.dateTo" type="date" class="input" :min="form.dateFrom" :class="errors.dateTo && 'input-error'"><p v-if="errors.dateTo" class="field-error">{{ errors.dateTo }}</p></div>
+                <div><label class="label" for="g-from">{{ t('generate.from') }}</label><UiDatePicker id="g-from" v-model="form.dateFrom" :clearable="false" :invalid="!!errors.dateFrom" /><p v-if="errors.dateFrom" class="field-error">{{ errors.dateFrom }}</p></div>
+                <div><label class="label" for="g-to">{{ t('generate.to') }}</label><UiDatePicker id="g-to" v-model="form.dateTo" :clearable="false" :min="form.dateFrom" :invalid="!!errors.dateTo" /><p v-if="errors.dateTo" class="field-error">{{ errors.dateTo }}</p></div>
               </div>
               <p class="hint">{{ t('generate.tzHint') }}</p>
             </section>

@@ -102,7 +102,7 @@ async function setStatus(s: ContentStatus) {
   if (statusBlocker({ scheduledDate: form.value.scheduledDate || null }, s) === 'needs_date') {
     errors.value = { scheduledDate: t('validation.needs_date') }
     notify.warning(t('content.needDateTitle'), t('content.needDateBody'))
-    document.querySelector<HTMLInputElement>('input[type="date"]')?.focus()
+    document.querySelector<HTMLButtonElement>('[data-date-picker]')?.focus()
     return
   }
   if (s === 'published') {
@@ -239,7 +239,7 @@ onBeforeRouteLeave(async () => {
       </div>
 
       <BrandLockBanner :brand="brand" />
-      <p v-if="!canEdit && !brand?.locked" class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('content.viewOnly') }}</p>
+      <p v-if="!canEdit && !brand?.locked" v-anim class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('content.viewOnly') }}</p>
 
       <!-- Ready to post: caption + image(s) → copy, download, publish manually -->
       <section v-if="readyToPost" v-anim class="mb-5 flex flex-wrap items-center gap-3 rounded-[1.5rem] bg-gradient-to-r from-success/15 to-sky/15 p-4">
@@ -325,8 +325,8 @@ onBeforeRouteLeave(async () => {
 
       <SidePanel :open="publishOpen" size="sm" :title="t('content.markPublished')" :subtitle="t('content.markPublishedHint')" @close="publishOpen = false">
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="label" for="pub-date">{{ t('content.publishedDate') }}</label><input id="pub-date" v-model="publishForm.date" type="date" class="input"></div>
-          <div><label class="label" for="pub-time">{{ t('content.fields.scheduledTime') }}</label><input id="pub-time" v-model="publishForm.time" type="time" class="input"></div>
+          <div><label class="label" for="pub-date">{{ t('content.publishedDate') }}</label><UiDatePicker id="pub-date" v-model="publishForm.date" /></div>
+          <div><label class="label" for="pub-time">{{ t('content.fields.scheduledTime') }}</label><UiTimePicker id="pub-time" v-model="publishForm.time" /></div>
         </div>
         <div><label class="label" for="pub-url">{{ t('content.postUrl') }} <span class="font-normal text-muted">({{ t('common.optional') }})</span></label><input id="pub-url" v-model.trim="publishForm.url" type="url" class="input" placeholder="https://"></div>
         <p class="rounded-2xl bg-surface-2 p-3 text-sm text-muted">{{ t('content.noAutoPost') }}</p>

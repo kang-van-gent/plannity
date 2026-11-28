@@ -143,7 +143,7 @@ function keepDrafts() {
         </div>
       </section>
 
-      <h2 class="mb-3 mt-6 font-display text-xl font-bold sm:mt-8">{{ t('jobs.items') }}</h2>
+      <h2 v-anim class="mb-3 mt-6 font-display text-xl font-bold sm:mt-8">{{ t('jobs.items') }}</h2>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <template v-for="it in job.items" :key="`${it.id}-${it.status}`">
           <NuxtLink v-if="it.status === 'succeeded' && it.contentId && contents[it.contentId]" v-anim="{ from: 'pop', scroll: false }" :to="`/app/content/${it.contentId}`" class="card pressable group p-4 hover:-translate-y-0.5 hover:shadow-pop">
@@ -157,11 +157,11 @@ function keepDrafts() {
             <p class="mt-2 text-xs text-muted">{{ t(`jobs.errors.${it.errorCode}`) }} · {{ t('jobs.attempts', { n: it.attempts }) }}</p>
             <p class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-success"><Undo2 class="size-3.5" />{{ t('jobs.creditReleased') }}</p>
           </div>
-          <div v-else-if="it.status === 'cancelled'" class="card p-4 opacity-60">
+          <div v-else-if="it.status === 'cancelled'" v-anim="{ from: 'pop', scroll: false }" class="card p-4 opacity-60">
             <p class="flex items-center gap-2 text-sm font-semibold text-muted"><Ban class="size-4" />#{{ it.ordinal + 1 }} {{ t('jobs.status.cancelled') }}</p>
             <p class="mt-2 flex items-center gap-1.5 text-xs font-semibold text-success"><Undo2 class="size-3.5" />{{ t('jobs.creditReleased') }}</p>
           </div>
-          <div v-else class="card relative overflow-hidden p-4">
+          <div v-else v-anim="{ from: 'pop', scroll: false }" class="card relative overflow-hidden p-4">
             <div class="flex items-center gap-2 text-xs font-bold text-muted">#{{ it.ordinal + 1 }}
               <span v-if="it.status === 'running'" class="ml-auto flex items-center gap-1 text-brand-500"><LoaderCircle class="size-3.5 animate-spin" />{{ t('jobs.writing') }}</span>
               <span v-else class="ml-auto">{{ t('jobs.queued') }}</span>
@@ -186,7 +186,7 @@ function keepDrafts() {
             <UiPlatformBadge :platform="c.platform" />
             <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ c.title }}</span>
             <span v-if="c.scheduledDate" class="chip bg-success/10 text-success">{{ t('jobs.onCalendar') }}</span>
-            <input v-model="dates[c.id]" type="date" class="input py-1.5 max-sm:ml-7 max-sm:w-[calc(100%-1.75rem)] sm:w-40" :disabled="!selected[c.id]" :aria-label="t('content.fields.scheduledDate')">
+            <UiDatePicker v-model="dates[c.id]" size="sm" class="max-sm:ml-7 max-sm:w-[calc(100%-1.75rem)] sm:w-44" :disabled="!selected[c.id]" :aria-label="t('content.fields.scheduledDate')" />
           </li>
         </ul>
         <div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">

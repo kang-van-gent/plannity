@@ -63,14 +63,14 @@ async function userInfo(accessToken) {
   return { openId: u.open_id, displayName: u.display_name ?? null, username: null, avatarUrl: u.avatar_url ?? null };
 }
 
-const creatorInfo = async (accessToken) => (await request(`${API}/v2/post/publish/creator_info/query/`, { method: 'POST', json: {}, headers: { authorization: `Bearer ${accessToken}` }, classify }))?.data || {};
+const creatorInfoRaw = async (accessToken) => (await request(`${API}/v2/post/publish/creator_info/query/`, { method: 'POST', json: {}, headers: { authorization: `Bearer ${accessToken}` }, classify }))?.data || {};
 
 /** Code → tokens + the account they belong to. */
 async function exchange({ code, redirectUri }) {
   const t = tokens(await tokenCall({ code, grant_type: 'authorization_code', redirect_uri: redirectUri }));
   const user = await userInfo(t.accessToken);
   // Best effort: the @username comes from creator_info (video.publish), not user.info.basic.
-  try { user.username = (await creatorInfo(t.accessToken)).creator_username ?? null; } catch { /* shown after "Test connection" */ }
+  try { user.username = (await creatorInfoRaw(t.accessToken)).creator_username ?? null; } catch { /* shown after "Test connection" */ }
   return { ...t, user: { ...user, openId: user.openId || t.openId } };
 }
 
@@ -81,7 +81,7 @@ async function test(conn, accessToken) {
   const checks = [{ key: 'token', ok: true }];
   const missing = NEEDED.filter((s) => !(conn.scopes || []).includes(s));
   checks.push({ key: 'permissions', ok: !missing.length, missing });
-  const d = await creatorInfo(accessToken);
+  const d = await creatorInfoRaw(accessToken);
   checks.push({ key: 'account', ok: true, name: d.creator_username ? `@${d.creator_username}` : d.creator_nickname });
   const options = Array.isArray(d.privacy_level_options) ? d.privacy_level_options : [];
   checks.push({ key: 'canPost', ok: options.length > 0, privacyOptions: options, privateOnly: !audited() });
@@ -93,4 +93,67 @@ async function revoke(accessToken) {
   await request(`${API}/v2/oauth/revoke/`, { method: 'POST', classify, form: { client_key: process.env.TIKTOK_CLIENT_KEY || 'fake-key', client_secret: process.env.TIKTOK_CLIENT_SECRET || 'fake-secret', token: accessToken } });
 }
 
-module.exports = { authorizeUrl, exchange, refresh, test, revoke, configured, audited, classify, SCOPES, NEEDED };
+/* ---- Publishing (photo posts: Plannity posts carry images, not video) ---- */
+
+const PRIVACY = ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'];
+
+/** What the posting screen must show before every TikTok post (TikTok's Direct Post rules). */
+async function creatorInfo(accessToken) {
+  const d = await creatorInfoRaw(accessToken);
+  return {
+    nickname: d.creator_nickname ?? null, username: d.creator_username ?? null, avatarUrl: d.creator_avatar_url ?? null,
+    privacyOptions: Array.isArray(d.privacy_level_options) ? d.privacy_level_options : [],
+    commentDisabled: !!d.comment_disabled, privateOnly: !audited(),
+  };
+}
+
+/**
+ * Starts a Direct Post photo post (developers.tiktok.com/doc/content-posting-api-reference-photo-post).
+ * TikTok downloads the images itself (PULL_FROM_URL: the image domain must be
+ * verified in the TikTok app). Publishing finishes asynchronously → { jobId }.
+ * @param {{ text: string, imageUrls: string[], options: { privacyLevel, allowComments, brandOrganic, brandedContent } }} p
+ */
+async function publishPhotos(conn, accessToken, { text, imageUrls, options = {} }) {
+  if (!imageUrls.length) throw new SocialError('invalid', 'tiktok_needs_image', 'TikTok photo posts need at least one image');
+  if (imageUrls.length > 35) throw new SocialError('invalid', 'tiktok_too_many_images', 'TikTok photo posts take up to 35 images');
+  const info = await creatorInfo(accessToken);
+  // Until TikTok audits the app, every post must be private (TikTok rejects anything else).
+  const privacy = info.privateOnly ? 'SELF_ONLY' : options.privacyLevel;
+  if (!PRIVACY.includes(privacy) || (info.privacyOptions.length && !info.privacyOptions.includes(privacy))) {
+    throw new SocialError('invalid', 'tiktok_privacy_required', 'Choose who can see this TikTok post');
+  }
+  const clean = String(text || '').trim();
+  const title = (clean.split('\n')[0] || '').slice(0, 90);
+  const r = await request(`${API}/v2/post/publish/content/init/`, {
+    method: 'POST', classify, headers: { authorization: `Bearer ${accessToken}` },
+    json: {
+      post_info: {
+        title, description: clean.slice(0, 4000), privacy_level: privacy,
+        disable_comment: info.commentDisabled || options.allowComments === false,
+        auto_add_music: true,
+        brand_content_toggle: !!options.brandedContent, brand_organic_toggle: !!options.brandOrganic,
+      },
+      source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: imageUrls },
+      post_mode: 'DIRECT_POST',
+      media_type: 'PHOTO',
+    },
+  });
+  const jobId = r?.data?.publish_id;
+  if (!jobId) throw new SocialError('unavailable', 'tiktok_no_publish_id', 'TikTok did not start the post');
+  return { jobId: String(jobId) };
+}
+
+/** Where an asynchronous TikTok post is: { state: 'processing'|'done'|'failed', postId?, url?, reason? }. */
+async function publishStatus(conn, accessToken, jobId) {
+  const r = await request(`${API}/v2/post/publish/status/fetch/`, { method: 'POST', classify, headers: { authorization: `Bearer ${accessToken}` }, json: { publish_id: jobId } });
+  const d = r?.data || {};
+  if (d.status === 'PUBLISH_COMPLETE') {
+    const id = Array.isArray(d.publicaly_available_post_id) ? d.publicaly_available_post_id[0] : null;
+    const user = conn.username ? `@${conn.username}` : null;
+    return { state: 'done', postId: id ? String(id) : null, url: id && user ? `https://www.tiktok.com/${user}/photo/${id}` : null };
+  }
+  if (d.status === 'FAILED') return { state: 'failed', reason: String(d.fail_reason || 'failed').slice(0, 60) };
+  return { state: 'processing' };
+}
+
+module.exports = { authorizeUrl, exchange, refresh, test, revoke, configured, audited, classify, creatorInfo, publishPhotos, publishStatus, SCOPES, NEEDED, PRIVACY };

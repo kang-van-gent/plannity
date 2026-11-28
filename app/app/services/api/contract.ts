@@ -1,12 +1,4 @@
-import type {
-  Brand, BrandInput, Content, ContentInput, ContentPatch, ContentQuery, ContentRevision, DashboardSummary,
-  FeedbackInput, GenerationInput, GenerationJob, Holiday, ISODate, LedgerEntry, Paginated, PaymentOrder,
-  PromotionInput, PromotionInquiry, RegisterInput, Session, SocialProvider, User, Wallet,
-  BrandRole, ContentImage, InvitationPreview, InviteResult, MyInvitation, TeamSummary, BrandMember, ActivityEntityType, ActivityEntry,
-  Entitlements, OrderInput, PaymentHandoff, PositionKey, Task, TaskAction, TaskInput,
-  DestinationInput, DestinationResult, PublishDestination,
-  ChannelProvider, MetaPageChoice, SocialChannels, SocialConnection, SocialPlatform, SocialTestResult,
-} from '~/types'
+import type { Brand, BrandInput, Content, ContentInput, ContentPatch, ContentQuery, ContentRevision, DashboardSummary, FeedbackInput, GenerationInput, GenerationJob, Holiday, ISODate, LedgerEntry, Paginated, PaymentOrder, PromotionInput, PromotionInquiry, RegisterInput, Session, SocialProvider, User, Wallet, BrandRole, ContentImage, InvitationPreview, InviteResult, MyInvitation, TeamSummary, BrandMember, ActivityEntityType, ActivityEntry, Entitlements, OrderInput, PaymentHandoff, PositionKey, Task, TaskAction, TaskInput, DestinationInput, DestinationResult, PublishDestination, ChannelProvider, MetaPageChoice, SocialChannels, SocialConnection, SocialPlatform, SocialTestResult, AutopostInfo, TikTokCreator, TikTokPostOptions, PublishOutcome } from '~/types'
 
 /**
  * The single seam between UI and backend. Pages only talk to this interface,
@@ -104,6 +96,16 @@ export interface DataSource {
     replace(contentId: string, items: DestinationInput[]): Promise<DestinationResult<PublishDestination[]>>
     /** "I posted it" on one platform (or undo with published: false). */
     markPublished(destinationId: string, input: { published?: boolean; publishedAt?: string; postUrl?: string | null }): Promise<DestinationResult<PublishDestination>>
+    /** Which platforms of this post can be posted automatically (connected accounts, plan). */
+    autopost(contentId: string): Promise<AutopostInfo>
+    /** TikTok's creator details, shown on the posting screen before every TikTok post. */
+    tiktokCreator(contentId: string): Promise<TikTokCreator>
+    /** Posts to a connected account now. */
+    publish(destinationId: string, options?: TikTokPostOptions): Promise<DestinationResult<PublishDestination> & { result: PublishOutcome | null }>
+    /** Posts automatically at the post's (or this platform's own) date and time. */
+    schedule(destinationId: string, options?: TikTokPostOptions): Promise<DestinationResult<PublishDestination>>
+    /** Cancels automatic posting: back to posting by hand. */
+    unschedule(destinationId: string): Promise<DestinationResult<PublishDestination>>
   }
 
   /**

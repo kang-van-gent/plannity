@@ -63,7 +63,7 @@ function submit() {
 
 <template>
   <form novalidate @submit.prevent="submit">
-    <ol v-if="stepped" class="mb-6 flex items-center gap-2" :aria-label="t('brands.onboardingSteps')">
+    <ol v-if="stepped" v-anim class="mb-6 flex items-center gap-2" :aria-label="t('brands.onboardingSteps')">
       <li v-for="(s, i) in STEPS" :key="s" class="flex flex-1 items-center gap-2">
         <span class="grid size-8 shrink-0 place-items-center rounded-full text-sm font-bold transition" :class="i < step ? 'bg-success text-white' : i === step ? 'bg-brand-500 text-white shadow-pop' : 'bg-surface-2 text-muted'">
           <Check v-if="i < step" class="size-4" /><template v-else>{{ i + 1 }}</template>
@@ -154,7 +154,7 @@ function submit() {
     </div>
 
     <!-- Sticky action bar above the tab bar on phones/tablets. -->
-    <div class="sticky bottom-[calc(var(--tabbar-h,0px)+0.75rem)] z-30 mt-6 flex items-center justify-end gap-2 max-lg:rounded-[1.5rem] max-lg:border max-lg:border-line max-lg:bg-surface/90 max-lg:p-2 max-lg:shadow-panel max-lg:backdrop-blur-xl lg:static max-lg:[&>.btn-primary]:flex-1">
+    <div v-anim class="sticky bottom-[calc(var(--tabbar-h,0px)+0.75rem)] z-30 mt-6 flex items-center justify-end gap-2 max-lg:rounded-[1.5rem] max-lg:border max-lg:border-line max-lg:bg-surface/90 max-lg:p-2 max-lg:shadow-panel max-lg:backdrop-blur-xl lg:static max-lg:[&>.btn-primary]:flex-1">
       <template v-if="stepped">
         <button v-if="step > 0" type="button" class="btn-secondary mr-auto max-sm:px-3.5" :aria-label="t('common.back')" @click="go(-1)"><ArrowLeft class="size-4" /><span class="max-sm:hidden">{{ t('common.back') }}</span></button>
         <button v-if="step > 0 && step < STEPS.length - 1" type="button" class="btn-ghost max-sm:px-2.5" :disabled="saving" @click="submit">{{ t('brands.skipAndSave') }}</button>

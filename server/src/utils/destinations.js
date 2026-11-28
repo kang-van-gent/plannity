@@ -9,8 +9,8 @@
  * content's caption, images and date unless it overrides them; `null` means
  * "inherit" and is kept apart from a deliberate empty value.
  *
- * This phase is manual publishing only: a destination is `draft` until a
- * member confirms it went live (`published`). Nothing here posts anywhere.
+ * A destination is `draft` until it goes live: by hand (a member marks it
+ * posted) or automatically (services/publisher.js: scheduled → publishing → published/failed).
  */
 
 const PLATFORMS = ['facebook', 'instagram', 'tiktok', 'youtube', 'line', 'x', 'linkedin'];
@@ -79,7 +79,7 @@ function validateSet(items, { imageIds }) {
     else if (!isValidTimezone(it.timezone)) errors[at('timezone')] = 'invalid';
     else out.timezone = it.timezone;
 
-    // Automatic publishing is not available yet (needs connections, quota and the scheduler).
+    // Automatic posting is switched on per platform with Post now / Schedule (services/publisher.js), never through this list.
     if (it.mode !== undefined && it.mode !== 'manual') errors[at('mode')] = 'auto_unavailable';
 
     list.push(out);

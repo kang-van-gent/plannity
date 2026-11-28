@@ -1683,6 +1683,10 @@ export interface ApiPublishDestinationPublishDestination
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 80;
       }>;
+    lastErrorMessage: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 300;
+      }>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1694,12 +1698,14 @@ export interface ApiPublishDestinationPublishDestination
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'manual'>;
     nextAttemptAt: Schema.Attribute.DateTime;
+    options: Schema.Attribute.JSON;
     platform: Schema.Attribute.Enumeration<
       ['facebook', 'instagram', 'tiktok', 'youtube', 'line', 'x', 'linkedin']
     > &
       Schema.Attribute.Required;
     postedAt: Schema.Attribute.DateTime;
     publishedAt: Schema.Attribute.DateTime;
+    publishStartedAt: Schema.Attribute.DateTime & Schema.Attribute.Private;
     revision: Schema.Attribute.Integer &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
@@ -1710,6 +1716,10 @@ export interface ApiPublishDestinationPublishDestination
       > &
       Schema.Attribute.DefaultTo<1>;
     scheduledAt: Schema.Attribute.DateTime;
+    scheduledBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
     status: Schema.Attribute.Enumeration<
       [
         'draft',

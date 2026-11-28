@@ -46,7 +46,7 @@ const canUpload = (x: Task) => x.caps.assignee && ['todo', 'in_progress', 'chang
     <UiEmptyState v-else-if="!q.data.value?.length" :icon="ClipboardList" :title="t('tasks.empty')" :message="t('tasks.emptyBody')" />
     <UiEmptyState v-else-if="!shown.length" :icon="ClipboardList" :title="t('tasks.emptyFilter')" :message="t('tasks.emptyFilterBody')" />
     <template v-else>
-      <p class="mb-2 text-xs text-muted">{{ t('tasks.sortHint') }}</p>
+      <p v-anim class="mb-2 text-xs text-muted">{{ t('tasks.sortHint') }}</p>
       <ul class="space-y-3">
         <li v-for="(x, i) in shown" :key="x.id" v-anim="i" class="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5"
           :class="isOverdue(x, today) && 'ring-2 ring-danger/30'">

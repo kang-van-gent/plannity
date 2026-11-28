@@ -95,7 +95,7 @@ async function save() {
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="label" for="task-due">{{ t('tasks.form.due') }}</label>
-        <input id="task-due" v-model="form.dueDate" type="date" class="input" :class="errors.dueDate && 'input-error'">
+        <UiDatePicker id="task-due" v-model="form.dueDate" :invalid="!!errors.dueDate" />
       </div>
       <fieldset>
         <legend class="label">{{ t('tasks.form.priority') }}</legend>

@@ -67,11 +67,12 @@ function openCreate() {
   createErrors.value = {}
   createOpen.value = true
 }
+const createContent = useCreateContent()
 async function create() {
   if (!createForm.value.title.trim()) { createErrors.value = { title: t('validation.required') }; return }
   creating.value = true
   try {
-    const c = await api.contents.create(formToInput(createForm.value))
+    const c = await createContent(createForm.value)
     createOpen.value = false
     notify.success(t('content.created'), t('content.createdFree'), { action: { label: t('common.open'), handler: () => navigateTo(`/app/content/${c.id}`) } })
     q.refresh({ silent: true })
@@ -106,8 +107,8 @@ async function create() {
         </div>
       </div>
       <div class="mt-2 flex flex-wrap items-center gap-2">
-        <label class="flex items-center gap-2 text-xs font-semibold text-muted">{{ t('generate.from') }}<input v-model="filters.from" type="date" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5"></label>
-        <label class="flex items-center gap-2 text-xs font-semibold text-muted">{{ t('generate.to') }}<input v-model="filters.to" type="date" class="input pill sm:h-auto sm:rounded-2xl sm:py-1.5"></label>
+        <label class="flex items-center gap-2 text-xs font-semibold text-muted">{{ t('generate.from') }}<UiDatePicker v-model="filters.from" size="pill" :aria-label="t('generate.from')" /></label>
+        <label class="flex items-center gap-2 text-xs font-semibold text-muted">{{ t('generate.to') }}<UiDatePicker v-model="filters.to" size="pill" :min="filters.from || undefined" :aria-label="t('generate.to')" /></label>
         <UiSelect v-model="filters.sort" class="hidden sm:block" size="sm" :aria-label="t('content.sort')" :options="sortOptions" />
         <button v-if="activeFilters" type="button" class="btn-ghost btn-sm" @click="clearFilters"><X class="size-3.5" />{{ t('content.clearFilters', { n: activeFilters }) }}</button>
         <div class="segmented ml-auto">
@@ -130,11 +131,11 @@ async function create() {
         <div v-if="view === 'grid'" class="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           <ContentCard v-for="(c, i) in q.data.value.data" :key="c.id" v-anim="i" :content="c" />
         </div>
-        <div v-else class="card divide-y divide-line overflow-hidden">
+        <div v-else v-anim="{ from: 'fade' }" class="card divide-y divide-line overflow-hidden">
           <ContentCard v-for="(c, i) in q.data.value.data" :key="c.id" v-anim="{ delay: i * 0.03, from: 'right' }" :content="c" layout="row" />
         </div>
       </div>
-      <nav class="mt-6 flex items-center justify-between gap-3 text-sm" :aria-label="t('common.pagination')">
+      <nav v-anim class="mt-6 flex items-center justify-between gap-3 text-sm" :aria-label="t('common.pagination')">
         <p class="text-muted">{{ t('content.showing', { from: (q.data.value.meta.page - 1) * q.data.value.meta.pageSize + 1, to: Math.min(q.data.value.meta.total, q.data.value.meta.page * q.data.value.meta.pageSize), total: q.data.value.meta.total }) }}</p>
         <div class="flex items-center gap-2">
           <button type="button" class="btn-secondary btn-sm" :disabled="filters.page <= 1" @click="filters.page--"><ChevronLeft class="size-4" /></button>
