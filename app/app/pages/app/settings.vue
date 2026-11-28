@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Camera, Database, Eye, EyeOff, KeyRound, LoaderCircle, Mail, Monitor, Moon, Palette, RotateCcw, ShieldAlert, Sun, Trash2, User as UserIcon } from '@lucide/vue'
+import { Camera, Database, Eye, EyeOff, KeyRound, LoaderCircle, Mail, Monitor, Moon, Palette, Pencil, RotateCcw, ShieldAlert, Sun, Trash2, User as UserIcon } from '@lucide/vue'
 import { isApiError } from '~/services/api/contract'
 import type { NoticeType } from '~/composables/useNotify'
 import type { ThemePref } from '~/composables/useTheme'
@@ -41,6 +41,12 @@ async function onPhoto(e: Event) {
   if (!file) return
   if (!PHOTO_TYPES.includes(file.type)) { notify.warning(t('settings.photo.errors.file_type')); return }
   if (file.size > 5 * 1024 * 1024) { notify.warning(t('settings.photo.errors.too_large')); return }
+  photoSource.value = file // crop it first
+}
+// Image editor (crop / zoom / rotate), for a new photo or the uploaded one.
+const photoSource = ref<File | string | null>(null)
+async function uploadEdited(file: File) {
+  photoSource.value = null
   photoBusy.value = 'upload'
   try {
     session.user.value = { ...session.user.value!, ...(await api.auth.uploadAvatar(file)) }
@@ -143,12 +149,15 @@ async function requestDeletion() {
             <LoaderCircle v-if="photoBusy === 'upload'" class="size-4 animate-spin" /><Camera v-else class="size-4" />
           </button>
           <input ref="photoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" tabindex="-1" aria-hidden="true" @change="onPhoto">
+          <UiImageEditor :open="!!photoSource" :source="photoSource" shape="circle" initial-fit="cover" :title="t('settings.photo.editTitle')" file-name="photo"
+            @close="photoSource = null" @apply="uploadEdited" />
         </div>
         <div class="min-w-0 flex-1 text-center sm:text-left">
           <p class="font-semibold">{{ t('settings.photo.title') }}</p>
           <p class="text-xs text-muted">{{ me?.avatarSource ? t(`settings.photo.source.${me.avatarSource}`) : t('settings.photo.source.none') }} · {{ t('settings.photo.hint') }}</p>
           <div class="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             <button type="button" class="btn-secondary btn-sm" :disabled="!!photoBusy" @click="photoInput?.click()"><Camera class="size-4" />{{ t('settings.photo.upload') }}</button>
+            <button v-if="me?.avatarSource === 'upload' && me?.avatarUrl" type="button" class="btn-secondary btn-sm" :disabled="!!photoBusy" @click="photoSource = me.avatarUrl"><Pencil class="size-4" />{{ t('settings.photo.edit') }}</button>
             <button v-if="me?.avatarSource !== 'gravatar'" type="button" class="btn-secondary btn-sm" :disabled="!!photoBusy" @click="usePhoto('gravatar')">
               <LoaderCircle v-if="photoBusy === 'gravatar'" class="size-4 animate-spin" /><Mail v-else class="size-4" />{{ t('settings.photo.useEmail') }}
             </button>
