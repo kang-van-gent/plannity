@@ -77,6 +77,10 @@
     "attemptCount": { "type": "integer", "default": 0, "min": 0 },
     "nextAttemptAt": { "type": "datetime" },
     "lastErrorCode": { "type": "string", "maxLength": 80 },
+    "lastErrorMessage": { "type": "string", "maxLength": 300, "description": "The platform's own words for the last failure (shown next to the code)." },
+    "options": { "type": "json", "description": "Per-platform posting choices made when posting/scheduling automatically, e.g. TikTok { privacyLevel, allowComments, brandOrganic, brandedContent }." },
+    "publishStartedAt": { "type": "datetime", "private": true, "description": "When the current automatic post attempt started (detects interrupted posts)." },
+    "scheduledBy": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
     "idempotencyKey": { "type": "string", "unique": true, "private": true },
     "postedAt": {
       "type": "datetime",

@@ -314,11 +314,12 @@ function openCreate(date: string) {
   createErrors.value = {}
   createOpen.value = true
 }
+const createContent = useCreateContent()
 async function create() {
   if (!createForm.value.title.trim()) { createErrors.value = { title: t('validation.required') }; return }
   creating.value = true
   try {
-    const c = await api.contents.create(formToInput(createForm.value))
+    const c = await createContent(createForm.value)
     if (!brands.currentBrandId.value || brands.currentBrandId.value === c.brandId) {
       items.value.push(c)
       popIn(c.id)
@@ -447,7 +448,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         </div>
 
         <!-- Phones: agenda for the tapped day -->
-        <section v-if="view === 'month'" ref="agendaEl" class="mt-4 sm:hidden">
+        <section v-if="view === 'month'" ref="agendaEl" v-anim class="mt-4 sm:hidden">
           <div class="mb-2 flex items-center justify-between px-1">
             <h3 class="font-display text-lg font-bold" :class="selectedDay === today && 'text-brand-500'">{{ formatDate(selectedDay, locale, { weekday: 'long', day: 'numeric', month: 'long' }) }}</h3>
             <button v-if="canCreateAny" type="button" class="btn-icon btn-ghost text-brand-500" :aria-label="t('calendar.addOn', { date: formatDate(selectedDay, locale) })" @click="openCreate(selectedDay)"><Plus class="size-5" /></button>
@@ -493,7 +494,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
 
         <!-- LIST -->
         <div v-else class="space-y-3">
-          <p v-if="!listDays.length" class="card p-8 text-center text-muted">{{ t('calendar.emptyMonth') }}</p>
+          <p v-if="!listDays.length" v-anim="{ from: 'scale' }" class="card p-8 text-center text-muted">{{ t('calendar.emptyMonth') }}</p>
           <section v-for="(d, i) in listDays" :key="d" v-anim="{ delay: Math.min(i, 10) * 0.04 }" class="card overflow-hidden">
             <header class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface-2 px-4 py-2.5">
               <span class="font-display text-base font-bold sm:text-lg" :class="d === today && 'text-brand-500'">{{ formatDate(d, locale, { weekday: 'long', day: 'numeric', month: 'long' }) }}</span>
@@ -537,8 +538,8 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
         <p class="rounded-2xl bg-surface-2 p-3 text-sm">{{ selected.hook || selected.caption.slice(0, 160) }}</p>
         <fieldset :disabled="!canMove(selected)" class="contents">
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="label" for="q-date">{{ t('content.fields.scheduledDate') }}</label><input id="q-date" v-model="quick.date" type="date" class="input"></div>
-          <div><label class="label" for="q-time">{{ t('content.fields.scheduledTime') }}</label><input id="q-time" v-model="quick.time" type="time" class="input"></div>
+          <div><label class="label" for="q-date">{{ t('content.fields.scheduledDate') }}</label><UiDatePicker id="q-date" v-model="quick.date" /></div>
+          <div><label class="label" for="q-time">{{ t('content.fields.scheduledTime') }}</label><UiTimePicker id="q-time" v-model="quick.time" /></div>
         </div>
         <div>
           <label class="label" for="q-status">{{ t('content.fields.status') }}</label>
@@ -567,7 +568,7 @@ const weekdayNames = computed(() => weekdayLabels(locale.value))
       <div class="rounded-2xl border border-line p-4">
         <p class="font-semibold">{{ t('calendar.addKeyDate') }}</p>
         <div class="mt-3 grid gap-3 sm:grid-cols-[10rem_1fr]">
-          <input v-model="keyForm.date" type="date" class="input" :aria-label="t('content.fields.scheduledDate')">
+          <UiDatePicker v-model="keyForm.date" :aria-label="t('content.fields.scheduledDate')" />
           <input v-model="keyForm.title" class="input" maxlength="120" :placeholder="t('calendar.keyDatePh')" @keydown.enter.prevent="addKeyDate">
         </div>
         <button type="button" class="btn-primary btn-sm mt-3" @click="addKeyDate"><Plus class="size-4" />{{ t('common.add') }}</button>

@@ -239,4 +239,4 @@ async function disconnect(strapi, conn, user) {
   });
 }
 
-module.exports = { settings, list, view, findConnection, startConnect, handleCallback, choices, choose, test, disconnect, PLATFORMS, CONN, REQ };
+module.exports = { settings, list, view, findConnection, startConnect, handleCallback, choices, choose, test, disconnect, accessTokenFor, PLATFORMS, CONN, REQ };

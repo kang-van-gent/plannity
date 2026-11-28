@@ -114,4 +114,73 @@ async function test(conn, token) {
   return { checks, profile };
 }
 
-module.exports = { authorizeUrl, exchange, test, configured, classify, NEEDED, DEFAULT_SCOPES };
+/* ---- Publishing -------------------------------------------------------- */
+
+const post = (path, form) => request(graph(path), { method: 'POST', form, classify });
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Facebook Page post (developers.facebook.com/docs/pages-api/posts).
+ * No image → text post on the feed; one → a photo post; several → unpublished
+ * photos attached to one feed post. Returns { postId, url }.
+ * @param {{ text: string, imageUrls: string[] }} p  imageUrls must be public https URLs
+ */
+async function publishFacebook(conn, token, { text, imageUrls }) {
+  const page = conn.externalAccountId;
+  let postId;
+  if (!imageUrls.length) {
+    if (!text.trim()) throw new SocialError('invalid', 'empty_post', 'Nothing to post: add a caption or an image');
+    postId = (await post(`/${page}/feed`, { access_token: token, message: text })).id;
+  } else if (imageUrls.length === 1) {
+    const r = await post(`/${page}/photos`, { access_token: token, url: imageUrls[0], ...(text ? { message: text } : {}), published: 'true' });
+    postId = r.post_id || r.id;
+  } else {
+    const ids = [];
+    for (const url of imageUrls) ids.push((await post(`/${page}/photos`, { access_token: token, url, published: 'false' })).id);
+    const form = { access_token: token, ...(text ? { message: text } : {}) };
+    ids.forEach((id, i) => { form[`attached_media[${i}]`] = JSON.stringify({ media_fbid: id }); });
+    postId = (await post(`/${page}/feed`, form)).id;
+  }
+  return { postId: String(postId), url: `https://www.facebook.com/${postId}` };
+}
+
+/** Waits for an Instagram media container to be ready (images are usually ready within seconds). */
+async function igReady(id, token) {
+  for (let i = 0; i < 20; i++) {
+    const r = await get(`/${id}`, { access_token: token, fields: 'status_code,status' });
+    if (r.status_code === 'FINISHED') return;
+    if (r.status_code === 'ERROR' || r.status_code === 'EXPIRED') throw new SocialError('invalid', `ig_container_${String(r.status_code).toLowerCase()}`, r.status || 'Instagram could not process the image');
+    await wait(1500);
+  }
+  throw new SocialError('unavailable', 'ig_container_timeout', 'Instagram is still processing the image');
+}
+
+/**
+ * Instagram feed post (developers.facebook.com/docs/instagram-platform/content-publishing):
+ * one image, or a carousel of 2–10. JPEG only (the publisher converts other types).
+ * Returns { postId, url }.
+ */
+async function publishInstagram(conn, token, { text, imageUrls }) {
+  const ig = conn.externalAccountId;
+  if (!imageUrls.length) throw new SocialError('invalid', 'ig_needs_image', 'Instagram posts need at least one image');
+  if (imageUrls.length > 10) throw new SocialError('invalid', 'ig_too_many_images', 'Instagram carousels take up to 10 images');
+  let container;
+  if (imageUrls.length === 1) {
+    container = (await post(`/${ig}/media`, { access_token: token, image_url: imageUrls[0], ...(text ? { caption: text } : {}) })).id;
+  } else {
+    const children = [];
+    for (const url of imageUrls) {
+      const id = (await post(`/${ig}/media`, { access_token: token, image_url: url, is_carousel_item: 'true' })).id;
+      children.push(id);
+    }
+    for (const id of children) await igReady(id, token);
+    container = (await post(`/${ig}/media`, { access_token: token, media_type: 'CAROUSEL', children: children.join(','), ...(text ? { caption: text } : {}) })).id;
+  }
+  await igReady(container, token);
+  const mediaId = (await post(`/${ig}/media_publish`, { access_token: token, creation_id: container })).id;
+  let url = null;
+  try { url = (await get(`/${mediaId}`, { access_token: token, fields: 'permalink' })).permalink ?? null; } catch { /* the post is live; the link is a nicety */ }
+  return { postId: String(mediaId), url };
+}
+
+module.exports = { authorizeUrl, exchange, test, configured, classify, publishFacebook, publishInstagram, NEEDED, DEFAULT_SCOPES };

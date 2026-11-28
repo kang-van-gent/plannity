@@ -3,8 +3,8 @@
 /**
  * Publish destinations: one row per platform a content item goes to
  * (plannity-context-social-publishing.md §3). Rules live in utils/destinations.js;
- * this file reads and writes them. Manual publishing only for now — nothing
- * here contacts a social network.
+ * this file reads and writes them. Nothing here contacts a social network:
+ * automatic posting (Post now / Schedule / the worker) is services/publisher.js.
  */
 const { randomUUID } = require('node:crypto');
 const { record } = require('./activity');
@@ -32,6 +32,10 @@ function view(d, contentDocumentId, imageIds) {
     externalPostUrl: d.externalPostUrl ?? null,
     publishedAt: d.postedAt ?? null,
     lastErrorCode: d.lastErrorCode ?? null,
+    lastErrorMessage: d.lastErrorMessage ?? null,
+    /** When an automatic post will go out (scheduled), UTC. */
+    dueAt: d.status === 'scheduled' ? d.nextAttemptAt ?? null : null,
+    options: d.options ?? null,
     updatedAt: d.updatedAt,
   };
 }
@@ -110,7 +114,7 @@ async function applySet(strapi, content, list, user) {
   const before = await ensureFor(strapi, content.documentId);
   const wanted = new Map(list.map((d) => [d.platform, d]));
   const removed = before.filter((d) => !wanted.has(d.platform));
-  if (removed.some((d) => d.status !== 'draft')) return { error: { destinations: 'published_cannot_remove' } };
+  if (removed.some((d) => d.status === 'published' || d.status === 'publishing')) return { error: { destinations: 'published_cannot_remove' } };
 
   const brandDocumentId = content.brand?.documentId ?? null;
   const result = await strapi.db.transaction(async () => {
@@ -244,4 +248,4 @@ async function backfill(strapi) {
   return created;
 }
 
-module.exports = { DEST, view, listFor, listForMany, orderedImageIds, ensureFor, applySet, markPublished, syncFromContent, contentPrecheck, backfill, effective };
+module.exports = { DEST, view, contentPatchView, listFor, listForMany, orderedImageIds, ensureFor, applyRollup, applySet, markPublished, syncFromContent, contentPrecheck, backfill, effective };

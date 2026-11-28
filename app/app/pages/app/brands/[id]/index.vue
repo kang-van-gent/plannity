@@ -74,7 +74,7 @@ async function toggleArchive() {
       <BrandTabs :brand-id="q.data.value.id" active="profile" />
       <BrandLockBanner :brand="q.data.value" />
       <!-- Only Owners/Admins edit brand settings; everyone else sees them read-only. -->
-      <p v-if="!canEdit" class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('team.readOnly') }}</p>
+      <p v-if="!canEdit" v-anim class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('team.readOnly') }}</p>
       <fieldset :disabled="!canEdit" class="contents [&:disabled_button[type=submit]]:hidden">
         <BrandForm :key="formKey" :initial="{ name: q.data.value.name, color: q.data.value.color, profile: q.data.value.profile }" :saving="saving" :server-errors="serverErrors" @submit="save" />
       </fieldset>

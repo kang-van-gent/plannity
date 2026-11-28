@@ -106,7 +106,7 @@ async function verify() {
         <p v-if="errors.acceptTerms" class="field-error -mt-2">{{ errors.acceptTerms }}</p>
         <button type="submit" class="btn-primary btn-lg w-full" :disabled="loading"><UserPlus class="size-5" />{{ loading ? t('common.loading') : t('auth.register') }}</button>
       </form>
-      <p class="mt-6 text-center text-sm text-muted">{{ t('auth.haveAccount') }} <NuxtLink to="/login" class="font-semibold text-brand-600 hover:underline dark:text-brand-300">{{ t('auth.login') }}</NuxtLink></p>
+      <p v-anim class="mt-6 text-center text-sm text-muted">{{ t('auth.haveAccount') }} <NuxtLink to="/login" class="font-semibold text-brand-600 hover:underline dark:text-brand-300">{{ t('auth.login') }}</NuxtLink></p>
     </template>
 
     <div v-else class="text-center">

@@ -356,8 +356,50 @@ export interface PublishDestination {
   externalPostUrl: string | null
   publishedAt: ISODateTime | null
   lastErrorCode: string | null
+  /** The platform's own words for the last failure. */
+  lastErrorMessage?: string | null
+  /** When a scheduled automatic post goes out (UTC). */
+  dueAt?: ISODateTime | null
+  /** Posting choices made for automatic posting (TikTok privacy etc.). */
+  options?: TikTokPostOptions | null
   updatedAt: ISODateTime
 }
+
+/** TikTok's Direct Post choices: privacy is picked by the person every time (no default). */
+export interface TikTokPostOptions {
+  privacyLevel: 'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'FOLLOWER_OF_CREATOR' | 'SELF_ONLY'
+  allowComments: boolean
+  /** Promoting your own business. */
+  brandOrganic: boolean
+  /** Paid partnership with another brand. */
+  brandedContent: boolean
+}
+
+/** A connected account that can post for the brand. */
+export interface AutopostAccount { id: string; status: 'connected' | 'reconnect_required'; displayName: string | null; username: string | null; avatarUrl: string | null }
+
+/** Which of a post's platforms Plannity can post to by itself. */
+export interface AutopostInfo {
+  /** The brand's plan includes automatic posting and the brand isn't locked. */
+  available: boolean
+  reason: 'plan_required' | 'brand_locked' | null
+  platforms: SocialPlatform[]
+  accounts: Partial<Record<SocialPlatform, AutopostAccount>>
+  /** TikTok hasn't audited the app yet: posts can only be private. */
+  tiktokPrivateOnly: boolean
+}
+
+export interface TikTokCreator {
+  nickname: string | null
+  username: string | null
+  avatarUrl: string | null
+  privacyOptions: TikTokPostOptions['privacyLevel'][]
+  commentDisabled: boolean
+  privateOnly: boolean
+}
+
+/** Outcome of Post now: published at once, still finishing (TikTok), or failed. */
+export interface PublishOutcome { state: 'published' | 'publishing' | 'failed' | 'retrying'; code?: string; message?: string }
 
 export type DestinationInput = Pick<PublishDestination, 'platform'> & Partial<Pick<PublishDestination, 'captionOverride' | 'mediaOverrideIds' | 'scheduledAt' | 'timezone'>>
 
@@ -657,7 +699,10 @@ export interface ContentFormModel {
   concept: string
   pillar: string
   objective: Objective
+  /** The post's main platform (always platforms[0] when creating). */
   platform: Platform
+  /** Creating a post: every platform it goes to. */
+  platforms: Platform[]
   format: ContentFormat
   hook: string
   caption: string

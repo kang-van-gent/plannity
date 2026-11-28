@@ -4,11 +4,7 @@
 // business operations (credits, generation, payments, export) call custom
 // Strapi controllers listed in README → "Strapi endpoints".
 
-import type {
-  ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, Entitlements, GenerationJob, Holiday, InvitationPreview,
-  InviteResult, LedgerEntry, MyInvitation, PaymentHandoff, PaymentOrder, PromotionInquiry, Session, Task, TeamSummary, User, Wallet,
-  ContentStatePatch, PublishDestination, MetaPageChoice, SocialConnection, SocialSettings, SocialTestResult,
-} from '~/types'
+import type { ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, Entitlements, GenerationJob, Holiday, InvitationPreview, InviteResult, LedgerEntry, MyInvitation, PaymentHandoff, PaymentOrder, PromotionInquiry, Session, Task, TeamSummary, User, Wallet, ContentStatePatch, PublishDestination, MetaPageChoice, SocialConnection, SocialSettings, SocialTestResult, AutopostInfo, TikTokCreator, PublishOutcome } from '~/types'
 import { ApiError, type ApiErrorCode, type DataSource } from './contract'
 
 type Row = Record<string, unknown> & { id?: number | string; documentId?: string }
@@ -180,6 +176,20 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       },
       markPublished: async (id, input) => {
         const r = await call<{ data: PublishDestination; meta?: { content?: Row | null } }>(`${BFF}/destinations/${id}/mark-published`, { method: 'POST', body: { data: input } })
+        return { data: r.data, content: (r.meta?.content as ContentStatePatch | null | undefined) ?? null }
+      },
+      autopost: (contentId) => call<{ data: AutopostInfo }>(`${BFF}/contents/${contentId}/autopost`).then((r) => r.data),
+      tiktokCreator: (contentId) => call<{ data: TikTokCreator }>(`${BFF}/contents/${contentId}/tiktok-creator`).then((r) => r.data),
+      publish: async (id, options) => {
+        const r = await call<{ data: PublishDestination; meta?: { content?: Row | null; result?: PublishOutcome | null } }>(`${BFF}/destinations/${id}/publish`, { method: 'POST', body: { data: options ? { options } : {} } })
+        return { data: r.data, content: (r.meta?.content as ContentStatePatch | null | undefined) ?? null, result: r.meta?.result ?? null }
+      },
+      schedule: async (id, options) => {
+        const r = await call<{ data: PublishDestination; meta?: { content?: Row | null } }>(`${BFF}/destinations/${id}/schedule`, { method: 'POST', body: { data: options ? { options } : {} } })
+        return { data: r.data, content: (r.meta?.content as ContentStatePatch | null | undefined) ?? null }
+      },
+      unschedule: async (id) => {
+        const r = await call<{ data: PublishDestination; meta?: { content?: Row | null } }>(`${BFF}/destinations/${id}/unschedule`, { method: 'POST', body: { data: {} } })
         return { data: r.data, content: (r.meta?.content as ContentStatePatch | null | undefined) ?? null }
       },
     },

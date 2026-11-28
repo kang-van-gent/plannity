@@ -8,6 +8,7 @@ const createPayments = require('./services/payments');
 const destinations = require('./services/destinations');
 const appSettings = require('./services/app-settings');
 const { resetWarning: resetSlip2goWarning } = require('./services/slip2go');
+const publisher = require('./services/publisher');
 
 /**
  * Actions the signed-in ("authenticated") role may call.
@@ -26,7 +27,7 @@ const AUTHENTICATED_ACTIONS = {
   'api::feedback.feedback': ['create'],
   'api::team.team': ['get', 'invite', 'resend', 'cancel', 'updateRole', 'removeMember', 'leave', 'mine', 'acceptMine', 'declineMine', 'accept', 'decline'],
   'api::content-image.content-image': ['upload', 'reorder', 'replace', 'remove', 'download'],
-  'api::publish-destination.publish-destination': ['list', 'replace', 'markPublished'],
+  'api::publish-destination.publish-destination': ['list', 'replace', 'markPublished', 'autopost', 'tiktokCreator', 'publish', 'schedule', 'unschedule'],
   'api::social-connection.social-connection': ['list', 'connect', 'request', 'choose', 'test', 'disconnect'],
   'api::activity-log.activity-log': ['list'],
   'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip', 'createHandoff'],
@@ -147,6 +148,12 @@ module.exports = {
     const every = (ms, fn) => { const t = setInterval(() => fn().catch((e) => strapi.log.error(`[payments] job failed: ${e.message}`)), ms); t.unref?.(); };
     every(5 * 60_000, () => payments.recover());
     every(24 * 3600_000, () => payments.purgeOldSlips());
+
+    // Automatic posting: every minute, post what's due and follow TikTok posts until they're live.
+    if (process.env.AUTOPOST_WORKER !== 'false') {
+      const t = setInterval(() => publisher.runDue(strapi).catch((e) => strapi.log.error(`[publish] worker failed: ${e.message}`)), 60_000);
+      t.unref?.();
+    }
 
     // Staff can also grant, extend or cancel plans/add-ons in the admin; entitlements follow at once.
     strapi.db.lifecycles.subscribe({

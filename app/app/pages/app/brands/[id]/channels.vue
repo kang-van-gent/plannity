@@ -182,7 +182,7 @@ const igMissing = computed(() => !!connOf('facebook') && !connOf('instagram'))
           <p class="text-sm text-muted">{{ t('channels.readyBody') }}</p>
         </div>
       </section>
-      <p v-if="settings?.fake" class="mb-4 flex items-start gap-2 rounded-2xl bg-warning/15 px-4 py-2.5 text-sm"><FlaskConical class="mt-0.5 size-4 shrink-0 text-warning" />{{ t('channels.fakeMode') }}</p>
+      <p v-if="settings?.fake" v-anim class="mb-4 flex items-start gap-2 rounded-2xl bg-warning/15 px-4 py-2.5 text-sm"><FlaskConical class="mt-0.5 size-4 shrink-0 text-warning" />{{ t('channels.fakeMode') }}</p>
 
       <UiErrorState v-if="chQ.error.value" :error="chQ.error.value" @retry="chQ.refresh()" />
       <div v-else class="grid gap-4 md:grid-cols-3">
@@ -264,8 +264,8 @@ const igMissing = computed(() => !!connOf('facebook') && !connOf('instagram'))
         </article>
       </div>
 
-      <p v-if="included" class="mt-4 flex items-start gap-2 text-sm text-muted"><Info class="mt-0.5 size-4 shrink-0" />{{ t('channels.metaTogether') }}</p>
-      <p v-if="included && !canManage" class="mt-2 flex items-start gap-2 text-sm text-muted"><Info class="mt-0.5 size-4 shrink-0" />{{ t('channels.adminsOnly') }}</p>
+      <p v-if="included" v-anim class="mt-4 flex items-start gap-2 text-sm text-muted"><Info class="mt-0.5 size-4 shrink-0" />{{ t('channels.metaTogether') }}</p>
+      <p v-if="included && !canManage" v-anim class="mt-2 flex items-start gap-2 text-sm text-muted"><Info class="mt-0.5 size-4 shrink-0" />{{ t('channels.adminsOnly') }}</p>
       <p v-anim class="mt-5 rounded-2xl bg-surface-2 p-4 text-sm text-muted">{{ t('channels.manualMeanwhile') }}</p>
     </template>
 

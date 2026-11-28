@@ -291,7 +291,7 @@ const initials = (s: string) => s.split(/[\s@._()\[\]-]+/).filter(Boolean).slice
         </ul>
       </section>
 
-      <div v-if="canLeave" class="mt-6 flex justify-end">
+      <div v-if="canLeave" v-anim class="mt-6 flex justify-end">
         <button type="button" class="btn-ghost text-danger max-sm:w-full" @click="leave"><LogOut class="size-4" />{{ t('team.leave') }}</button>
       </div>
     </template>

@@ -4,6 +4,7 @@ const { brandScopedController } = require('../../../utils/brand-access');
 const { CONTENT_FIELDS, diff, classifyContent } = require('../../../utils/activity');
 const { PLATFORMS } = require('../../../utils/destinations');
 const destinations = require('../../../services/destinations');
+const publisher = require('../../../services/publisher');
 
 // Status rules from plannity-spec §10. Publishing is always a user confirmation;
 // nothing here posts to social networks.
@@ -43,6 +44,8 @@ module.exports = brandScopedController('api::content.content', {
   async onUpdate(existing, data, user) {
     if (REVISION_FIELDS.some((k) => k in data && JSON.stringify(data[k]) !== JSON.stringify(existing[k]))) await revision(existing, 'edit', user);
     await destinations.syncFromContent(strapi, existing, data);
+    // Scheduled automatic posts follow the post's new date and time.
+    if ('scheduledDate' in data || 'scheduledTime' in data) await publisher.followContent(strapi, existing.documentId);
   },
   // A post going to several platforms is marked published per platform, never all at once.
   precheck: (existing, data) => destinations.contentPrecheck(strapi, existing, data),

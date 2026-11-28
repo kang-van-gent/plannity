@@ -242,7 +242,7 @@ async function demoExpire() {
       </section>
 
       <!-- Demo-only: see what a lapsed plan does -->
-      <section v-if="isMock && api.billing.simulateExpire && ent.planKey !== 'solo'" class="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-sun bg-sun/10 p-4 text-sm">
+      <section v-if="isMock && api.billing.simulateExpire && ent.planKey !== 'solo'" v-anim class="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-sun bg-sun/10 p-4 text-sm">
         <TimerOff class="size-5 text-amber-600 dark:text-sun" />
         <p class="min-w-0 flex-1"><b>{{ t('plan.demoTitle') }}</b> · {{ t('plan.demoExpiredBody') }}</p>
         <button type="button" class="btn-secondary btn-sm" @click="demoExpire">{{ t('plan.demoExpire') }}</button>

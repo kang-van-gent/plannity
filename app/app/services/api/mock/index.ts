@@ -4,11 +4,7 @@
 // idempotency, optimistic versions, sandbox-only payments) so the UI is
 // built against realistic behaviour. Enabled when NUXT_PUBLIC_DATA_SOURCE=mock.
 
-import type {
-  ActivityChange, Brand, BrandInput, BrandInvitation, BrandMember, BrandRole, Content, ContentDraft, ContentImage, ContentQuery, DashboardSummary, GenerationInput, GenerationJob,
-  ContentStatePatch, PublishDestination,
-  Holiday, ItemStatus, LedgerEntry, LedgerType, OrderInput, Paginated, PaymentOrder, PlanKey, PositionKey, PromotionInquiry, Task, TaskAction, User, Wallet,
-} from '~/types'
+import type { ActivityChange, Brand, BrandInput, BrandInvitation, BrandMember, BrandRole, Content, ContentDraft, ContentImage, ContentQuery, DashboardSummary, GenerationInput, GenerationJob, ContentStatePatch, PublishDestination, Holiday, ItemStatus, LedgerEntry, LedgerType, OrderInput, Paginated, PaymentOrder, PlanKey, PositionKey, PromotionInquiry, Task, TaskAction, User, Wallet, AutopostInfo, SocialConnection, SocialPlatform, TikTokPostOptions } from '~/types'
 import { DEFAULT_PRICING, FREE_BRANDS, activePlan, addBillingMonths, brandCoverage, brandCreateErrorFor, featureFlags, nextPeriod, renewalStart, seatCount, slotAssignments } from '~/utils/pricing'
 import { normalizePositions } from '~/utils/positions'
 import { TASK_TRANSITIONS, OPEN_TASK_STATUSES, actorCapabilities, assigneeError, isOverdue, transitionError } from '~/utils/tasks'
@@ -19,7 +15,8 @@ import { CONTENT_STATUSES, FORMATS, OBJECTIVES, PLATFORMS } from '~/types'
 import { addDays, diffDays, isValidISODate, nowISO, todayISO } from '~/utils/date'
 import { normalizeTitle, uid } from '~/utils/format'
 import { buildContentCsv } from '~/utils/csv'
-import { DEFAULT_TIMEZONE, MAX_CAPTION, platformsOf, rollupContent } from '~/utils/destinations'
+import { DEFAULT_TIMEZONE, MAX_CAPTION, bangkokToUtc, platformsOf, rollupContent } from '~/utils/destinations'
+import { PLATFORM_META } from '~/utils/content-meta'
 import { ApiError, type DataSource } from '../contract'
 import { buildSeed, membership, seedPlans, type MockBrand, type MockContentImage, type MockDB, type MockInvitation, type MockJob, type MockTask, type Owned } from './seed'
 import { hashString, mockGenerate, validateDraft } from './llm'
@@ -265,6 +262,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
   type MockDest = MockDB['destinations'][number]
   /** Every post has at least its own platform as a (manual) destination; older demo data is migrated here. */
   function destsOf(c: Content): MockDest[] {
+    runDueMock()
     const d = load()
     let rows = d.destinations.filter((x) => x.contentId === c.id)
     if (!rows.length) {
@@ -294,6 +292,75 @@ export function createMockSource(getToken: () => string | null | undefined, limi
     Object.assign(c, patch, { version: c.version + 1, updatedAt: nowISO() })
     return { status: c.status, version: c.version, publishedAt: c.publishedAt, postUrl: c.postUrl, platform: c.platform }
   }
+  // ---- demo social accounts + automatic posting (mirrors server/src/services/publisher.js) ----
+  const AUTO: SocialPlatform[] = ['facebook', 'instagram', 'tiktok']
+  const conns = () => (load().socialConnections ??= [])
+  const connOf = (brandId: string, p: string) => conns().find((x) => x.brandId === brandId && x.platform === p) ?? null
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'brand'
+  function postTextOf(c: Content, dest: MockDest): string {
+    if (dest.captionOverride !== null) return dest.captionOverride
+    const caption = (c.caption ?? '').trim()
+    const tags = (c.hashtags ?? []).filter((h) => h && !caption.includes(h))
+    return [caption, tags.join(' ')].filter(Boolean).join('\n\n')
+  }
+  function dueOf(c: Content, dest: MockDest): string | null {
+    if (dest.scheduledAt) return dest.scheduledAt
+    if (!c.scheduledDate || !/^\d{2}:\d{2}$/.test(c.scheduledTime ?? '')) return null
+    return bangkokToUtc(c.scheduledDate, c.scheduledTime!)
+  }
+  function publishFail(code: string, message: string, status = 409): never {
+    throw new ApiError(status, status === 403 ? (code === 'plan_required' ? 'PLAN_REQUIRED' : 'FORBIDDEN') : status === 400 ? 'INVALID_INPUT' : 'CONFLICT', message, { publish: code })
+  }
+  function preflightMock(c: Owned<Content>, dest: MockDest) {
+    if (!AUTO.includes(dest.platform as SocialPlatform)) publishFail('manual_only', 'This platform is posted by hand')
+    const plan = brandPlan(c.brandId)
+    if (plan.locked) publishFail('brand_locked', 'This brand is locked until its plan is renewed', 403)
+    if (!plan.features.socialConnections) publishFail('plan_required', 'Automatic posting is part of Team and Studio', 403)
+    const conn = connOf(c.brandId, dest.platform)
+    if (!conn) publishFail('not_connected', `Connect ${PLATFORM_META[dest.platform].label} in Social channels first`)
+    if (conn.status !== 'connected') publishFail('reconnect_required', `${PLATFORM_META[dest.platform].label} needs to be connected again`)
+    const all = imagesOf(c.id)
+    const imgs = dest.mediaOverrideIds ? dest.mediaOverrideIds.filter((id) => all.some((i) => i.id === id)) : all.map((i) => i.id)
+    if (dest.platform === 'instagram' && !imgs.length) publishFail('ig_needs_image', 'Instagram posts need at least one image')
+    if (dest.platform === 'instagram' && imgs.length > 10) publishFail('ig_too_many_images', 'Instagram carousels take up to 10 images')
+    if (dest.platform === 'instagram' && postTextOf(c, dest).length > 2200) publishFail('caption_too_long', 'Instagram captions are limited to 2,200 characters')
+    if (dest.platform === 'tiktok' && !imgs.length) publishFail('tiktok_needs_image', 'TikTok photo posts need at least one image')
+    if (dest.platform === 'facebook' && !imgs.length && !postTextOf(c, dest).trim()) publishFail('empty_post', 'Add a caption or an image first')
+    return conn
+  }
+  function tiktokOpts(input: TikTokPostOptions | null | undefined): TikTokPostOptions {
+    // The demo behaves like an app TikTok hasn't audited yet: always private.
+    const o = input ?? ({} as Partial<TikTokPostOptions>)
+    return { privacyLevel: 'SELF_ONLY', allowComments: o.allowComments !== false, brandOrganic: !!o.brandOrganic, brandedContent: !!o.brandedContent }
+  }
+  function goLive(c: Owned<Content>, dest: MockDest, conn: SocialConnection) {
+    const id = `${Date.now()}`
+    const url = dest.platform === 'facebook' ? `https://www.facebook.com/${conn.externalAccountId}_${id}`
+      : dest.platform === 'instagram' ? `https://www.instagram.com/p/DEMO${id.slice(-6)}/`
+      : `https://www.tiktok.com/@${conn.username}/photo/${id}`
+    Object.assign(dest, { status: 'published', mode: 'auto', publishedAt: nowISO(), externalPostUrl: url, dueAt: null, lastErrorCode: null, lastErrorMessage: null, updatedAt: nowISO() })
+    rollupFor(c)
+    logContent(c, 'content.autoposted', [{ field: 'platform', from: null, to: dest.platform }])
+  }
+  /** The demo's "worker": runs whenever posts are read. Scheduled posts that are due go out; TikTok finishes after a few seconds. */
+  function runDueMock() {
+    const d = load()
+    const now = Date.now()
+    let changed = false
+    for (const dest of d.destinations) {
+      const due = dest.status === 'scheduled' && dest.dueAt && Date.parse(dest.dueAt) <= now
+      const tiktokDone = dest.status === 'publishing' && Date.parse(dest.updatedAt) + 4000 <= now
+      if (!due && !tiktokDone) continue
+      const c = d.contents.find((x) => x.id === dest.contentId)
+      const conn = c ? connOf(c.brandId, dest.platform) : null
+      if (!c || !conn) { Object.assign(dest, { status: 'failed', mode: 'auto', dueAt: null, lastErrorCode: 'not_connected', updatedAt: nowISO() }); changed = true; continue }
+      if (due && dest.platform === 'tiktok') Object.assign(dest, { status: 'publishing', dueAt: null, updatedAt: nowISO() })
+      else goLive(c, dest, conn)
+      changed = true
+    }
+    if (changed) persist()
+  }
+
   function wallet(userId: string) {
     const d = load()
     return (d.wallets[userId] ??= { available: 0, reserved: 0 })
@@ -693,6 +760,15 @@ export function createMockSource(getToken: () => string | null | undefined, limi
           else if (c.status !== 'published' && only.status === 'published') Object.assign(only, { status: 'draft', publishedAt: null })
           else if (c.status === 'published' && 'postUrl' in patch) only.externalPostUrl = c.postUrl
         }
+        // Scheduled automatic posts follow the post's date and time (removed date → back to draft).
+        if ('scheduledDate' in patch || 'scheduledTime' in patch) {
+          for (const x of destsOf(c)) {
+            if (x.status !== 'scheduled' || x.scheduledAt) continue
+            const due = dueOf(c, x)
+            if (due) x.dueAt = due
+            else Object.assign(x, { status: 'draft', mode: 'manual', dueAt: null, lastErrorCode: 'date_removed' })
+          }
+        }
         logContent(c, classifyContent(changes), changes)
         persist()
         return contentView(c)
@@ -1031,7 +1107,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const d = load()
         const before = destsOf(c)
         const wanted = new Set(items.map((x) => x.platform))
-        if (before.some((x) => !wanted.has(x.platform) && x.status !== 'draft')) {
+        if (before.some((x) => !wanted.has(x.platform) && (x.status === 'published' || x.status === 'publishing'))) {
           throw new ApiError(409, 'CONFLICT', 'A platform that is already published can’t be removed. Undo “published” first.', { destinations: 'published_cannot_remove' })
         }
         d.destinations = d.destinations.filter((x) => x.contentId !== c.id || wanted.has(x.platform))
@@ -1047,6 +1123,7 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         const to = items.map((x) => x.platform)
         const content = rollupFor(c, wanted.has(c.platform) ? {} : { platform: items[0]!.platform })
         if (from.join() !== to.join()) logContent(c, 'content.platforms_changed', [{ field: 'platform', from, to }])
+        for (const x of destsOf(c)) if (x.status === 'scheduled') x.dueAt = dueOf(c, x)
         persist()
         return { data: destsOf(c).map(destView), content }
       },
@@ -1068,24 +1145,126 @@ export function createMockSource(getToken: () => string | null | undefined, limi
         persist()
         return { data: destView(dest), content }
       },
+      async autopost(contentId) {
+        await net({ canFail: false, latency: 120 })
+        const c = contentAccess(contentId, 'content.read')
+        const plan = brandPlan(c.brandId)
+        const accounts: AutopostInfo['accounts'] = {}
+        for (const x of conns().filter((k) => k.brandId === c.brandId)) {
+          accounts[x.platform] = { id: x.id, status: x.status, displayName: x.displayName, username: x.username, avatarUrl: x.avatarUrl }
+        }
+        return { available: plan.features.socialConnections && !plan.locked, reason: plan.locked ? 'brand_locked' : plan.features.socialConnections ? null : 'plan_required', platforms: AUTO, accounts, tiktokPrivateOnly: true }
+      },
+      async tiktokCreator(contentId) {
+        await net({ canFail: false })
+        const c = contentAccess(contentId, 'content.update')
+        const conn = connOf(c.brandId, 'tiktok')
+        if (!conn) publishFail('not_connected', 'Connect TikTok in Social channels first')
+        return { nickname: conn.displayName, username: conn.username, avatarUrl: null, privacyOptions: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'], commentDisabled: false, privateOnly: true }
+      },
+      async publish(destinationId, options) {
+        await net({ canFail: false, latency: 900 })
+        const dest = load().destinations.find((x) => x.id === destinationId)
+        if (!dest) throw new ApiError(404, 'NOT_FOUND', 'Not found')
+        const c = contentAccess(dest.contentId, 'content.update')
+        if (c.archivedAt) throw new ApiError(409, 'CONFLICT', 'This post is archived')
+        if (dest.status === 'published') publishFail('already_published', 'Already posted on this platform')
+        if (dest.status === 'publishing') publishFail('in_progress', 'Already posting')
+        const conn = preflightMock(c, dest)
+        if (dest.platform === 'tiktok') {
+          Object.assign(dest, { status: 'publishing', mode: 'auto', options: tiktokOpts(options ?? dest.options), dueAt: null, lastErrorCode: null, lastErrorMessage: null, updatedAt: nowISO() })
+          persist()
+          return { data: destView(dest), content: null, result: { state: 'publishing' } }
+        }
+        goLive(c, dest, conn)
+        persist()
+        return { data: destView(dest), content: { status: c.status, version: c.version, publishedAt: c.publishedAt, postUrl: c.postUrl, platform: c.platform }, result: { state: 'published' } }
+      },
+      async schedule(destinationId, options) {
+        await net({ canFail: false })
+        const dest = load().destinations.find((x) => x.id === destinationId)
+        if (!dest) throw new ApiError(404, 'NOT_FOUND', 'Not found')
+        const c = contentAccess(dest.contentId, 'content.update')
+        if (c.archivedAt) throw new ApiError(409, 'CONFLICT', 'This post is archived')
+        if (dest.status === 'published' || dest.status === 'publishing') publishFail('already_published', 'Already posted on this platform')
+        const due = dueOf(c, dest)
+        if (!due) publishFail('needs_time', 'Set a date and time first', 400)
+        if (Date.parse(due) <= Date.now() + 60_000) publishFail('time_passed', 'That time has passed — post now instead', 400)
+        preflightMock(c, dest)
+        Object.assign(dest, { status: 'scheduled', mode: 'auto', dueAt: due, options: dest.platform === 'tiktok' ? tiktokOpts(options ?? dest.options) : dest.options ?? null, lastErrorCode: null, lastErrorMessage: null, updatedAt: nowISO() })
+        logContent(c, 'content.autopost_scheduled', [{ field: 'platform', from: null, to: dest.platform }])
+        persist()
+        return { data: destView(dest), content: null }
+      },
+      async unschedule(destinationId) {
+        await net({ canFail: false })
+        const dest = load().destinations.find((x) => x.id === destinationId)
+        if (!dest) throw new ApiError(404, 'NOT_FOUND', 'Not found')
+        const c = contentAccess(dest.contentId, 'content.update')
+        if (!['scheduled', 'failed', 'paused'].includes(dest.status)) publishFail('not_scheduled', 'This platform isn’t scheduled')
+        Object.assign(dest, { status: 'draft', mode: 'manual', dueAt: null, lastErrorCode: null, lastErrorMessage: null, updatedAt: nowISO() })
+        logContent(c, 'content.autopost_cancelled', [{ field: 'platform', from: dest.platform, to: null }])
+        persist()
+        return { data: destView(dest), content: null }
+      },
     },
 
-    // The in-browser demo has no Meta/TikTok apps: channels are visible but can't be connected.
+    // The in-browser demo has no Meta/TikTok apps: "Connect" adds demo accounts at once
+    // (Meta → the brand's Facebook Page + Instagram; TikTok → a creator account). Nothing leaves the browser.
     social: {
       async list(brandId) {
         await net()
         brandAccess(brandId, 'brand.read')
-        return { connections: [], settings: { meta: false, tiktok: false, fake: false, tiktokPrivateOnly: true } }
+        const connections = conns().filter((x) => x.brandId === brandId).map(({ brandId: _b, ...x }) => clone(x))
+        return { connections, settings: { meta: true, tiktok: true, fake: true, tiktokPrivateOnly: true } }
       },
-      async connect(brandId) {
+      async connect(brandId, provider) {
         await net()
-        brandAccess(brandId, 'brand.update')
-        throw new ApiError(503, 'PROVIDER_UNAVAILABLE', 'Connecting accounts isn’t available in the demo')
+        const b = brandAccess(brandId, 'brand.update')
+        const plan = brandPlan(brandId)
+        if (plan.locked) throw new ApiError(403, 'FORBIDDEN', 'This brand is locked until its plan is renewed', { brand: 'locked' })
+        if (!plan.features.socialConnections) throw new ApiError(403, 'PLAN_REQUIRED', 'Connecting accounts is part of Team and Studio', { plan: 'plan_required' })
+        const me = load().users.find((u) => u.id === uidOf())
+        const handle = slug(b.name)
+        const make = (platform: SocialPlatform, extra: Partial<SocialConnection>) => {
+          const list = conns()
+          const i = list.findIndex((x) => x.brandId === brandId && x.platform === platform)
+          const row = {
+            id: `sc_${nextSeq()}`, brandId, platform, provider: platform === 'tiktok' ? 'tiktok' : 'meta', externalAccountId: `${Date.now()}${list.length}`,
+            displayName: b.name, username: null, avatarUrl: null, status: 'connected', connectedAt: nowISO(), connectedBy: { id: uidOf(), name: me?.name ?? null },
+            lastCheckedAt: null, lastCheckOk: null, lastCheckError: null, lastCheck: null, ...extra,
+          } as SocialConnection & { brandId: string }
+          if (i >= 0) list[i] = row
+          else list.push(row)
+        }
+        if (provider === 'meta') { make('facebook', {}); make('instagram', { username: handle }) }
+        else make('tiktok', { username: handle })
+        persist()
+        return { url: `/app/brands/${brandId}/channels?social=connected&platform=${provider === 'meta' ? 'facebook' : 'tiktok'}` }
       },
       async pages() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Not found') },
       async choosePage() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Not found') },
-      async test() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Connection not found') },
-      async disconnect() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Connection not found') },
+      async test(connectionId) {
+        await net()
+        const x = conns().find((k) => k.id === connectionId)
+        if (!x) throw new ApiError(404, 'NOT_FOUND', 'Connection not found')
+        brandAccess(x.brandId, 'brand.update')
+        const checks = [{ key: 'token', ok: true }, { key: 'permissions', ok: true, missing: [] }, { key: 'account', ok: true, name: x.username ? `@${x.username}` : x.displayName ?? '' }] as SocialConnection['lastCheck'] & object
+        Object.assign(x, { status: 'connected', lastCheckedAt: nowISO(), lastCheckOk: true, lastCheckError: null, lastCheck: checks })
+        persist()
+        const { brandId: _b, ...connection } = x
+        return { ok: true, errorKind: null, errorCode: null, checks, connection: clone(connection) }
+      },
+      async disconnect(connectionId) {
+        await net()
+        const list = conns()
+        const x = list.find((k) => k.id === connectionId)
+        if (!x) throw new ApiError(404, 'NOT_FOUND', 'Connection not found')
+        brandAccess(x.brandId, 'brand.update')
+        load().socialConnections = list.filter((k) => k.id !== connectionId)
+        persist()
+        return conns().filter((k) => k.brandId === x.brandId).map(({ brandId: _b, ...k }) => clone(k))
+      },
     },
 
     calendar: {

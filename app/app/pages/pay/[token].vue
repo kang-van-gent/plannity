@@ -34,8 +34,8 @@ onMounted(load)
 
 <template>
   <div>
-    <h1 class="font-display text-3xl font-bold">{{ t('pay.handoff.phoneTitle') }}</h1>
-    <p v-if="order" class="mt-1 text-sm text-muted">{{ orderLabel(order) }} · <span class="font-mono">{{ order.reference }}</span></p>
+    <h1 v-anim class="font-display text-3xl font-bold">{{ t('pay.handoff.phoneTitle') }}</h1>
+    <p v-if="order" v-anim="1" class="mt-1 text-sm text-muted">{{ orderLabel(order) }} · <span class="font-mono">{{ order.reference }}</span></p>
 
     <div class="mt-6">
       <div v-if="state === 'loading'" class="space-y-3" aria-busy="true">
@@ -51,7 +51,7 @@ onMounted(load)
 
       <UiErrorState v-else-if="state === 'error'" :error="error" @retry="load" />
 
-      <CreditsPromptPayCheckout v-else-if="order" :order="order" :handoff-token="token" @update="order = $event" @link-expired="state = 'linkExpired'" />
+      <CreditsPromptPayCheckout v-else-if="order" v-anim="2" :order="order" :handoff-token="token" @update="order = $event" @link-expired="state = 'linkExpired'" />
     </div>
   </div>
 </template>

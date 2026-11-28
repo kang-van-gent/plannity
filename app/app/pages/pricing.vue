@@ -142,7 +142,7 @@ const rows = computed<{ key: string; cells: [Cell, Cell, Cell] }[]>(() => [
       <ul v-anim class="mt-6 grid gap-2 text-sm text-muted sm:grid-cols-2">
         <li v-for="(c, i) in tm<string[]>('pricing.notes')" :key="i" class="flex gap-2"><ShieldCheck class="mt-0.5 size-4 shrink-0 text-success" />{{ c }}</li>
       </ul>
-      <p class="mt-4 flex items-start gap-2 text-xs text-muted"><Info class="mt-0.5 size-3.5 shrink-0" />{{ t('plan.billingNote') }}</p>
+      <p v-anim class="mt-4 flex items-start gap-2 text-xs text-muted"><Info class="mt-0.5 size-3.5 shrink-0" />{{ t('plan.billingNote') }}</p>
     </section>
   </div>
 </template>
