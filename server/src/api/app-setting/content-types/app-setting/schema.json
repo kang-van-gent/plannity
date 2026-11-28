@@ -1,0 +1,36 @@
+{
+  "kind": "singleType",
+  "collectionName": "app_settings",
+  "info": {
+    "singularName": "app-setting",
+    "pluralName": "app-settings",
+    "displayName": "App settings",
+    "description": "Integration settings managed here instead of server/.env: Social channels (Meta, TikTok), PromptPay and Slip2Go. A filled field overrides .env; an empty field uses .env. Saved changes apply within seconds, no restart. Secret fields are encrypted when saved (they then show as v1.…): to change one, clear it and paste the new value. Server-only settings (database, JWT, SOCIAL_TOKEN_KEY, PUBLIC_URL) stay in .env."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "metaAppId": { "type": "string", "maxLength": 40, "regex": "^\\d{5,25}$", "description": "META_APP_ID. Meta app → App settings → Basic → App ID. Register the redirect URI <PUBLIC_URL>/api/social/callback/meta in Facebook Login settings." },
+    "metaAppSecret": { "type": "text", "private": true, "description": "META_APP_SECRET (secret, encrypted on save). Meta app → App settings → Basic → App secret." },
+    "metaGraphVersion": { "type": "string", "maxLength": 10, "regex": "^v\\d{2,3}\\.\\d$", "description": "META_GRAPH_VERSION, e.g. v27.0. Empty = .env or v27.0." },
+    "metaLoginConfigId": { "type": "string", "maxLength": 40, "description": "META_LOGIN_CONFIG_ID (optional): a Facebook Login for Business configuration ID. When set, it replaces the permission list." },
+    "tiktokClientKey": { "type": "string", "maxLength": 80, "description": "TIKTOK_CLIENT_KEY. TikTok app → Client key. Register the redirect URI <PUBLIC_URL>/api/social/callback/tiktok in Login Kit (must be https)." },
+    "tiktokClientSecret": { "type": "text", "private": true, "description": "TIKTOK_CLIENT_SECRET (secret, encrypted on save)." },
+    "tiktokAudited": { "type": "boolean", "description": "TIKTOK_AUDITED. Turn on once TikTok approved Direct Post (until then TikTok posts can only be private). Empty = .env." },
+    "socialTestMode": { "type": "boolean", "description": "SOCIAL_FAKE. Local testing only: stand-in Meta/TikTok so Connect and Test can be tried without real apps. Always ignored in production." },
+    "promptpayId": { "type": "string", "maxLength": 20, "regex": "^[0-9]{10,15}$", "description": "PROMPTPAY_ID. Payee mobile number or 13-digit ID used to build the payment QR." },
+    "promptpayName": { "type": "string", "maxLength": 80, "description": "PROMPTPAY_NAME. Shown next to the QR." },
+    "promptpayType": { "type": "enumeration", "enum": ["phone_number", "citizen_id", "e_wallet"], "description": "PROMPTPAY_TYPE." },
+    "receiverAccountType": { "type": "string", "maxLength": 5, "regex": "^0\\d{4}$", "description": "PAYMENT_RECEIVER_ACCOUNT_TYPE. 02001 PromptPay phone · 02003 national/tax ID · 02004 e-wallet · 01004 KBank account. Empty = from PromptPay type." },
+    "receiverAccountNumber": { "type": "string", "maxLength": 20, "regex": "^[0-9]{6,20}$", "description": "PAYMENT_RECEIVER_ACCOUNT_NUMBER. Digits only. Empty = PromptPay ID." },
+    "receiverNameTh": { "type": "string", "maxLength": 120, "description": "PAYMENT_RECEIVER_NAME_TH. Registered Thai account name WITHOUT title (นาย/นาง…), exactly as the bank shows it. Leave empty unless sure: a wrong name fails every slip." },
+    "receiverBankAccount": { "type": "string", "maxLength": 20, "regex": "^[0-9]{10,15}$", "description": "PAYMENT_RECEIVER_BANK_ACCOUNT. Bank account behind the PromptPay ID (digits); many slips show this instead of the phone number." },
+    "receiverBankType": { "type": "string", "maxLength": 5, "regex": "^01\\d{3}$", "description": "PAYMENT_RECEIVER_BANK_TYPE. Bank of that account: 01004 KBank, 01014 SCB, 01002 BBL, 01006 KTB, 01025 Krungsri…" },
+    "slip2goApiUrl": { "type": "string", "maxLength": 200, "description": "SLIP2GO_API_URL. API URL from the Slip2Go dashboard (Settings → API Connect), https." },
+    "slip2goSecretKey": { "type": "text", "private": true, "description": "SLIP2GO_SECRET_KEY (secret, encrypted on save). From the Slip2Go dashboard." },
+    "slip2goTimeoutMs": { "type": "integer", "min": 2000, "max": 60000, "description": "SLIP2GO_TIMEOUT_MS. Empty = .env or 15000." },
+    "slip2goAutoApprove": { "type": "boolean", "description": "SLIP2GO_AUTO_APPROVE. On = slips Slip2Go verifies are approved automatically; off = they still wait for staff. Empty = .env." },
+    "slip2goGenerateQr": { "type": "boolean", "description": "SLIP2GO_GENERATE_QR. On = checkout QR from Slip2Go (checked: our receiver + exact amount); off = built locally. Empty = .env." },
+    "paymentOrderTtlMinutes": { "type": "integer", "min": 5, "max": 1440, "description": "PAYMENT_ORDER_TTL_MINUTES. Payment window: only transfers made inside it are approved automatically. Empty = .env." }
+  }
+}

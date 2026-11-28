@@ -527,6 +527,108 @@ export interface ApiActivityLogActivityLog extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiAppSettingAppSetting extends Struct.SingleTypeSchema {
+  collectionName: 'app_settings';
+  info: {
+    description: 'Integration settings managed here instead of server/.env: Social channels (Meta, TikTok), PromptPay and Slip2Go. A filled field overrides .env; an empty field uses .env. Saved changes apply within seconds, no restart. Secret fields are encrypted when saved (they then show as v1.\u2026): to change one, clear it and paste the new value. Server-only settings (database, JWT, SOCIAL_TOKEN_KEY, PUBLIC_URL) stay in .env.';
+    displayName: 'App settings';
+    pluralName: 'app-settings';
+    singularName: 'app-setting';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::app-setting.app-setting'
+    > &
+      Schema.Attribute.Private;
+    metaAppId: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+    metaAppSecret: Schema.Attribute.Text & Schema.Attribute.Private;
+    metaGraphVersion: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 10;
+      }>;
+    metaLoginConfigId: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+    paymentOrderTtlMinutes: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 1440;
+          min: 5;
+        },
+        number
+      >;
+    promptpayId: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 20;
+      }>;
+    promptpayName: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    promptpayType: Schema.Attribute.Enumeration<
+      ['phone_number', 'citizen_id', 'e_wallet']
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    receiverAccountNumber: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 20;
+      }>;
+    receiverAccountType: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 5;
+      }>;
+    receiverBankAccount: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 20;
+      }>;
+    receiverBankType: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 5;
+      }>;
+    receiverNameTh: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    slip2goApiUrl: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    slip2goAutoApprove: Schema.Attribute.Boolean;
+    slip2goGenerateQr: Schema.Attribute.Boolean;
+    slip2goSecretKey: Schema.Attribute.Text & Schema.Attribute.Private;
+    slip2goTimeoutMs: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 60000;
+          min: 2000;
+        },
+        number
+      >;
+    socialTestMode: Schema.Attribute.Boolean;
+    tiktokAudited: Schema.Attribute.Boolean;
+    tiktokClientKey: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    tiktokClientSecret: Schema.Attribute.Text & Schema.Attribute.Private;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiBlogPostBlogPost extends Struct.CollectionTypeSchema {
   collectionName: 'blog_posts';
   info: {
@@ -805,6 +907,10 @@ export interface ApiContentContent extends Struct.CollectionTypeSchema {
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 300;
       }>;
+    destinations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::publish-destination.publish-destination'
+    >;
     format: Schema.Attribute.Enumeration<
       ['static', 'carousel', 'short_video', 'text']
     > &
@@ -1397,6 +1503,9 @@ export interface ApiPaymentOrderPaymentOrder
     provider: Schema.Attribute.String & Schema.Attribute.Required;
     providerRef: Schema.Attribute.String & Schema.Attribute.Unique;
     publishedAt: Schema.Attribute.DateTime;
+    qrPayload: Schema.Attribute.Text;
+    qrSource: Schema.Attribute.Enumeration<['slip2go', 'local']> &
+      Schema.Attribute.DefaultTo<'local'>;
     quantity: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -1502,6 +1611,273 @@ export interface ApiPromotionInquiryPromotionInquiry
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+  };
+}
+
+export interface ApiPublishDestinationPublishDestination
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'publish_destinations';
+  info: {
+    description: 'Where one content item goes: one row per platform. Caption/media/time inherit from the content unless overridden (null = inherit). Written only through /contents/:id/destinations and /destinations/:id/* (plannity-context-social-publishing.md \u00A73).';
+    displayName: 'Publish destination';
+    pluralName: 'publish-destinations';
+    singularName: 'publish-destination';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    addedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    approvedRevision: Schema.Attribute.Integer;
+    attemptCount: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    brand: Schema.Attribute.Relation<'manyToOne', 'api::brand.brand'>;
+    captionOverride: Schema.Attribute.Text;
+    content: Schema.Attribute.Relation<'manyToOne', 'api::content.content'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    destinationKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    externalJobId: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    externalPostId: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    externalPostUrl: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    idempotencyKey: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    lastErrorCode: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::publish-destination.publish-destination'
+    > &
+      Schema.Attribute.Private;
+    mediaOverrideIds: Schema.Attribute.JSON;
+    mode: Schema.Attribute.Enumeration<['manual', 'auto']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'manual'>;
+    nextAttemptAt: Schema.Attribute.DateTime;
+    platform: Schema.Attribute.Enumeration<
+      ['facebook', 'instagram', 'tiktok', 'youtube', 'line', 'x', 'linkedin']
+    > &
+      Schema.Attribute.Required;
+    postedAt: Schema.Attribute.DateTime;
+    publishedAt: Schema.Attribute.DateTime;
+    revision: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<1>;
+    scheduledAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<
+      [
+        'draft',
+        'scheduled',
+        'publishing',
+        'published',
+        'failed',
+        'reconciling',
+        'cancelled',
+        'paused',
+      ]
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'draft'>;
+    timezone: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 64;
+      }> &
+      Schema.Attribute.DefaultTo<'Asia/Bangkok'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiSiteSettingSiteSetting extends Struct.SingleTypeSchema {
+  collectionName: 'site_settings';
+  info: {
+    description: 'SEO & analytics for the public website: Google Analytics / Tag Manager and Google Search Console. Changes reach the site within a minute.';
+    displayName: 'Site settings';
+    pluralName: 'site-settings';
+    singularName: 'site-setting';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    analyticsEnabled: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    googleAnalyticsId: Schema.Attribute.String;
+    googleSiteVerification: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 400;
+      }>;
+    googleTagManagerId: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::site-setting.site-setting'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    requireCookieConsent: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiSocialConnectionSocialAuthRequest
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'social_auth_requests';
+  info: {
+    description: "One OAuth attempt to connect a brand's accounts. The state sent to Meta/TikTok is stored only as a hash, is single-use and expires after 15 minutes. Meta Pages waiting to be chosen are kept encrypted for that time.";
+    displayName: 'Social auth request';
+    pluralName: 'social-auth-requests';
+    singularName: 'social-auth-request';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    brand: Schema.Attribute.Relation<'manyToOne', 'api::brand.brand'>;
+    choicesEnc: Schema.Attribute.Text & Schema.Attribute.Private;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    errorCode: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    expiresAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::social-connection.social-auth-request'
+    > &
+      Schema.Attribute.Private;
+    provider: Schema.Attribute.Enumeration<['meta', 'tiktok']> &
+      Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    stateHash: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    status: Schema.Attribute.Enumeration<
+      ['pending', 'exchanging', 'choosing', 'completed', 'failed']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
+export interface ApiSocialConnectionSocialConnection
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'social_connections';
+  info: {
+    description: "A brand's connected Facebook Page, Instagram professional account or TikTok account (plannity-context-social-publishing.md \u00A73). One per brand and platform. Tokens are encrypted and never leave the server.";
+    displayName: 'Social connection';
+    pluralName: 'social-connections';
+    singularName: 'social-connection';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    accessTokenEnc: Schema.Attribute.Text & Schema.Attribute.Private;
+    avatarUrl: Schema.Attribute.Text;
+    brand: Schema.Attribute.Relation<'manyToOne', 'api::brand.brand'>;
+    connectedAt: Schema.Attribute.DateTime;
+    connectedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    connectionKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    displayName: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    externalAccountId: Schema.Attribute.String & Schema.Attribute.Required;
+    lastCheck: Schema.Attribute.JSON;
+    lastCheckedAt: Schema.Attribute.DateTime;
+    lastCheckError: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    lastCheckOk: Schema.Attribute.Boolean;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::social-connection.social-connection'
+    > &
+      Schema.Attribute.Private;
+    parentAccountId: Schema.Attribute.String;
+    platform: Schema.Attribute.Enumeration<
+      ['facebook', 'instagram', 'tiktok']
+    > &
+      Schema.Attribute.Required;
+    provider: Schema.Attribute.Enumeration<['meta', 'tiktok']> &
+      Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    refreshExpiresAt: Schema.Attribute.DateTime & Schema.Attribute.Private;
+    refreshTokenEnc: Schema.Attribute.Text & Schema.Attribute.Private;
+    scopes: Schema.Attribute.JSON;
+    status: Schema.Attribute.Enumeration<['connected', 'reconnect_required']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'connected'>;
+    tokenExpiresAt: Schema.Attribute.DateTime & Schema.Attribute.Private;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    username: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
   };
 }
 
@@ -2279,6 +2655,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::activity-log.activity-log': ApiActivityLogActivityLog;
+      'api::app-setting.app-setting': ApiAppSettingAppSetting;
       'api::blog-post.blog-post': ApiBlogPostBlogPost;
       'api::brand-invitation.brand-invitation': ApiBrandInvitationBrandInvitation;
       'api::brand-membership.brand-membership': ApiBrandMembershipBrandMembership;
@@ -2296,6 +2673,10 @@ declare module '@strapi/strapi' {
       'api::payment-event.payment-event': ApiPaymentEventPaymentEvent;
       'api::payment-order.payment-order': ApiPaymentOrderPaymentOrder;
       'api::promotion-inquiry.promotion-inquiry': ApiPromotionInquiryPromotionInquiry;
+      'api::publish-destination.publish-destination': ApiPublishDestinationPublishDestination;
+      'api::site-setting.site-setting': ApiSiteSettingSiteSetting;
+      'api::social-connection.social-auth-request': ApiSocialConnectionSocialAuthRequest;
+      'api::social-connection.social-connection': ApiSocialConnectionSocialConnection;
       'api::subscription-add-on.subscription-add-on': ApiSubscriptionAddOnSubscriptionAddOn;
       'api::subscription.subscription': ApiSubscriptionSubscription;
       'api::task-event.task-event': ApiTaskEventTaskEvent;

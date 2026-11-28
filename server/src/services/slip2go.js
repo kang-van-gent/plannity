@@ -100,4 +100,7 @@ async function generateQr(cfg, { promptPayCode, promptPayType, accountName, amou
   });
 }
 
-module.exports = { slip2goConfig, verifyImage, accountInfo, generateQr };
+/** Settings changed (App settings saved): report a broken configuration again. */
+function resetWarning() { warned = false; }
+
+module.exports = { slip2goConfig, verifyImage, accountInfo, generateQr, resetWarning };

@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "social_connections",
+  "info": {
+    "singularName": "social-connection",
+    "pluralName": "social-connections",
+    "displayName": "Social connection",
+    "description": "A brand's connected Facebook Page, Instagram professional account or TikTok account (plannity-context-social-publishing.md §3). One per brand and platform. Tokens are encrypted and never leave the server."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "brand": { "type": "relation", "relation": "manyToOne", "target": "api::brand.brand" },
+    "platform": { "type": "enumeration", "enum": ["facebook", "instagram", "tiktok"], "required": true },
+    "provider": { "type": "enumeration", "enum": ["meta", "tiktok"], "required": true },
+    "connectionKey": { "type": "string", "unique": true, "required": true, "private": true, "description": "<brandDocumentId>:<platform>" },
+    "externalAccountId": { "type": "string", "required": true, "description": "Facebook Page id, Instagram user id or TikTok open_id." },
+    "parentAccountId": { "type": "string", "description": "Instagram: the Facebook Page it is linked to." },
+    "displayName": { "type": "string", "maxLength": 200 },
+    "username": { "type": "string", "maxLength": 200 },
+    "avatarUrl": { "type": "text" },
+    "status": { "type": "enumeration", "enum": ["connected", "reconnect_required"], "default": "connected", "required": true },
+    "scopes": { "type": "json" },
+    "accessTokenEnc": { "type": "text", "private": true },
+    "refreshTokenEnc": { "type": "text", "private": true },
+    "tokenExpiresAt": { "type": "datetime", "private": true },
+    "refreshExpiresAt": { "type": "datetime", "private": true },
+    "connectedBy": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "connectedAt": { "type": "datetime" },
+    "lastCheckedAt": { "type": "datetime" },
+    "lastCheckOk": { "type": "boolean" },
+    "lastCheckError": { "type": "string", "maxLength": 80 },
+    "lastCheck": { "type": "json", "description": "Checks from the last connection test: [{ key, ok, ... }]." }
+  }
+}

@@ -1070,6 +1070,24 @@ export function createMockSource(getToken: () => string | null | undefined, limi
       },
     },
 
+    // The in-browser demo has no Meta/TikTok apps: channels are visible but can't be connected.
+    social: {
+      async list(brandId) {
+        await net()
+        brandAccess(brandId, 'brand.read')
+        return { connections: [], settings: { meta: false, tiktok: false, fake: false, tiktokPrivateOnly: true } }
+      },
+      async connect(brandId) {
+        await net()
+        brandAccess(brandId, 'brand.update')
+        throw new ApiError(503, 'PROVIDER_UNAVAILABLE', 'Connecting accounts isn’t available in the demo')
+      },
+      async pages() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Not found') },
+      async choosePage() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Not found') },
+      async test() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Connection not found') },
+      async disconnect() { await net(); throw new ApiError(404, 'NOT_FOUND', 'Connection not found') },
+    },
+
     calendar: {
       async range(from, to, brandId, opts = {}) {
         await net()
