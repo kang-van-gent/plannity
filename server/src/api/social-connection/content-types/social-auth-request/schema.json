@@ -1,0 +1,22 @@
+{
+  "kind": "collectionType",
+  "collectionName": "social_auth_requests",
+  "info": {
+    "singularName": "social-auth-request",
+    "pluralName": "social-auth-requests",
+    "displayName": "Social auth request",
+    "description": "One OAuth attempt to connect a brand's accounts. The state sent to Meta/TikTok is stored only as a hash, is single-use and expires after 15 minutes. Meta Pages waiting to be chosen are kept encrypted for that time."
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "stateHash": { "type": "string", "unique": true, "required": true, "private": true },
+    "brand": { "type": "relation", "relation": "manyToOne", "target": "api::brand.brand" },
+    "user": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "provider": { "type": "enumeration", "enum": ["meta", "tiktok"], "required": true },
+    "status": { "type": "enumeration", "enum": ["pending", "exchanging", "choosing", "completed", "failed"], "default": "pending", "required": true },
+    "expiresAt": { "type": "datetime", "required": true },
+    "errorCode": { "type": "string", "maxLength": 80 },
+    "choicesEnc": { "type": "text", "private": true }
+  }
+}

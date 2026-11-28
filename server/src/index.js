@@ -6,6 +6,8 @@ const { fulfillOrder } = require('./services/billing');
 const { invalidate } = require('./services/entitlements');
 const createPayments = require('./services/payments');
 const destinations = require('./services/destinations');
+const appSettings = require('./services/app-settings');
+const { resetWarning: resetSlip2goWarning } = require('./services/slip2go');
 
 /**
  * Actions the signed-in ("authenticated") role may call.
@@ -25,6 +27,7 @@ const AUTHENTICATED_ACTIONS = {
   'api::team.team': ['get', 'invite', 'resend', 'cancel', 'updateRole', 'removeMember', 'leave', 'mine', 'acceptMine', 'declineMine', 'accept', 'decline'],
   'api::content-image.content-image': ['upload', 'reorder', 'replace', 'remove', 'download'],
   'api::publish-destination.publish-destination': ['list', 'replace', 'markPublished'],
+  'api::social-connection.social-connection': ['list', 'connect', 'request', 'choose', 'test', 'disconnect'],
   'api::activity-log.activity-log': ['list'],
   'api::payment-order.payment-order': ['myOrders', 'createMine', 'findMine', 'uploadSlip', 'createHandoff'],
   'api::credit-wallet.credit-wallet': ['balance', 'ledger'],
@@ -87,7 +90,23 @@ module.exports = {
   },
 
   async bootstrap({ strapi }) {
+    // Admin-managed settings (Content Manager → App settings) override .env; applied before anything reads them.
+    const fromAdmin = await appSettings.apply(strapi);
+    if (fromAdmin.length) strapi.log.info(`[settings] from App settings: ${fromAdmin.join(', ')}`);
     const payments = createPayments({ strapi });
+    strapi.db.lifecycles.subscribe({
+      models: [appSettings.UID],
+      beforeCreate(event) { appSettings.sealSecrets(event.params.data); },
+      beforeUpdate(event) { appSettings.sealSecrets(event.params.data); },
+      async afterCreate() { await reapply(); },
+      async afterUpdate() { await reapply(); },
+    });
+    async function reapply() {
+      const keys = await appSettings.apply(strapi);
+      strapi.log.info(`[settings] App settings saved and applied${keys.length ? `: ${keys.join(', ')}` : ' (all from .env)'}`);
+      resetSlip2goWarning();
+      payments.healthCheck().catch((e) => strapi.log.error(`[slip2go] health check error: ${e.message}`));
+    }
     await grantPermissions(strapi, 'authenticated', AUTHENTICATED_ACTIONS);
     await grantPermissions(strapi, 'public', PUBLIC_ACTIONS);
     await seedHolidays(strapi);

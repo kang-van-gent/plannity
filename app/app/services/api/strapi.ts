@@ -7,7 +7,7 @@
 import type {
   ActivityEntry, Brand, BrandMember, Content, ContentImage, ContentQuery, ContentRevision, DashboardSummary, Entitlements, GenerationJob, Holiday, InvitationPreview,
   InviteResult, LedgerEntry, MyInvitation, PaymentHandoff, PaymentOrder, PromotionInquiry, Session, Task, TeamSummary, User, Wallet,
-  ContentStatePatch, PublishDestination,
+  ContentStatePatch, PublishDestination, MetaPageChoice, SocialConnection, SocialSettings, SocialTestResult,
 } from '~/types'
 import { ApiError, type ApiErrorCode, type DataSource } from './contract'
 
@@ -182,6 +182,21 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
         const r = await call<{ data: PublishDestination; meta?: { content?: Row | null } }>(`${BFF}/destinations/${id}/mark-published`, { method: 'POST', body: { data: input } })
         return { data: r.data, content: (r.meta?.content as ContentStatePatch | null | undefined) ?? null }
       },
+    },
+
+    social: {
+      list: async (brandId) => {
+        const r = await call<{ data: SocialConnection[]; meta: SocialSettings }>(`${BFF}/brands/${brandId}/social-connections`)
+        return { connections: r.data, settings: r.meta }
+      },
+      connect: (brandId, provider) => call<{ data: { url: string } }>(`${BFF}/brands/${brandId}/social-connections/connect`, { method: 'POST', body: { data: { provider } } }).then((r) => r.data),
+      pages: (brandId, requestId) => call<{ data: { pages: MetaPageChoice[] } }>(`${BFF}/brands/${brandId}/social-connections/requests/${requestId}`).then((r) => r.data.pages),
+      choosePage: async (brandId, requestId, pageId) => {
+        const r = await call<{ data: SocialConnection[]; meta: { connected: SocialConnection['platform'][] } }>(`${BFF}/brands/${brandId}/social-connections/requests/${requestId}/choose`, { method: 'POST', body: { data: { pageId } } })
+        return { connections: r.data, connected: r.meta.connected }
+      },
+      test: (id) => call<{ data: SocialTestResult }>(`${BFF}/social-connections/${id}/test`, { method: 'POST' }).then((r) => r.data),
+      disconnect: (id) => call<{ data: SocialConnection[] }>(`${BFF}/social-connections/${id}`, { method: 'DELETE' }).then((r) => r.data),
     },
 
     calendar: {

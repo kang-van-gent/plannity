@@ -370,6 +370,69 @@ export interface DestinationResult<T> {
   content: ContentStatePatch | null
 }
 
+// ---- Social channels: a brand's connected accounts (plannity-context-social-publishing.md §3–4) ----
+export type SocialPlatform = 'facebook' | 'instagram' | 'tiktok'
+export type ChannelProvider = 'meta' | 'tiktok'
+
+/** One step of "Test connection" (read-only: nothing is posted). */
+export interface SocialCheck {
+  key: 'token' | 'permissions' | 'account' | 'quota' | 'canPost' | 'reach'
+  ok: boolean
+  missing?: string[]
+  name?: string
+  used?: number
+  total?: number
+  privacyOptions?: string[]
+  privateOnly?: boolean
+}
+
+export interface SocialConnection {
+  id: string
+  platform: SocialPlatform
+  provider: ChannelProvider
+  externalAccountId: string
+  displayName: string | null
+  username: string | null
+  avatarUrl: string | null
+  /** reconnect_required: the platform no longer accepts the sign-in (revoked, expired, permission removed). */
+  status: 'connected' | 'reconnect_required'
+  connectedAt: ISODateTime | null
+  connectedBy: { id: string; name: string | null } | null
+  lastCheckedAt: ISODateTime | null
+  lastCheckOk: boolean | null
+  /** auth · permission · limit · rate_limited · unavailable · invalid */
+  lastCheckError: string | null
+  lastCheck: SocialCheck[] | null
+}
+
+/** Which platforms this Plannity server can connect to. */
+export interface SocialSettings {
+  meta: boolean
+  tiktok: boolean
+  /** Local testing with stand-in Meta/TikTok (never in production). */
+  fake: boolean
+  /** TikTok hasn't approved Plannity yet: posts can only be private. */
+  tiktokPrivateOnly: boolean
+}
+
+export interface SocialChannels { connections: SocialConnection[]; settings: SocialSettings }
+
+export interface SocialTestResult {
+  ok: boolean
+  errorKind: string | null
+  errorCode: string | null
+  checks: SocialCheck[]
+  connection: SocialConnection
+}
+
+/** A Facebook Page offered after signing in with Meta; its linked Instagram account comes with it. */
+export interface MetaPageChoice {
+  id: string
+  name: string
+  pictureUrl: string | null
+  instagram: { id: string; username: string | null; name: string | null; pictureUrl: string | null } | null
+}
+
 export type ContentInput = Partial<Omit<Content, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'jobItemId' | 'source'>> & {
   brandId: string
   title: string

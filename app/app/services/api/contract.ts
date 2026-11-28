@@ -5,6 +5,7 @@ import type {
   BrandRole, ContentImage, InvitationPreview, InviteResult, MyInvitation, TeamSummary, BrandMember, ActivityEntityType, ActivityEntry,
   Entitlements, OrderInput, PaymentHandoff, PositionKey, Task, TaskAction, TaskInput,
   DestinationInput, DestinationResult, PublishDestination,
+  ChannelProvider, MetaPageChoice, SocialChannels, SocialConnection, SocialPlatform, SocialTestResult,
 } from '~/types'
 
 /**
@@ -101,6 +102,24 @@ export interface DataSource {
     replace(contentId: string, items: DestinationInput[]): Promise<DestinationResult<PublishDestination[]>>
     /** "I posted it" on one platform (or undo with published: false). */
     markPublished(destinationId: string, input: { published?: boolean; publishedAt?: string; postUrl?: string | null }): Promise<DestinationResult<PublishDestination>>
+  }
+
+  /**
+   * Social channels: each brand connects its own Facebook Page, Instagram and
+   * TikTok. Owners/admins on Team or Studio manage them; everyone in the brand
+   * can see them. Tokens never reach the browser.
+   */
+  social: {
+    list(brandId: string): Promise<SocialChannels>
+    /** Starts signing in with Meta or TikTok; send the browser to the returned URL. */
+    connect(brandId: string, provider: ChannelProvider): Promise<{ url: string }>
+    /** Facebook Pages to pick from after signing in with Meta. */
+    pages(brandId: string, requestId: string): Promise<MetaPageChoice[]>
+    /** Connects the Page (and its Instagram account, if linked). */
+    choosePage(brandId: string, requestId: string, pageId: string): Promise<{ connections: SocialConnection[]; connected: SocialPlatform[] }>
+    /** Checks the connection works (sign-in, permissions, account, can post). Never posts. */
+    test(connectionId: string): Promise<SocialTestResult>
+    disconnect(connectionId: string): Promise<SocialConnection[]>
   }
 
   calendar: {
