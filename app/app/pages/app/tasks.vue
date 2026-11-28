@@ -52,7 +52,7 @@ const canUpload = (x: Task) => x.caps.assignee && ['todo', 'in_progress', 'chang
           :class="isOverdue(x, today) && 'ring-2 ring-danger/30'">
           <div class="min-w-0 flex-1">
             <p class="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted">
-              <UiBrandDot :name="x.brandName" :color="x.brandColor" :size="18" />{{ x.brandName }} · {{ t(`positions.${x.positionKey}`) }}
+              <UiBrandDot :name="x.brandName" :logo="x.brandLogoUrl" :color="x.brandColor" :size="18" />{{ x.brandName }} · {{ t(`positions.${x.positionKey}`) }}
             </p>
             <NuxtLink :to="`/app/content/${x.contentId}`" class="mt-1 block truncate font-display text-lg font-bold hover:text-brand-600 dark:hover:text-brand-300">{{ x.contentTitle }}</NuxtLink>
             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">

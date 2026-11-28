@@ -44,7 +44,7 @@ const displayName = (u) => (u ? u.name || u.username || u.email : '—');
 const today = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10); // Asia/Bangkok
 
 const POPULATE = {
-  brand: { fields: ['name', 'color'] },
+  brand: { fields: ['name', 'color', 'logoUrl'] },
   content: { fields: ['title', 'version', 'visualBrief', 'caption', 'scheduledDate', 'status'], populate: { images: { fields: ['id'] } } },
   assignee: { fields: ['role', 'status', 'positionKeys'], populate: { user: { fields: ['id', 'username', 'name', 'email'] } } },
   assignedBy: { fields: ['id', 'username', 'name', 'email'] },
@@ -65,7 +65,7 @@ module.exports = ({ strapi }) => {
     const a = t.assignee;
     const brief = t.content?.visualBrief ?? '';
     return {
-      id: t.documentId, brandId: t.brand?.documentId ?? null, brandName: t.brand?.name ?? '—', brandColor: t.brand?.color ?? '#6C4CF5',
+      id: t.documentId, brandId: t.brand?.documentId ?? null, brandName: t.brand?.name ?? '—', brandColor: t.brand?.color ?? '#6C4CF5', brandLogoUrl: t.brand?.logoUrl ?? null,
       contentId: t.content?.documentId ?? null, contentTitle: t.content?.title ?? '—', contentScheduledDate: t.content?.scheduledDate ?? null,
       imageCount: t.content?.images?.length ?? 0, type: t.type, positionKey: t.positionKey,
       assignee: a ? { memberId: a.documentId, userId: String(a.user?.id ?? ''), name: displayName(a.user), positionKeys: a.positionKeys ?? [], active: a.status === 'active' } : null,

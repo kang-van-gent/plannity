@@ -22,7 +22,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
       <p class="mt-3 line-clamp-2 font-display text-[1.0625rem] font-semibold leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-300">{{ content.title }}</p>
       <p class="mt-1.5 line-clamp-2 text-sm text-muted">{{ content.hook || content.caption }}</p>
       <div class="mt-auto flex items-center gap-2 pt-4 text-xs text-muted">
-        <UiBrandDot :name="brand?.name" :color="brand?.color" :size="18" />
+        <UiBrandDot :name="brand?.name" :logo="brand?.logoUrl" :color="brand?.color" :size="18" />
         <span class="min-w-0 flex-1 truncate">{{ brand?.name }}</span>
         <UiImageCount :count="content.imageCount" />
         <span class="chip bg-pink/10 py-0.5 text-pink">{{ content.pillar }}</span>

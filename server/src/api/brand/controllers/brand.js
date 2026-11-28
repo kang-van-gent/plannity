@@ -14,7 +14,8 @@ module.exports = brandScopedController('api::brand.brand', {
     delete: 'brand.delete',
   },
   // Membership, invitations and seat limits change only through the team API / billing.
-  protectedFields: ['memberships', 'invitations', 'maxSeats', 'contents'],
+  // The logo changes only through /brands/:id/logo (checked, resized image — never a typed URL).
+  protectedFields: ['memberships', 'invitations', 'maxSeats', 'contents', 'logo', 'logoUrl'],
   audit: { entityType: 'brand', title: (b) => b.name, diff: (before, data) => diffBrand(before, data), classify: classifyBrand },
   // Owned-brand capacity comes from the account's plan + brand add-ons (pricing.md §6).
   async guardCreate(user, trx) {

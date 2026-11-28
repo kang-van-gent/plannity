@@ -20,7 +20,7 @@ const filter = ref<ActivityEntityType | 'all'>('all')
     <UiSkeletonList v-else-if="!brandQ.data.value || !brandQ.ready.value" :rows="3" />
     <template v-else>
       <div class="mb-5 flex items-center gap-4">
-        <UiBrandDot v-anim="{ from: 'pop' }" :name="brandQ.data.value.name" :color="brandQ.data.value.color" :size="56" />
+        <UiBrandDot v-anim="{ from: 'pop' }" :name="brandQ.data.value.name" :logo="brandQ.data.value.logoUrl" :color="brandQ.data.value.color" :size="56" />
         <div class="min-w-0 flex-1">
           <h1 v-anim="1" class="truncate font-display text-[1.625rem] font-bold sm:text-3xl">{{ brandQ.data.value.name }}</h1>
           <p v-anim="2" class="text-sm text-muted">{{ t('activity.subtitle', { brand: brandQ.data.value.name }) }}</p>

@@ -84,7 +84,7 @@ async function switchAccount() {
 
     <template v-else-if="inv">
       <div class="mt-6 lg:mt-0">
-        <UiBrandDot v-anim="{ from: 'pop' }" :name="inv.brandName" :color="inv.brandColor" :size="64" />
+        <UiBrandDot v-anim="{ from: 'pop' }" :name="inv.brandName" :logo="inv.brandLogoUrl" :color="inv.brandColor" :size="64" />
         <h1 v-anim="1" class="mt-5 font-display text-4xl font-bold">{{ t('invite.title') }}</h1>
         <p v-anim="2" class="mt-2 text-muted">{{ t('invite.body', { inviter: inv.inviterName, brand: inv.brandName, role: t(`roles.${inv.role}`) }) }}</p>
         <div v-anim="3" class="mt-5 space-y-2 rounded-2xl bg-surface-2 p-4 text-sm">

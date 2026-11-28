@@ -1,11 +1,42 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, Check, Plus, X } from '@lucide/vue'
-import type { BrandInput, ContentLanguage } from '~/types'
+import { ArrowLeft, ArrowRight, Check, ImagePlus, Plus, Trash2, X } from '@lucide/vue'
+import type { BrandInput, ContentLanguage, LogoChange } from '~/types'
 import { DEFAULT_PILLARS, PLATFORMS } from '~/types'
 
-const props = defineProps<{ initial?: BrandInput; stepped?: boolean; saving?: boolean; serverErrors?: Record<string, string>; submitLabel?: string }>()
-const emit = defineEmits<{ submit: [input: BrandInput] }>()
+const props = defineProps<{ initial?: BrandInput; stepped?: boolean; saving?: boolean; serverErrors?: Record<string, string>; submitLabel?: string; logoUrl?: string | null }>()
+const emit = defineEmits<{ submit: [input: BrandInput, logo: LogoChange] }>()
 const { t } = useLocale()
+const notify = useNotify()
+
+// ---- logo (picked here, uploaded by the page after saving) ----
+const LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const logoInput = ref<HTMLInputElement | null>(null)
+const logoFile = ref<File | null>(null)
+const logoRemoved = ref(false)
+const logoPreview = ref<string | null>(null)
+function pickLogo(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!LOGO_TYPES.includes(file.type)) { notify.warning(t('brands.logo.errors.file_type')); return }
+  if (file.size > 5 * 1024 * 1024) { notify.warning(t('brands.logo.errors.too_large')); return }
+  if (logoPreview.value) URL.revokeObjectURL(logoPreview.value)
+  logoFile.value = file
+  logoPreview.value = URL.createObjectURL(file)
+  logoRemoved.value = false
+}
+function removeLogo() {
+  if (logoPreview.value) URL.revokeObjectURL(logoPreview.value)
+  logoFile.value = null
+  logoPreview.value = null
+  logoRemoved.value = true
+}
+const shownLogo = computed(() => logoPreview.value ?? (logoRemoved.value ? null : props.logoUrl ?? null))
+const logoChange = (): LogoChange => (logoFile.value ? { file: logoFile.value } : logoRemoved.value && props.logoUrl ? { remove: true } : null)
+// Saved (the page passes the new URL back): start clean.
+watch(() => props.logoUrl, () => { removeLogo(); logoRemoved.value = false })
+onBeforeUnmount(() => { if (logoPreview.value) URL.revokeObjectURL(logoPreview.value) })
 
 const blank = (): BrandInput => ({
   name: '', color: BRAND_COLORS[0],
@@ -57,7 +88,7 @@ function submit() {
     if (props.stepped && (errors.name || errors.description)) step.value = 0
     return
   }
-  emit('submit', JSON.parse(JSON.stringify(form)))
+  emit('submit', JSON.parse(JSON.stringify(form)), logoChange())
 }
 </script>
 
@@ -76,6 +107,19 @@ function submit() {
     <div ref="stepEl" class="space-y-5">
       <section v-if="show('basics')" v-anim="enter" class="card card-pad space-y-4">
         <h2 class="font-display text-lg font-bold">{{ t('brands.sections.basics') }}</h2>
+        <!-- Logo: shown wherever the brand appears (initials on the brand colour until one is added) -->
+        <div class="flex flex-wrap items-center gap-4 rounded-2xl bg-surface-2/60 p-3 sm:p-4">
+          <UiBrandDot :name="form.name || '?'" :color="form.color" :logo="shownLogo" :size="64" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold">{{ t('brands.logo.title') }}<span v-if="logoFile" class="chip ml-2 bg-sun/15 py-0.5 text-amber-700 dark:text-sun">{{ t('brands.logo.unsaved') }}</span></p>
+            <p class="text-xs text-muted">{{ t('brands.logo.hint') }}</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button type="button" class="btn-secondary btn-sm" @click="logoInput?.click()"><ImagePlus class="size-4" />{{ shownLogo ? t('brands.logo.change') : t('brands.logo.upload') }}</button>
+              <button v-if="shownLogo" type="button" class="btn-ghost btn-sm text-danger" @click="removeLogo"><Trash2 class="size-4" />{{ t('brands.logo.remove') }}</button>
+            </div>
+          </div>
+          <input ref="logoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" tabindex="-1" aria-hidden="true" @change="pickLogo">
+        </div>
         <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
           <div>
             <label class="label" for="b-name">{{ t('brands.fields.name') }} *</label>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Archive, ArchiveRestore, Eye, Library, WandSparkles } from '@lucide/vue'
-import type { BrandInput } from '~/types'
+import type { BrandInput, LogoChange } from '~/types'
 import { isApiError } from '~/services/api/contract'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
@@ -20,10 +20,19 @@ const formKey = ref(0)
 const canEdit = computed(() => roleCan(q.data.value?.myRole, 'brand.update'))
 const canArchive = computed(() => roleCan(q.data.value?.myRole, 'brand.delete'))
 
-async function save(input: BrandInput) {
+async function save(input: BrandInput, logo: LogoChange) {
   saving.value = true
   try {
     q.data.value = await api.brands.update(id.value, input)
+    if (logo) {
+      try {
+        const r = 'file' in logo ? await api.brands.uploadLogo(id.value, logo.file) : await api.brands.removeLogo(id.value)
+        q.data.value = { ...q.data.value, logoUrl: r.logoUrl }
+      } catch (e) {
+        if (isApiError(e) && e.fieldErrors.file) notify.warning(t(`brands.logo.errors.${e.fieldErrors.file}`))
+        else notify.fromError(e)
+      }
+    }
     await brands.load(true)
     notify.success(t('common.saved'), q.data.value.name)
   } catch (e) {
@@ -56,7 +65,7 @@ async function toggleArchive() {
     <UiSkeletonList v-else-if="!q.data.value || !q.ready.value" :rows="3" />
     <template v-else>
       <div class="mb-6 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-4 sm:flex sm:flex-row">
-        <UiBrandDot v-anim="{ from: 'pop' }" :name="q.data.value.name" :color="q.data.value.color" :size="64" />
+        <UiBrandDot v-anim="{ from: 'pop' }" :name="q.data.value.name" :logo="q.data.value.logoUrl" :color="q.data.value.color" :size="64" />
         <div class="min-w-0 flex-1">
           <h1 v-anim="1" class="truncate font-display text-[1.625rem] font-bold sm:text-3xl">{{ q.data.value.name }}</h1>
           <p v-anim="2" class="text-sm text-muted">{{ t('brands.updatedAt', { date: formatDateTime(q.data.value.updatedAt, locale) }) }}<span v-if="q.data.value.archivedAt" class="chip ml-2 bg-slate-500/10 text-muted">{{ t('brands.archivedChip') }}</span></p>
@@ -76,7 +85,7 @@ async function toggleArchive() {
       <!-- Only Owners/Admins edit brand settings; everyone else sees them read-only. -->
       <p v-if="!canEdit" v-anim class="mb-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-3 text-sm text-muted"><Eye class="size-4 shrink-0" />{{ t('team.readOnly') }}</p>
       <fieldset :disabled="!canEdit" class="contents [&:disabled_button[type=submit]]:hidden">
-        <BrandForm :key="formKey" :initial="{ name: q.data.value.name, color: q.data.value.color, profile: q.data.value.profile }" :saving="saving" :server-errors="serverErrors" @submit="save" />
+        <BrandForm :key="formKey" :initial="{ name: q.data.value.name, color: q.data.value.color, profile: q.data.value.profile }" :logo-url="q.data.value.logoUrl" :saving="saving" :server-errors="serverErrors" @submit="save" />
       </fieldset>
     </template>
   </div>

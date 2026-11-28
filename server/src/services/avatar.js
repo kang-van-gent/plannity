@@ -9,17 +9,13 @@
  *  - none     initials.
  * user.avatarUrl always holds the absolute URL to show (or null).
  */
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const crypto = require('node:crypto');
+const { squareWebp, absoluteUrl } = require('../utils/square-image');
 
 const USER = 'plugin::users-permissions.user';
 const SIZE = 400;
 const MAX_BYTES = 5 * 1024 * 1024;
 
-const apiUrl = () => String(process.env.PUBLIC_URL || 'http://localhost:1337').replace(/\/$/, '');
-const absolute = (url) => (/^https?:\/\//.test(url) ? url : `${apiUrl()}${url}`);
 
 /** Gravatar URL for an email (SHA-256, as Gravatar recommends). d=404 → no image when none is set. */
 function gravatarUrl(email) {
@@ -46,17 +42,13 @@ async function removeUploaded(strapi, user) {
 
 /** Stores an uploaded photo (formidable file already type/size-checked) and makes it the profile photo. */
 async function saveUpload(strapi, user, file) {
-  const sharp = require('sharp');
-  const out = path.join(os.tmpdir(), `avatar-${user.id}-${Date.now()}.webp`);
-  await sharp(file.filepath, { animated: false }).rotate().resize(SIZE, SIZE, { fit: 'cover', position: 'attention' }).webp({ quality: 86 }).toFile(out);
-  const stat = fs.statSync(out);
-  const prepared = { ...file, filepath: out, mimetype: 'image/webp', size: stat.size, originalFilename: `avatar-${user.id}.webp` };
+  const { file: prepared, cleanup } = await squareWebp(file, { size: SIZE, fit: 'cover', name: `avatar-${user.id}` });
   try {
     const [uploaded] = await strapi.plugin('upload').service('upload').upload({ data: { fileInfo: { name: `avatar-${user.id}.webp`, alternativeText: 'Profile photo' } }, files: prepared });
     await removeUploaded(strapi, user);
-    return strapi.db.query(USER).update({ where: { id: user.id }, data: { avatar: uploaded.id, avatarSource: 'upload', avatarUrl: absolute(uploaded.url) } });
+    return strapi.db.query(USER).update({ where: { id: user.id }, data: { avatar: uploaded.id, avatarSource: 'upload', avatarUrl: absoluteUrl(uploaded.url) } });
   } finally {
-    fs.rmSync(out, { force: true });
+    cleanup();
   }
 }
 

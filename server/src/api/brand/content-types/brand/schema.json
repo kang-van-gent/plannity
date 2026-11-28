@@ -17,6 +17,8 @@
       "required": true,
       "maxLength": 80
     },
+    "logo": { "type": "media", "multiple": false, "allowedTypes": ["images"] },
+    "logoUrl": { "type": "string", "maxLength": 500, "description": "Absolute URL of the brand logo (null = coloured initials). Set only through /brands/:id/logo." },
     "color": {
       "type": "string",
       "maxLength": 9,

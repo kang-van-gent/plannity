@@ -158,6 +158,15 @@ export function createStrapiSource(opts0: { mediaBaseUrl?: string } = {}): DataS
       update: (id, input) => one<Brand>(`${BFF}/brands/${id}`, { method: 'PUT', body: { data: input } }),
       archive: (id) => one<Brand>(`${BFF}/brands/${id}`, { method: 'PUT', body: { data: { archivedAt: new Date().toISOString() } } }),
       restore: (id) => one<Brand>(`${BFF}/brands/${id}`, { method: 'PUT', body: { data: { archivedAt: null } } }),
+      async uploadLogo(id, file) {
+        const form = new FormData()
+        form.append('file', file, file.name)
+        const res = await fetch(`${BFF}/brands/${id}/logo`, { method: 'POST', body: form, headers: { 'X-Requested-With': 'plannity' }, credentials: 'same-origin' })
+        const body = await res.json().catch(() => ({})) as { data?: { logoUrl: string | null } } & StrapiErrorBody
+        if (!res.ok) throw toApiError({ status: res.status, data: body })
+        return { logoUrl: body.data?.logoUrl ?? null }
+      },
+      removeLogo: async (id) => ({ logoUrl: (await call<{ data: { logoUrl: string | null } }>(`${BFF}/brands/${id}/logo`, { method: 'DELETE' })).data.logoUrl }),
     },
 
     contents: {

@@ -84,8 +84,8 @@ function onDragUp() {
       class="group flex w-full min-w-0 items-center gap-2.5 rounded-2xl py-1 pl-1 pr-2 text-left transition active:scale-[0.98] sm:max-w-[16rem] sm:gap-2 sm:border sm:border-line sm:bg-surface sm:px-2.5 sm:py-1.5 sm:shadow-soft sm:hover:border-brand-300"
       :aria-expanded="open || sheet" aria-haspopup="listbox" :aria-label="`${t('brands.scope')}: ${currentBrand?.name ?? t('brands.allBrands')}`" @click="toggle">
       <template v-if="currentBrand">
-        <span class="flex sm:hidden"><UiBrandDot :name="currentBrand.name" :color="currentBrand.color" :size="34" /></span>
-        <span class="hidden sm:flex"><UiBrandDot :name="currentBrand.name" :color="currentBrand.color" :size="26" /></span>
+        <span class="flex sm:hidden"><UiBrandDot :name="currentBrand.name" :logo="currentBrand.logoUrl" :color="currentBrand.color" :size="34" /></span>
+        <span class="hidden sm:flex"><UiBrandDot :name="currentBrand.name" :logo="currentBrand.logoUrl" :color="currentBrand.color" :size="26" /></span>
       </template>
       <span v-else class="grid size-[34px] shrink-0 place-items-center rounded-[35%] bg-gradient-to-br from-brand-500 to-pink text-white sm:size-[26px]"><Layers class="size-4 sm:size-3.5" /></span>
       <span class="min-w-0 flex-1">
@@ -109,7 +109,7 @@ function onDragUp() {
       <div class="my-1 border-t border-line" />
       <button v-for="b in active" :key="b.id" type="button" role="option" :aria-selected="scope === b.id"
         class="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold hover:bg-surface-2" @click="choose(b.id)">
-        <UiBrandDot :name="b.name" :color="b.color" :size="28" />
+        <UiBrandDot :name="b.name" :logo="b.logoUrl" :color="b.color" :size="28" />
         <span class="min-w-0 flex-1 truncate" :class="b.locked && 'text-muted'">{{ b.name }}</span>
         <span v-if="b.locked" class="chip shrink-0 bg-danger/12 py-0.5 text-[0.6875rem] text-danger"><Lock class="size-3" />{{ t('brands.locked') }}</span>
         <Check v-if="scope === b.id" class="size-4 text-brand-500" />
@@ -143,7 +143,7 @@ function onDragUp() {
               <button v-for="b in active" :key="b.id" data-sheet-item type="button" role="option" :aria-selected="scope === b.id"
                 class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left font-semibold transition active:scale-[0.98]"
                 :class="scope === b.id ? 'bg-brand-500/10 text-brand-600 dark:text-brand-300' : 'active:bg-surface-2'" @click="choose(b.id)">
-                <UiBrandDot :name="b.name" :color="b.color" :size="40" />
+                <UiBrandDot :name="b.name" :logo="b.logoUrl" :color="b.color" :size="40" />
                 <span class="min-w-0 flex-1 truncate" :class="b.locked && 'text-muted'">{{ b.name }}</span>
                 <span v-if="b.locked" class="chip shrink-0 bg-danger/12 py-0.5 text-xs text-danger"><Lock class="size-3" />{{ t('brands.locked') }}</span>
                 <span class="grid size-6 place-items-center rounded-full" :class="scope === b.id ? 'bg-brand-500 text-white' : 'border-2 border-line'"><Check v-if="scope === b.id" class="size-3.5" /></span>

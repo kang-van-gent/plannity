@@ -91,7 +91,7 @@ const en: Messages = {
       title: 'Title', concept: 'Concept', pillar: 'Pillar', objective: 'Objective', platform: 'Platform', format: 'Format', hook: 'Hook',
       caption: 'Caption', cta: 'CTA', hashtags: 'Hashtags', visualBrief: 'Visual brief', videoScript: 'Video script', status: 'Status',
       scheduledDate: 'Post date', scheduledTime: 'Time', publishedAt: 'Published', postedAt: 'Published', postUrl: 'Post link', archivedAt: 'Archived',
-      images: 'Images', role: 'Role', source: 'Copied from', name: 'Brand name', color: 'Brand colour',
+      logo: 'Logo', images: 'Images', role: 'Role', source: 'Copied from', name: 'Brand name', color: 'Brand colour',
       profile_industry: 'Business type', profile_description: 'Business description', profile_products: 'Products/services', profile_usp: 'Unique selling point',
       profile_audience: 'Target audience', profile_painPoints: 'Audience pain points', profile_tone: 'Tone of voice', profile_language: 'Content language',
       profile_platforms: 'Platforms', profile_guidelines: 'Brand guidelines', profile_forbiddenWords: 'Forbidden words/claims', profile_competitors: 'Competitors',
@@ -558,6 +558,12 @@ const en: Messages = {
   },
 
   brands: {
+    logo: {
+      title: 'Logo', hint: 'JPG, PNG, WEBP or GIF up to 5 MB. Shown wherever the brand appears; transparent backgrounds are kept.',
+      upload: 'Upload logo', change: 'Change logo', remove: 'Remove', unsaved: 'Saved with the brand',
+      notSaved: 'Brand created without its logo', notSavedBody: 'Add the logo again from the brand’s profile.',
+      errors: { file_type: 'Use a JPG, PNG, WEBP or GIF image', too_large: 'The logo must be 5 MB or smaller', unreadable: 'This image couldn’t be read — try another one', required: 'Choose an image' },
+    },
     lockedCount: '{n} locked',
     locked: 'Locked', lockedTitle: 'This brand is locked', lockedOwner: 'Its cover ended, so it’s read-only for everyone. Renew it to edit again — nothing was deleted.', lockedMember: 'The owner needs to renew this brand. You can still view everything.', renewBrand: 'Renew brand', paidUntil: 'Paid until {date}',
     slotsUsed: '{used} of {max} brands', limitTitle: 'No free brand slot', limitBody: 'Your {plan} plan covers {max} owned brands (extra slots included), and they are all in use. Add a slot for this brand, or move to Studio for unlimited brands.', addSlot: 'Add a brand slot · {price}/month', upgradeStudio: 'See Studio — unlimited brands', limitArchived: 'Archived brands still use a slot. Brands you joined as a member never do.',
