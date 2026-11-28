@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, Check, ImagePlus, Plus, Trash2, X } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, Check, ImagePlus, Pencil, Plus, Trash2, X } from '@lucide/vue'
 import type { BrandInput, ContentLanguage, LogoChange } from '~/types'
 import { DEFAULT_PILLARS, PLATFORMS } from '~/types'
 
@@ -21,10 +21,17 @@ function pickLogo(e: Event) {
   if (!file) return
   if (!LOGO_TYPES.includes(file.type)) { notify.warning(t('brands.logo.errors.file_type')); return }
   if (file.size > 5 * 1024 * 1024) { notify.warning(t('brands.logo.errors.too_large')); return }
+  editorSource.value = file // adjust it before it's used
+}
+// Image editor: crop / zoom / rotate / background, for a new file or the current logo.
+const editorSource = ref<File | string | null>(null)
+function editLogo() { editorSource.value = logoFile.value ?? (logoRemoved.value ? null : props.logoUrl ?? null) }
+function applyEdited(file: File) {
   if (logoPreview.value) URL.revokeObjectURL(logoPreview.value)
   logoFile.value = file
   logoPreview.value = URL.createObjectURL(file)
   logoRemoved.value = false
+  editorSource.value = null
 }
 function removeLogo() {
   if (logoPreview.value) URL.revokeObjectURL(logoPreview.value)
@@ -115,10 +122,13 @@ function submit() {
             <p class="text-xs text-muted">{{ t('brands.logo.hint') }}</p>
             <div class="mt-2 flex flex-wrap gap-2">
               <button type="button" class="btn-secondary btn-sm" @click="logoInput?.click()"><ImagePlus class="size-4" />{{ shownLogo ? t('brands.logo.change') : t('brands.logo.upload') }}</button>
+              <button v-if="shownLogo" type="button" class="btn-secondary btn-sm" @click="editLogo"><Pencil class="size-4" />{{ t('brands.logo.edit') }}</button>
               <button v-if="shownLogo" type="button" class="btn-ghost btn-sm text-danger" @click="removeLogo"><Trash2 class="size-4" />{{ t('brands.logo.remove') }}</button>
             </div>
           </div>
           <input ref="logoInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" tabindex="-1" aria-hidden="true" @change="pickLogo">
+          <UiImageEditor :open="!!editorSource" :source="editorSource" shape="rounded" backgrounds :brand-color="form.color" initial-fit="contain"
+            :title="t('brands.logo.editTitle')" file-name="logo" @close="editorSource = null" @apply="applyEdited" />
         </div>
         <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
           <div>

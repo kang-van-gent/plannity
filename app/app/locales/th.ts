@@ -12,6 +12,13 @@ const th = {
     discard: 'ทิ้ง', keepEditing: 'แก้ไขต่อ', resizePanel: 'ลากเพื่อปรับขนาด (ดับเบิลคลิกเพื่อขยาย)',
   },
 
+  editor: {
+    title: 'แก้ไขรูป', subtitle: 'ลากเพื่อจัดตำแหน่ง เลื่อนหรือบีบนิ้วเพื่อซูม', canvasLabel: 'รูปภาพ — ลากเพื่อย้าย ใช้ปุ่มลูกศรขยับ + และ − เพื่อซูม R เพื่อหมุน',
+    dragHint: 'ลากเพื่อจัดตำแหน่ง · เลื่อนเพื่อซูม', zoom: 'ซูม', zoomIn: 'ซูมเข้า', zoomOut: 'ซูมออก', fit: 'ขนาด', fitWhole: 'พอดีกรอบ', fill: 'เต็มกรอบ',
+    rotateLeft: 'หมุนซ้าย', rotateRight: 'หมุนขวา', background: 'พื้นหลัง', bg: { transparent: 'โปร่งใส', white: 'สีขาว', color: 'สีแบรนด์' },
+    preview: 'ตัวอย่าง', reset: 'เริ่มใหม่', apply: 'ใช้รูปนี้', loadFailed: 'เปิดรูปนี้เพื่อแก้ไขไม่ได้ — อัปโหลดไฟล์ต้นฉบับแทน',
+    exportFailed: 'เตรียมรูปไม่สำเร็จ', exportFailedBody: 'ลองอีกครั้ง หรืออัปโหลดไฟล์อื่น',
+  },
   picker: {
     chooseDate: 'เลือกวันที่', chooseTime: 'เลือกเวลา', today: 'วันนี้', tomorrow: 'พรุ่งนี้', clear: 'ล้าง',
     prevMonth: 'เดือนก่อน', nextMonth: 'เดือนถัดไป', prevYear: 'ปีก่อน', nextYear: 'ปีถัดไป',
@@ -559,7 +566,7 @@ const th = {
   brands: {
     logo: {
       title: 'โลโก้', hint: 'ไฟล์ JPG, PNG, WEBP หรือ GIF ไม่เกิน 5 MB แสดงทุกที่ที่มีแบรนด์นี้ พื้นหลังโปร่งใสจะคงไว้',
-      upload: 'อัปโหลดโลโก้', change: 'เปลี่ยนโลโก้', remove: 'ลบ', unsaved: 'บันทึกพร้อมแบรนด์',
+      upload: 'อัปโหลดโลโก้', change: 'เปลี่ยนโลโก้', remove: 'ลบ', edit: 'แก้ไข', editTitle: 'แก้ไขโลโก้', unsaved: 'บันทึกพร้อมแบรนด์',
       notSaved: 'สร้างแบรนด์แล้ว แต่บันทึกโลโก้ไม่สำเร็จ', notSavedBody: 'เพิ่มโลโก้อีกครั้งได้ในหน้าโปรไฟล์แบรนด์',
       errors: { file_type: 'ใช้ไฟล์ JPG, PNG, WEBP หรือ GIF', too_large: 'โลโก้ต้องมีขนาดไม่เกิน 5 MB', unreadable: 'อ่านรูปนี้ไม่ได้ — ลองรูปอื่น', required: 'เลือกรูป' },
     },
@@ -714,7 +721,7 @@ const th = {
 
   settings: {
     photo: {
-      title: 'รูปโปรไฟล์', hint: 'ทีมของคุณจะเห็นรูปนี้', upload: 'อัปโหลดรูป', useEmail: 'ใช้รูปจากอีเมล', useGoogle: 'ใช้รูปจาก Google', remove: 'ลบรูป',
+      title: 'รูปโปรไฟล์', hint: 'ทีมของคุณจะเห็นรูปนี้', upload: 'อัปโหลดรูป', edit: 'แก้ไข', editTitle: 'แก้ไขรูปโปรไฟล์', useEmail: 'ใช้รูปจากอีเมล', useGoogle: 'ใช้รูปจาก Google', remove: 'ลบรูป',
       saved: 'อัปเดตรูปโปรไฟล์แล้ว', removed: 'ลบรูปโปรไฟล์แล้ว',
       source: { none: 'แสดงเป็นตัวอักษรย่อ', upload: 'รูปที่คุณอัปโหลด', gravatar: 'รูปจากอีเมลของคุณ (Gravatar)', google: 'รูปจากบัญชี Google ของคุณ' },
       errors: {

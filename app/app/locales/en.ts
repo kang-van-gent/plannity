@@ -14,6 +14,13 @@ const en: Messages = {
     discard: 'Discard', keepEditing: 'Keep editing', resizePanel: 'Drag to resize panel (double-click to expand)',
   },
 
+  editor: {
+    title: 'Edit image', subtitle: 'Drag to move, scroll or pinch to zoom', canvasLabel: 'Image — drag to move, arrow keys to nudge, + and − to zoom, R to rotate',
+    dragHint: 'Drag to position · scroll to zoom', zoom: 'Zoom', zoomIn: 'Zoom in', zoomOut: 'Zoom out', fit: 'Size', fitWhole: 'Fit', fill: 'Fill',
+    rotateLeft: 'Rotate left', rotateRight: 'Rotate right', background: 'Background', bg: { transparent: 'Transparent', white: 'White', color: 'Brand colour' },
+    preview: 'Preview', reset: 'Reset', apply: 'Use this', loadFailed: 'This image couldn’t be opened for editing. Upload the original file instead.',
+    exportFailed: 'Couldn’t prepare the image', exportFailedBody: 'Try again, or upload a different file.',
+  },
   picker: {
     chooseDate: 'Pick a date', chooseTime: 'Pick a time', today: 'Today', tomorrow: 'Tomorrow', clear: 'Clear',
     prevMonth: 'Previous month', nextMonth: 'Next month', prevYear: 'Previous year', nextYear: 'Next year',
@@ -560,7 +567,7 @@ const en: Messages = {
   brands: {
     logo: {
       title: 'Logo', hint: 'JPG, PNG, WEBP or GIF up to 5 MB. Shown wherever the brand appears; transparent backgrounds are kept.',
-      upload: 'Upload logo', change: 'Change logo', remove: 'Remove', unsaved: 'Saved with the brand',
+      upload: 'Upload logo', change: 'Change logo', remove: 'Remove', edit: 'Edit', editTitle: 'Edit logo', unsaved: 'Saved with the brand',
       notSaved: 'Brand created without its logo', notSavedBody: 'Add the logo again from the brand’s profile.',
       errors: { file_type: 'Use a JPG, PNG, WEBP or GIF image', too_large: 'The logo must be 5 MB or smaller', unreadable: 'This image couldn’t be read — try another one', required: 'Choose an image' },
     },
@@ -715,7 +722,7 @@ const en: Messages = {
 
   settings: {
     photo: {
-      title: 'Profile photo', hint: 'Shown to your team', upload: 'Upload photo', useEmail: 'Use email photo', useGoogle: 'Use Google photo', remove: 'Remove',
+      title: 'Profile photo', hint: 'Shown to your team', upload: 'Upload photo', edit: 'Edit', editTitle: 'Edit profile photo', useEmail: 'Use email photo', useGoogle: 'Use Google photo', remove: 'Remove',
       saved: 'Profile photo updated', removed: 'Profile photo removed',
       source: { none: 'Showing your initials', upload: 'Your uploaded photo', gravatar: 'Photo from your email (Gravatar)', google: 'Photo from your Google account' },
       errors: {
