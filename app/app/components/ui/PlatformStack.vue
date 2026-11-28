@@ -19,8 +19,8 @@ const label = computed(() => items.value.map((i) => `${PLATFORM_META[i.platform]
       <UiPlatformBadge :platform="i.platform" :size="size" />
       <span v-if="i.posted && items.length > 1" class="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-success ring-2 ring-surface" aria-hidden="true" />
     </span>
-    <span v-if="more > 0" class="text-[10px] font-semibold text-muted">+{{ more }}</span>
-    <span v-if="withProgress && progress.total > 1" class="ml-0.5 text-[11px] font-medium text-muted">{{ t('publishing.progress', { done: progress.done, total: progress.total }) }}</span>
+    <span v-if="more > 0" class="text-[0.625rem] font-semibold text-muted">+{{ more }}</span>
+    <span v-if="withProgress && progress.total > 1" class="ml-0.5 text-[0.6875rem] font-medium text-muted">{{ t('publishing.progress', { done: progress.done, total: progress.total }) }}</span>
     <span class="sr-only">{{ label }}</span>
   </span>
 </template>

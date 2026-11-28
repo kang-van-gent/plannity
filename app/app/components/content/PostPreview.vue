@@ -66,18 +66,18 @@ const isVideo = computed(() => props.format === 'short_video')
 
     <!-- Phone-sized frame; everything inside is a simulation -->
     <div role="tabpanel" class="mx-auto mt-4 w-full max-w-[340px]">
-      <p class="mb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted">{{ t('preview.badge') }}</p>
+      <p class="mb-2 text-center text-[0.6875rem] font-semibold uppercase tracking-wide text-muted">{{ t('preview.badge') }}</p>
 
       <!-- Facebook: caption above media -->
       <div v-if="tab === 'facebook'" class="overflow-hidden rounded-2xl border border-line bg-white text-[#050505] shadow-soft dark:bg-[#242526] dark:text-[#e4e6eb]">
         <div class="flex items-center gap-2 p-3">
           <span class="grid size-9 place-items-center rounded-full font-display text-sm font-bold text-white" :style="{ background: brandColor }">{{ initials }}</span>
-          <div class="min-w-0 text-[13px] leading-tight">
+          <div class="min-w-0 text-[0.8125rem] leading-tight">
             <p class="truncate font-semibold">{{ brandName }}</p>
-            <p class="flex items-center gap-1 text-[11px] opacity-60">{{ t('preview.justNow') }} · <Globe class="size-3" /></p>
+            <p class="flex items-center gap-1 text-[0.6875rem] opacity-60">{{ t('preview.justNow') }} · <Globe class="size-3" /></p>
           </div>
         </div>
-        <div class="px-3 pb-2 text-[14px] leading-snug">
+        <div class="px-3 pb-2 text-[0.875rem] leading-snug">
           <p v-if="text" class="whitespace-pre-line break-words" :class="!expanded && longText && 'line-clamp-5'">{{ text }}</p>
           <p v-else class="italic opacity-50">{{ t('preview.noCaption') }}</p>
           <button v-if="longText" type="button" class="font-semibold opacity-60 hover:underline" @click="expanded = !expanded">{{ expanded ? t('preview.less') : t('preview.more') }}</button>
@@ -90,7 +90,7 @@ const isVideo = computed(() => props.format === 'short_video')
         </div>
         <p v-if="images.length > 4" class="bg-black/5 px-3 py-1 text-right text-xs font-semibold dark:bg-white/5">+{{ images.length - 4 }}</p>
         <!-- Decorative actions — no counts, not clickable -->
-        <div class="grid grid-cols-3 border-t border-black/10 px-1 py-1 text-[12px] font-semibold opacity-60 dark:border-white/10" aria-hidden="true">
+        <div class="grid grid-cols-3 border-t border-black/10 px-1 py-1 text-[0.75rem] font-semibold opacity-60 dark:border-white/10" aria-hidden="true">
           <span v-for="(a, i) in tm<string[]>('preview.fbActions')" :key="a" class="flex items-center justify-center gap-1.5 py-1.5">
             <ThumbsUp v-if="i === 0" class="size-4" /><MessageCircle v-else-if="i === 1" class="size-4" /><Share2 v-else class="size-4" />{{ a }}
           </span>
@@ -101,13 +101,13 @@ const isVideo = computed(() => props.format === 'short_video')
       <div v-else-if="tab === 'instagram'" class="overflow-hidden rounded-2xl border border-line bg-white text-[#0f0f0f] shadow-soft dark:bg-black dark:text-white">
         <div class="flex items-center gap-2 p-2.5">
           <span class="rounded-full bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] p-[2px]"><span class="grid size-8 place-items-center rounded-full border-2 border-white font-display text-xs font-bold text-white dark:border-black" :style="{ background: brandColor }">{{ initials }}</span></span>
-          <p class="min-w-0 truncate text-[13px] font-semibold">{{ brandName }}</p>
+          <p class="min-w-0 truncate text-[0.8125rem] font-semibold">{{ brandName }}</p>
         </div>
         <div class="relative aspect-[4/5] bg-black/5 dark:bg-white/5">
           <img v-if="current" :src="current.url" :alt="current.filename" class="size-full object-cover">
           <span v-else class="absolute inset-0 grid place-items-center text-sm opacity-60"><span class="flex flex-col items-center gap-1"><ImageOff class="size-6" />{{ t('preview.noImage') }}</span></span>
           <template v-if="images.length > 1">
-            <span class="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">{{ index + 1 }}/{{ images.length }}</span>
+            <span class="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[0.6875rem] font-semibold text-white">{{ index + 1 }}/{{ images.length }}</span>
             <button type="button" class="absolute left-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-black shadow" :aria-label="t('preview.prev')" @click="go(-1)"><ChevronLeft class="size-4" /></button>
             <button type="button" class="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-black shadow" :aria-label="t('preview.next')" @click="go(1)"><ChevronRight class="size-4" /></button>
           </template>
@@ -119,11 +119,11 @@ const isVideo = computed(() => props.format === 'short_video')
           </span>
           <Bookmark class="ml-auto size-5" />
         </div>
-        <div class="px-3 pb-3 pt-2 text-[13px] leading-snug">
+        <div class="px-3 pb-3 pt-2 text-[0.8125rem] leading-snug">
           <p v-if="text" class="whitespace-pre-line break-words" :class="!expanded && longText && 'line-clamp-2'"><b class="mr-1">{{ brandName }}</b>{{ text }}</p>
           <p v-else class="italic opacity-50">{{ t('preview.noCaption') }}</p>
           <button v-if="longText" type="button" class="opacity-60 hover:underline" @click="expanded = !expanded">{{ expanded ? t('preview.less') : t('preview.more') }}</button>
-          <p class="mt-1 text-[10px] uppercase opacity-50">{{ t('preview.justNow') }}</p>
+          <p class="mt-1 text-[0.625rem] uppercase opacity-50">{{ t('preview.justNow') }}</p>
         </div>
       </div>
 
@@ -143,12 +143,12 @@ const isVideo = computed(() => props.format === 'short_video')
           <span class="grid size-9 place-items-center rounded-full border-2 border-white font-display text-xs font-bold" :style="{ background: brandColor }">{{ initials }}</span>
           <Heart class="size-7 drop-shadow" /><MessageCircle class="size-7 drop-shadow" /><Bookmark class="size-6 drop-shadow" /><Share2 class="size-6 drop-shadow" />
         </div>
-        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pr-14 pt-10 text-[13px] leading-snug">
+        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pr-14 pt-10 text-[0.8125rem] leading-snug">
           <p class="font-semibold">{{ brandName }}</p>
           <p v-if="text" class="mt-0.5 whitespace-pre-line break-words" :class="!expanded && longText && 'line-clamp-2'">{{ text }}</p>
           <p v-else class="mt-0.5 italic opacity-60">{{ t('preview.noCaption') }}</p>
           <button v-if="longText" type="button" class="font-semibold opacity-80 hover:underline" @click="expanded = !expanded">{{ expanded ? t('preview.less') : t('preview.more') }}</button>
-          <p class="mt-1.5 flex items-center gap-1 text-[11px] opacity-80" aria-hidden="true"><Music2 class="size-3" />{{ brandName }}</p>
+          <p class="mt-1.5 flex items-center gap-1 text-[0.6875rem] opacity-80" aria-hidden="true"><Music2 class="size-3" />{{ brandName }}</p>
         </div>
       </div>
 

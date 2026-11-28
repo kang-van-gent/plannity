@@ -36,7 +36,7 @@ async function go(p: SocialProvider) {
 <template>
   <div class="grid gap-2" :class="PROVIDERS.length > 1 ? 'grid-cols-3' : 'grid-cols-1'">
     <button v-for="p in PROVIDERS" :key="p.id" type="button" :disabled="!!busy"
-      class="btn group relative h-12 border text-[15px] shadow-soft disabled:opacity-100"
+      class="btn group relative h-12 border text-[0.9375rem] shadow-soft disabled:opacity-100"
       :class="{
         'border-line bg-surface text-fg hover:border-brand-300 hover:shadow-pop': p.id === 'google',
         'border-transparent bg-[#1877F2] text-white hover:brightness-110': p.id === 'facebook',

@@ -168,7 +168,7 @@ const shortDate = (iso: string) => (iso ? formatDate(iso.slice(0, 10), locale.va
         </button>
         <div class="p-2.5">
           <p class="truncate text-xs font-semibold" :title="img.filename">{{ img.filename }}</p>
-          <p class="text-[11px] text-muted">{{ formatBytes(img.size) }}<template v-if="img.width"> · {{ img.width }}×{{ img.height }}</template> · {{ shortDate(img.createdAt) }}</p>
+          <p class="text-[0.6875rem] text-muted">{{ formatBytes(img.size) }}<template v-if="img.width"> · {{ img.width }}×{{ img.height }}</template> · {{ shortDate(img.createdAt) }}</p>
           <div class="mt-2 flex items-center gap-1">
             <button type="button" class="btn-icon btn-ghost p-1.5" :aria-label="`${t('images.download')} ${img.filename}`" :title="t('images.download')" @click="downloadOne(contentId, img)"><Download class="size-4" /></button>
             <template v-if="canEdit">

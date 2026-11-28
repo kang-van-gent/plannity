@@ -19,7 +19,7 @@ const date = computed(() => props.content.scheduledDate ?? props.content.suggest
         <Sparkles v-if="content.source === 'ai'" class="size-3.5 text-sun" :aria-label="t('content.aiMade')" />
         <UiStatusBadge :status="content.status" small class="ml-auto" />
       </div>
-      <p class="mt-3 line-clamp-2 font-display text-[17px] font-semibold leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-300">{{ content.title }}</p>
+      <p class="mt-3 line-clamp-2 font-display text-[1.0625rem] font-semibold leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-300">{{ content.title }}</p>
       <p class="mt-1.5 line-clamp-2 text-sm text-muted">{{ content.hook || content.caption }}</p>
       <div class="mt-auto flex items-center gap-2 pt-4 text-xs text-muted">
         <UiBrandDot :name="brand?.name" :color="brand?.color" :size="18" />

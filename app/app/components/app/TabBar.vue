@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
       <span ref="pill" class="pointer-events-none absolute left-0 top-1.5 h-[3.25rem] w-[4.25rem] rounded-[1.25rem] bg-brand-500/12 opacity-0" aria-hidden="true" />
       <template v-for="(i, idx) in items" :key="i.to">
       <button v-if="i.locked" :ref="(el) => setTab(el, idx)" type="button" aria-disabled="true" :aria-label="`${i.label} (${t('nav.comingSoon')})`"
-        class="relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight text-muted transition active:scale-90" @click="lockedTap">
+        class="relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[0.6562rem] font-semibold leading-tight text-muted transition active:scale-90" @click="lockedTap">
         <span v-if="i.primary" class="relative grid size-12 place-items-center rounded-[1.1rem] bg-surface-2 text-muted/70">
           <component :is="i.icon" class="size-[22px]" />
           <span class="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-surface text-muted shadow-soft ring-1 ring-line"><Lock class="size-3" /></span>
@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
       </button>
       <NuxtLink v-else :ref="(el) => setTab(el, idx)" :to="i.to"
         :aria-current="activeIndex === idx ? 'page' : undefined"
-        class="relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight transition-colors active:scale-90"
+        class="relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[0.6562rem] font-semibold leading-tight transition-colors active:scale-90"
         :class="activeIndex === idx ? 'text-brand-600 dark:text-brand-300' : 'text-muted'">
         <span v-if="i.primary" class="grid size-12 place-items-center rounded-[1.1rem] bg-gradient-to-br from-brand-500 to-pink text-white shadow-pop transition-transform"
           :class="activeIndex === idx ? 'scale-105 ring-2 ring-brand-300/60 ring-offset-2 ring-offset-surface' : ''" :aria-label="i.label">
@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
         </template>
       </NuxtLink>
       </template>
-      <button type="button" class="flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[10.5px] font-semibold leading-tight text-muted transition active:scale-90" @click="emit('more')">
+      <button type="button" class="flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[0.6562rem] font-semibold leading-tight text-muted transition active:scale-90" @click="emit('more')">
         <Menu class="size-[22px]" />
         <span class="max-w-full truncate px-0.5">{{ t('nav.more') }}</span>
       </button>

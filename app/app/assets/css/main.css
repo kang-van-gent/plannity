@@ -76,6 +76,10 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
+  /* Text size from Settings (app panel only; set by layouts/app.vue). */
+  html[data-font-size="sm"] { font-size: 87.5%; }
+  html[data-font-size="lg"] { font-size: 112.5%; }
+  html[data-font-size="xl"] { font-size: 125%; }
   body {
     @apply bg-bg text-fg font-sans antialiased;
     text-rendering: optimizeLegibility;
@@ -141,7 +145,7 @@ html.anim-fallback .landing-intro { display: none; }
   /* Phones: 44px tall, 15px label (native tap-target size); every button "presses" in. */
   @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold whitespace-nowrap
     transition-all duration-200 select-none active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-    max-sm:min-h-11 max-sm:text-[15px];
+    max-sm:min-h-11 max-sm:text-[0.9375rem];
 }
 @utility chip {
   @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
@@ -160,7 +164,7 @@ html.anim-fallback .landing-intro { display: none; }
   .btn-danger {
     @apply btn bg-danger text-white hover:brightness-110;
   }
-  .btn-sm { @apply px-3 py-1.5 text-xs rounded-xl max-sm:min-h-9 max-sm:text-[13px]; }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-xl max-sm:min-h-9 max-sm:text-[0.8125rem]; }
   .btn-lg { @apply px-6 py-3.5 text-base; }
   .btn-icon { @apply btn p-2.5 rounded-xl max-sm:min-w-11; }
 
@@ -179,7 +183,7 @@ html.anim-fallback .landing-intro { display: none; }
   textarea.input { @apply min-h-24 leading-relaxed; }
   select.input { @apply appearance-none bg-no-repeat pr-10; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6588' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-position: right 0.9rem center; }
 
-  .label { @apply mb-1.5 block text-sm font-semibold text-fg max-sm:text-[13px] max-sm:text-muted; }
+  .label { @apply mb-1.5 block text-sm font-semibold text-fg max-sm:text-[0.8125rem] max-sm:text-muted; }
   .hint { @apply mt-1 text-xs text-muted; }
   .field-error { @apply mt-1 text-xs font-medium text-danger; }
 
@@ -197,7 +201,7 @@ html.anim-fallback .landing-intro { display: none; }
   .muted { @apply text-muted; }
 
   .kbd {
-    @apply rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-muted;
+    @apply rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted;
   }
 
   /* ---- Mobile-app building blocks ---------------------------------------- */
@@ -233,7 +237,7 @@ html.anim-fallback .landing-intro { display: none; }
   .switch:checked::after { transform: translateX(1rem); }
 
   /* Section heading inside a page (outside cards). */
-  .section-label { @apply mb-2 px-1 text-[13px] font-bold uppercase tracking-wider text-muted; }
+  .section-label { @apply mb-2 px-1 text-[0.8125rem] font-bold uppercase tracking-wider text-muted; }
 
   .skeleton {
     @apply animate-pulse rounded-2xl bg-surface-2;

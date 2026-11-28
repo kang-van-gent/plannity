@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
 })
 
 const SIZE = {
-  md: 'h-12 rounded-2xl px-4 text-[15px]',
+  md: 'h-12 rounded-2xl px-4 text-[0.9375rem]',
   pill: 'h-10 rounded-full pl-4 pr-3 text-sm',
   sm: 'h-9 rounded-xl px-3 text-sm',
 } as const

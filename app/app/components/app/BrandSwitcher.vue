@@ -89,8 +89,8 @@ function onDragUp() {
       </template>
       <span v-else class="grid size-[34px] shrink-0 place-items-center rounded-[35%] bg-gradient-to-br from-brand-500 to-pink text-white sm:size-[26px]"><Layers class="size-4 sm:size-3.5" /></span>
       <span class="min-w-0 flex-1">
-        <span class="block text-[11px] font-medium leading-tight text-muted sm:text-[10px] sm:font-semibold sm:uppercase sm:tracking-wider">{{ t('brands.scope') }}</span>
-        <span class="flex min-w-0 items-center gap-1 font-display text-[17px] font-bold leading-tight sm:font-sans sm:text-sm sm:font-semibold">
+        <span class="block text-[0.6875rem] font-medium leading-tight text-muted sm:text-[0.625rem] sm:font-semibold sm:uppercase sm:tracking-wider">{{ t('brands.scope') }}</span>
+        <span class="flex min-w-0 items-center gap-1 font-display text-[1.0625rem] font-bold leading-tight sm:font-sans sm:text-sm sm:font-semibold">
           <span class="truncate">{{ currentBrand?.name ?? t('brands.allBrands') }}</span>
           <Lock v-if="currentBrand?.locked" class="size-3.5 shrink-0 text-danger" :aria-label="t('brands.locked')" />
           <ChevronDown class="size-4 shrink-0 text-muted transition sm:hidden" :class="sheet ? 'rotate-180' : ''" />
@@ -111,7 +111,7 @@ function onDragUp() {
         class="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold hover:bg-surface-2" @click="choose(b.id)">
         <UiBrandDot :name="b.name" :color="b.color" :size="28" />
         <span class="min-w-0 flex-1 truncate" :class="b.locked && 'text-muted'">{{ b.name }}</span>
-        <span v-if="b.locked" class="chip shrink-0 bg-danger/12 py-0.5 text-[11px] text-danger"><Lock class="size-3" />{{ t('brands.locked') }}</span>
+        <span v-if="b.locked" class="chip shrink-0 bg-danger/12 py-0.5 text-[0.6875rem] text-danger"><Lock class="size-3" />{{ t('brands.locked') }}</span>
         <Check v-if="scope === b.id" class="size-4 text-brand-500" />
       </button>
       <p v-if="!active.length" class="px-3 py-2 text-sm text-muted">{{ t('brands.none') }}</p>

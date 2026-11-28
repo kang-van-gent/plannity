@@ -21,7 +21,7 @@ watch(() => props.value, (v) => {
         <component :is="icon" class="size-[18px]" />
       </span>
     </div>
-    <p class="relative mt-1.5 font-display text-[26px] font-bold leading-none sm:mt-2 sm:text-3xl tabular-nums">{{ formatNumber(shown, locale) }}</p>
-    <p v-if="hint" class="relative mt-1 text-[11px] leading-snug text-muted sm:text-xs">{{ hint }}</p>
+    <p class="relative mt-1.5 font-display text-[1.625rem] font-bold leading-none sm:mt-2 sm:text-3xl tabular-nums">{{ formatNumber(shown, locale) }}</p>
+    <p v-if="hint" class="relative mt-1 text-[0.6875rem] leading-snug text-muted sm:text-xs">{{ hint }}</p>
   </div>
 </template>

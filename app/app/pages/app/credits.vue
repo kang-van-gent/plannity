@@ -139,7 +139,7 @@ async function resume(o: PaymentOrder) {
                   <span v-if="l.deltaAvailable" :class="l.deltaAvailable > 0 ? 'text-success' : ''">{{ l.deltaAvailable > 0 ? '+' : '' }}{{ l.deltaAvailable }}</span>
                   <span v-else class="text-sm font-semibold text-muted">{{ t('credits.reservedDelta', { n: (l.deltaReserved > 0 ? '+' : '') + l.deltaReserved }) }}</span>
                 </p>
-                <p class="text-[11px] text-muted tabular-nums">{{ t('credits.cols.balance') }} {{ l.availableAfter }}</p>
+                <p class="text-[0.6875rem] text-muted tabular-nums">{{ t('credits.cols.balance') }} {{ l.availableAfter }}</p>
               </div>
             </li>
           </ul>

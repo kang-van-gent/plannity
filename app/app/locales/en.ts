@@ -659,7 +659,7 @@ const en: Messages = {
   settings: {
     subtitle: 'Manage your profile, appearance and data', profile: 'Profile', timezone: 'Time zone', emailStatus: 'Email status',
     verified: 'Verified', unverified: 'Not verified', profileSaved: 'Profile saved', appearance: 'Appearance & language', theme: 'Theme',
-    themes: { light: 'Light', dark: 'Dark', system: 'System' }, languageHint: 'Applies to menus and system text. Generated content follows each brand’s language setting.',
+    fontSize: 'Text size', fontSizes: { sm: 'Small', md: 'Default', lg: 'Large', xl: 'Extra large' }, fontSizeHint: 'Changes text size across the app on this device.', themes: { light: 'Light', dark: 'Dark', system: 'System' }, languageHint: 'Applies to menus and system text. Generated content follows each brand’s language setting.',
     demo: 'Demo mode controls', demoHint: 'Exercise loading, error and retry states — mock data mode only',
     latency: 'Latency', failRate: 'API failure chance', itemFailRate: 'Item failure chance',
     previewTitle: 'Preview notifications', reset: 'Reset demo data', resetConfirm: 'Reset demo data?',

@@ -13,7 +13,7 @@ const tabs = computed(() => [
 </script>
 
 <template>
-  <nav class="segmented mb-6 w-full sm:w-auto" :aria-label="t('nav.brands')">
+  <nav v-anim="3" class="segmented mb-6 w-full sm:w-auto" :aria-label="t('nav.brands')">
     <NuxtLink v-for="tab in tabs" :key="tab.key" :to="tab.to" :aria-current="active === tab.key ? 'page' : undefined"
       class="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 sm:px-4 text-sm font-semibold transition active:scale-[0.97]"
       :class="active === tab.key ? 'bg-surface text-fg shadow-soft' : 'text-muted hover:text-fg'">

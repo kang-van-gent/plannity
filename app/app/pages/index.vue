@@ -122,7 +122,7 @@ onMounted(() => {
     })
 
     // Final CTA: words fill in as you scroll.
-    gsap.fromTo(q('[data-word]'), { opacity: 0.12, y: 20 }, { opacity: 1, y: 0, stagger: 0.25, ease: 'none', scrollTrigger: { trigger: q('[data-final]')[0], start: 'top 80%', end: 'top 30%', scrub: true } })
+    gsap.fromTo(q('[data-word]'), { opacity: 0.12, y: 20 }, { opacity: 1, y: 0, stagger: 0.25, ease: 'none', scrollTrigger: { trigger: q('[data-final]')[0], start: 'clamp(top 80%)', end: 'clamp(top 30%)', scrub: true } })
   })
   requestAnimationFrame(() => ScrollTrigger.refresh())
 })
@@ -167,7 +167,7 @@ onBeforeUnmount(() => {
         <div data-preview class="relative rounded-[2rem] border border-line bg-surface p-3 shadow-[0_40px_120px_-40px_rgba(108,76,245,0.55)] sm:p-4 [transform-style:preserve-3d]">
           <div class="flex items-center gap-2 px-2 pb-3">
             <span class="size-3 rounded-full bg-pink" /><span class="size-3 rounded-full bg-sun" /><span class="size-3 rounded-full bg-lime" />
-            <span class="ml-3 rounded-full bg-sun/20 px-3 py-1 text-[11px] font-bold text-amber-700 dark:text-sun">{{ t('landing.preview.sample') }}</span>
+            <span class="ml-3 rounded-full bg-sun/20 px-3 py-1 text-[0.6875rem] font-bold text-amber-700 dark:text-sun">{{ t('landing.preview.sample') }}</span>
           </div>
           <div class="grid gap-4 lg:grid-cols-[1fr_320px]">
             <div class="rounded-3xl bg-surface-2 p-4">
@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
                 <p class="font-display text-lg font-bold">{{ t('landing.preview.month') }}</p>
                 <div class="flex gap-1.5"><span class="chip bg-brand-500/10 text-brand-600 dark:text-brand-300">{{ t('calendar.month') }}</span><span class="chip bg-surface text-muted">{{ t('calendar.list') }}</span></div>
               </div>
-              <div class="grid grid-cols-7 gap-1.5 text-[10px] sm:text-xs">
+              <div class="grid grid-cols-7 gap-1.5 text-[0.625rem] sm:text-xs">
                 <div v-for="d in previewDays" :key="d" class="aspect-[1/0.9] rounded-xl bg-surface p-1.5" :class="d < 1 || d > 31 ? 'opacity-40' : ''">
                   <span class="font-semibold text-muted">{{ d < 1 ? 30 + d : d > 31 ? d - 31 : d }}</span>
                   <div class="mt-1 space-y-1">
@@ -188,15 +188,15 @@ onBeforeUnmount(() => {
               <div class="flex items-center gap-2"><UiPlatformBadge platform="instagram" /><span class="chip bg-pink/15 text-pink">Education</span><span data-field="workflow" class="ml-auto rounded-xl p-1"><UiStatusBadge status="approved" small /></span></div>
               <p class="mt-3 font-display text-lg font-bold leading-snug">{{ t('landing.preview.title') }}</p>
               <dl class="mt-3 space-y-2 text-sm">
-                <div data-field="hook" class="rounded-xl p-2 transition"><dt class="text-[11px] font-bold uppercase tracking-wider text-muted">Hook</dt><dd>{{ t('landing.preview.hook') }}</dd></div>
-                <div data-field="caption" class="rounded-xl p-2 transition"><dt class="text-[11px] font-bold uppercase tracking-wider text-muted">Caption</dt><dd class="line-clamp-2">{{ t('landing.preview.caption') }}</dd></div>
-                <div data-field="cta" class="rounded-xl p-2 transition"><dt class="text-[11px] font-bold uppercase tracking-wider text-muted">CTA</dt><dd>{{ t('landing.preview.cta') }}</dd></div>
+                <div data-field="hook" class="rounded-xl p-2 transition"><dt class="text-[0.6875rem] font-bold uppercase tracking-wider text-muted">Hook</dt><dd>{{ t('landing.preview.hook') }}</dd></div>
+                <div data-field="caption" class="rounded-xl p-2 transition"><dt class="text-[0.6875rem] font-bold uppercase tracking-wider text-muted">Caption</dt><dd class="line-clamp-2">{{ t('landing.preview.caption') }}</dd></div>
+                <div data-field="cta" class="rounded-xl p-2 transition"><dt class="text-[0.6875rem] font-bold uppercase tracking-wider text-muted">CTA</dt><dd>{{ t('landing.preview.cta') }}</dd></div>
               </dl>
               <div data-field="images" class="mt-1 flex gap-1.5 rounded-xl p-2">
                 <span v-for="c in ['#FFB23F', '#FF6FAE', '#62C5F4']" :key="c" class="size-10 rounded-lg" :style="{ background: `linear-gradient(135deg, ${c}, ${c}66)` }" />
               </div>
               <p data-field="activity" class="mt-1 flex items-center gap-2 rounded-xl p-2 text-xs text-muted">
-                <span class="grid size-6 place-items-center rounded-full bg-gradient-to-br from-pink to-sun text-[10px] font-bold text-white">P</span>{{ t('landing.preview.approvedBy') }}
+                <span class="grid size-6 place-items-center rounded-full bg-gradient-to-br from-pink to-sun text-[0.625rem] font-bold text-white">P</span>{{ t('landing.preview.approvedBy') }}
               </p>
             </div>
           </div>

@@ -2,6 +2,7 @@
 import { Database, Monitor, Moon, Palette, RotateCcw, ShieldAlert, Sun, User as UserIcon } from '@lucide/vue'
 import type { NoticeType } from '~/composables/useNotify'
 import type { ThemePref } from '~/composables/useTheme'
+import type { FontSizePref } from '~/composables/useFontSize'
 import { mockAdmin, type MockConfig } from '~/services/api/mock'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
@@ -29,6 +30,9 @@ async function saveProfile() {
 
 const themes: { v: ThemePref; icon: typeof Sun }[] = [{ v: 'light', icon: Sun }, { v: 'dark', icon: Moon }, { v: 'system', icon: Monitor }]
 function pickTheme(v: ThemePref, e: MouseEvent) { theme.set(v, { x: e.clientX, y: e.clientY }) }
+
+const fontSize = useFontSize()
+const fontSizes: { v: FontSizePref; px: number }[] = [{ v: 'sm', px: 13 }, { v: 'md', px: 15 }, { v: 'lg', px: 18 }, { v: 'xl', px: 21 }]
 
 // Mock backend controls — visible only in demo mode.
 const cfg = reactive<MockConfig>(isMock ? mockAdmin.getConfig() : { latency: 0, failRate: 0, itemFailRate: 0 })
@@ -81,6 +85,16 @@ async function requestDeletion() {
             <component :is="th.icon" class="size-5" /><span class="font-semibold">{{ t(`settings.themes.${th.v}`) }}</span>
           </button>
         </div>
+      </div>
+      <div>
+        <span class="label">{{ t('settings.fontSize') }}</span>
+        <div class="grid grid-cols-4 gap-2 sm:gap-3" role="group" :aria-label="t('settings.fontSize')">
+          <button v-for="f in fontSizes" :key="f.v" type="button" class="flex flex-col items-center justify-end gap-1 rounded-2xl border-2 p-3 text-center transition active:scale-[0.97] sm:p-4" :class="fontSize.pref.value === f.v ? 'border-brand-500 bg-brand-500/5' : 'border-line hover:border-brand-300'" :aria-pressed="fontSize.pref.value === f.v" @click="fontSize.set(f.v)">
+            <span class="font-display font-bold leading-none" :style="{ fontSize: `${f.px}px` }" aria-hidden="true">Aa</span>
+            <span class="text-xs font-semibold text-muted">{{ t(`settings.fontSizes.${f.v}`) }}</span>
+          </button>
+        </div>
+        <p class="hint">{{ t('settings.fontSizeHint') }}</p>
       </div>
       <div>
         <span class="label">{{ t('common.language') }}</span>

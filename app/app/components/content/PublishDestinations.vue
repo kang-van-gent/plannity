@@ -253,7 +253,7 @@ const previewFor = ref<PublishDestination | null>(null)
                 :class="draft.imageIds.includes(img.id) ? 'border-brand-500' : 'border-transparent opacity-50'" :aria-pressed="draft.imageIds.includes(img.id)"
                 :aria-label="t('publishing.imageN', { n: i + 1 })" @click="toggleImage(img.id)">
                 <img :src="img.thumbnailUrl" alt="" class="size-full object-cover">
-                <span v-if="draft.imageIds.includes(img.id)" class="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-brand-500 text-[9px] font-bold text-white">{{ draft.imageIds.indexOf(img.id) + 1 }}</span>
+                <span v-if="draft.imageIds.includes(img.id)" class="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-brand-500 text-[0.5625rem] font-bold text-white">{{ draft.imageIds.indexOf(img.id) + 1 }}</span>
               </button>
             </div>
           </fieldset>
